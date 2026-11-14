@@ -2010,20 +2010,62 @@ RESTRICTIONS: dict[str, re.Pattern] = {
                       r"\d{2}\s*ans\b", re.IGNORECASE),
     "religion": re.compile(r"\bmust be (?:a )?(?:practising|committed|born-again|devout)\s+(?:christian|muslim|"
                            r"catholic)\b|\b(?:christian|muslim|catholic) (?:faith|believer) (?:is )?(?:required|"
-                           r"essential)\b|\bpersonal (?:christian )?faith (?:is )?required\b|\bactive church member\b",
-                           re.IGNORECASE),
+                           r"essential)\b|\bpersonal (?:christian )?faith (?:is )?required\b|\bactive church member\b|"
+                           r"\b(?:mature|personal|active|growing|committed|living)(?: and (?:mature|personal))? "
+                           r"(?:christian|muslim|catholic) faith\b|\b(?:christian|catholic|muslim) faith is (?:a )?"
+                           r"(?:prerequisite|requirement|condition)\b|\b(?:affirm|acknowledge|sign|adhere to)\b[^.\n]{0,40}"
+                           r"\b(?:statement of faith|faith statement|core beliefs)\b|\bspiritually (?:rooted|grounded)\b|"
+                           r"\benracin[ée]e? spirituellement\b", re.IGNORECASE),
     "marital_family": re.compile(r"\b" + APPLICANT + r"\b[^.\n]{0,30}?\b(?:must|should) be (?:single|unmarried|married)\b|"
                                  r"\b(?:single|unmarried|married) (?:candidates|applicants)\b|\b(?:single|unmarried|"
                                  r"married) (?:candidate|applicant)s? only\b|\bc[ée]libataires? uniquement\b",
                                  re.IGNORECASE),
-    "nationality": re.compile(r"\b(?:nationals?|citizens?) (?:of [a-z]+(?: [a-z]+)? )?only\b|\bonly (?:open to )?(?:[a-z]+ )?"
-                              r"(?:nationals|citizens)\b|\b" + APPLICANT + r" must be (?:an? )?(?:[a-z]+ )?(?:national|"
-                              r"citizen)s?\b|\bopen (?:only )?to (?:[a-z]+ )?nationals(?: only)?\b|\blocal candidates "
-                              r"only\b|\bressortissants? [^.\n]{0,30}uniquement\b|\bnationalit[ée] [^.\n]{0,20}"
-                              r"(?:exig[ée]e|obligatoire)\b|\bnon-?nationals? only\b", re.IGNORECASE),
-    # UN-style national posts are a case of their own (section 20.2), recorded apart from nationality.
+    # Nationality, citizenship and ethnicity; where applicants live is `residence` (the user, 14 November 2026).
+    "nationality": re.compile(r"(?i:\b(?:nationals?|citizens?) (?:of [a-z]+(?: [a-z]+)? )?only\b|\bonly (?:open to )?"
+                              r"(?:[a-z]+ )?(?:nationals|citizens)\b|\b" + APPLICANT + r" must be (?:an? )?(?:[a-z]+ )?"
+                              r"(?:national|citizen)s?\b|\bopen (?:only )?to (?:[a-z]+ )?nationals(?: only)?\b|"
+                              r"\bressortissants? [^.\n]{0,30}uniquement\b|\bnationalit[ée] [^.\n]{0,20}(?:exig[ée]e|"
+                              r"obligatoire)\b|\bnon-?nationals? only\b|\binternational candidates only\b|"
+                              r"\bcitizenship (?:of [a-z][\w ]{0,30} )?(?:is )?(?:required|mandatory)\b|\bmust (?:hold|have|"
+                              r"possess) (?:[a-z.]+ )?citizenship\b|\b(?:citizens?|nationals?) of (?:one of )?(?:the |a |an )?"
+                              r"(?:[\w']+ )?member (?:states?|countr(?:y|ies))\b|\bnot open to (?:[a-z]+ )?nationals\b|"
+                              r"\b(?:nationals|ressortissants) (?:of|des) (?:the )?(?:countr(?:y|ies)|pays)\b[^.\n]{0,80}"
+                              r"\b(?:(?:will|shall) not (?:normally )?be (?:recruited|eligible|considered)|ne (?:seront|"
+                              r"sont) (?:normalement )?pas (?:recrut|[ée]ligibl))|\b(?:preference|priority)\b[^.\n]{0,40}"
+                              r"\b(?:to|for) (?:the )?(?:[a-z]+ )?(?:nationals?|citizens?|pacific islanders?)\b|"
+                              r"\bnationals of\b[^.\n]{0,120}\bare preferred\b|\bpr[ée]f[ée]rence (?:est|sera) (?:donn[ée]e|"
+                              r"accord[ée]e) (?:à|aux) (?:un[·.]?e? )?(?:oc[ée]anien|ressortissant))|"
+                              r"\((?:[A-Z][a-z]+ )+nationals?\b"),
+    # Where applicants live or are based: a country, region, city or time zone, or commuting distance;
+    # also a limit that nationality or residence can each meet. Recorded, not flagged (employer-side
+    # plan, section 20.2).
+    "residence": re.compile(r"\b(?:live|living|reside|residing|based|located)\b[^.\n]{0,20}\bwithin (?:a |an )?"
+                            r"(?:easy |reasonable )?(?:commutable|commuting) distance\b|\b" + APPLICANT +
+                            r"\b[^.\n]{0,60}?\b(?:must|should|will need to|need to|are required to)\b[^.\n]{0,40}?"
+                            r"\b(?:(?:be )?(?:currently |already )?(?:based|located|resident|residing|living) (?:in|within|on|"
+                            r"anywhere)|live (?:in|within|near)|reside in|have an? [\w.]+-based (?:permanent |home )?"
+                            r"address)\b|\bopen (?:only )?to (?:candidates|applicants|people|individuals|those)(?: who are)? "
+                            r"(?:currently )?(?:based|resident|residing|living|located) in\b|(?m:^\s*(?:[-•*]\s*)?(?:be )?"
+                            r"(?:a )?(?:legal |permanent )?resident (?:in|of) (?:the )?(?-i:[A-Z])[\w .'-]{1,40}[.;]?\s*$)|"
+                            r"(?m:^\s*(?:[-•*]\s*)?(?:must|should) be (?:based|located|resident|living) (?:in|on|within)\b)|"
+                            r"\b(?:remote|home[- ]based)\b[^.\n]{0,50}?\b(?:can|may|must) be (?:based|located|performed) "
+                            r"(?:anywhere )?(?:in|within) (?:the )?(?-i:[A-Z])|\b(?:preference|priority)\b[^.\n]{0,40}\b(?:to|for) "
+                            r"(?:locals?|local (?:candidates|applicants|people|residents)|(?:people|candidates|applicants) "
+                            r"(?:from|of|living in|based in) (?:the )?(?:same|local|surrounding) (?:area|community|region|"
+                            r"district))\b|\blocal (?:candidates|applicants) only\b|\bonly local (?:candidates|applicants)\b|"
+                            r"\bcandidat(?:e)?s locaux (?:uniquement|seulement)\b|\bpriorit[ée] (?:sera )?(?:donn[ée]e|"
+                            r"accord[ée]e) aux candidat(?:e)?s locaux\b|\bdont la r[ée]sidence (?:officielle |habituelle )?"
+                            r"se trouve\b|\b(?:nationals?|citizens?|citizenship|nationalit[ée] [\w-]+)\b,? (?:or|and/or|ou) "
+                            r"(?:\w+ ){0,2}(?:permanent )?(?:residents?|residence(?: permit| status)?|r[ée]sidents?)\b|"
+                            r"\bindividuals with residence status\b|\b" + APPLICANT + r"\b[^.\n]{0,50}\b(?:based|located|"
+                            r"living)\b[^.\n]{0,30}\btime ?zones?\b", re.IGNORECASE),
+    # UN-style national posts and locally engaged posts are a case of their own (section 20.2),
+    # recorded apart from nationality.
     "national_post": re.compile(r"(?i:\bnational (?:position|post|officer|professional officer|staff (?:position|post))\b|"
-                                r"\bposte national\b)|\bNO-?[A-E]\b"),
+                                r"\bposte national\b|\bconsultants? nationa(?:l|ux)\b|\bnational consultan(?:t|ts|cy|cies)\b|"
+                                r"\blocally[- ]engaged\b|\blocal(?:ly)? hire[ds]?\b|\bhired locally\b|\blocal recruitment\b|"
+                                r"\brecrutement local\b|\b(?:on|under) a local (?:employment )?contract\b|\blocal contract\b)|"
+                                r"\bNO-?[A-E]\b"),
     "disability": re.compile(r"\bable[- ]bodied\b", re.IGNORECASE),
     "photo_appearance": re.compile(r"(?<!not )(?<!n't )(?<!never )\b(?:attach|include|send|submit|enclose) (?:a |your )?"
                                    r"(?:recent )?(?:passport[- ]size )?(?:photo|photograph|picture)\b|\b" + APPLICANT +
@@ -2031,37 +2073,99 @@ RESTRICTIONS: dict[str, re.Pattern] = {
                                    r"applicants?)\b|\bgood appearance\b|\b(?:minimum height|height requirement)\b|\b" +
                                    APPLICANT + r"\b[^.\n]{0,30}\b(?:must|should) (?:be|have)\b[^.\n]{0,20}(?<!at )"
                                    r"\bheight\b(?!s)|"
-                                   r"\bphoto (?:d'identit[ée]|r[ée]cente)\b", re.IGNORECASE),
+                                   r"\bphoto (?:d'identit[ée]|r[ée]cente)\b|\b(?:send|submit|attach|enclose|email)\b[^.\n]{0,60}?"
+                                   r"\b(?:passport[- ]?size[d]?|recent|colou?r)\s+(?:photo|photograph|picture)s?\b",
+                                   re.IGNORECASE),
 }
+# Age limits beyond the applicant-subject forms: a French list item under an eligibility heading, and a
+# minimum age.
+RESTRICTIONS["age"] = re.compile(RESTRICTIONS["age"].pattern + r"|(?m:^\s*(?:[-•*]\s*)?de moins de \d{2} ans\b)|"
+                                 r"\bage of (?:the )?(?:applicants?|candidates?)\b[^.\n]{0,20}\b\d{2}\b|\b" + APPLICANT +
+                                 r"\b[^.\n]{0,30}\b(?:must|should) be (?:at least )?\d{2}(?: years)?(?: of age| old)? "
+                                 r"(?:and|or) (?:above|over|older)\b", re.IGNORECASE)
+# A national post named in the title alone: "(X national; 6 months)". In the text, the same words may
+# describe the person sought rather than the post (role-survey.md 19.18).
+TITLE_NATIONAL_POST = re.compile(r"\((?:[A-Z][a-z]+ )+national\b")
 # A match about the people an organisation serves, not the applicant, is not a restriction.
 SERVED = re.compile(r"\b(?:children|child|youth|young people|girls?|boys?|women|men|adolescents?|beneficiar\w*|pupils?|"
                     r"students?|infants?|participants?|survivors?|patients?|learners?|enfants|jeunes|filles|femmes)\b",
                     re.IGNORECASE)
 NOT_NATIONALITY = re.compile(r"\ball nationals\b|\bnationals? and non-?nationals?\b|\bnon-?nationals? and nationals?\b|"
                              r"\bregardless of (?:their )?nationality\b", re.IGNORECASE)
+# A limit that nationality or residence can each meet is a residence limit, never a nationality one.
+NATIONAL_OR_RESIDENT = re.compile(r"\b(?:nationals?|citizens?|citizenship|nationalit[ée] [\w-]+)\b,? (?:or|and/or|ou) "
+                                  r"(?:\w+ ){0,2}(?:permanent )?(?:residents?|residence|r[ée]sidents?)\b|"
+                                  r"\bindividuals with residence status\b", re.IGNORECASE)
+# Nationals encouraged to apply, among others, are not limited to: an encouragement is not a restriction,
+# unless it addresses only the candidates who are nationals of a list ("all candidates who are nationals
+# of the member countries").
+ENCOURAGED = re.compile(r"\bencourag", re.IGNORECASE)
+MEMBERS_ONLY = re.compile(r"\bcandidates who are (?:citizens|nationals) of\b", re.IGNORECASE)
+# A willingness to move to the duty station is not a limit on where applicants live.
+NOT_RESIDENCE = re.compile(r"\bwilling\b|\bprepared to\b|\bready to\b|\brelocat|\bable to (?:travel|move)\b|"
+                           r"\bregardless\b|\birrespective\b|\bwithout regard\b", re.IGNORECASE)
+# A national category named in a note about positions in general does not designate this post.
+GENERAL_NOTE = re.compile(r"\bpositions? (?:in|at|of|for) the national (?:officer|professional)\b|\bnational officer "
+                          r"(?:and|or) general service\b", re.IGNORECASE)
+NOT_SENT = re.compile(r"\b(?:do not|don't|never|not|please don't) (?:send|submit|attach|include|enclose)\b", re.IGNORECASE)
+PREFERENCE = "~preference"
+PREFERRED = re.compile(r"\bprefer|\bpreference\b|\bpriority\b|\bpriorit[ée]\b|\bpr[ée]f[ée]r", re.IGNORECASE)
 
-def restrictions_of(text: str) -> set[str]:
-    """The explicit restrictions an advert states (employer-side plan, section 20.2), each match checked
-    against its surroundings: an age about the people served, "open to all nationals", or a service
-    "for women only" is not a restriction on who may apply."""
-    found = set()
+
+def _sentence(text: str, m: re.Match) -> str:
+    start = max(text.rfind(c, 0, m.start()) for c in ".!?\n") + 1
+    ends = [i for i in (text.find(c, m.end()) for c in ".!?\n") if i >= 0]
+    return text[start:min(ends) if ends else len(text)]
+
+
+def restriction_labels(text: str, title: str = "") -> dict[str, str]:
+    """The explicit restrictions an advert states (employer-side plan, section 20.2), each "limit" or
+    "preference": a preference when every match of its category is stated only as one. Each match is
+    checked against its surroundings: an age about the people served, "open to all nationals", a service
+    "for women only", nationals encouraged to apply, or a willingness to relocate is not a restriction
+    on who may apply."""
+    found: dict[str, str] = {}
     for kind, pattern in RESTRICTIONS.items():
         for m in pattern.finditer(text):
             before = text[max(0, m.start() - 40):m.start()]
             own = re.sub(r"\([^)]*\)", " ", m.group(0))      # "Applicants (youth) must be aged …" is about applicants
-            heading = re.match(r"\s*age\s*:", m.group(0), re.IGNORECASE)
+            # An "Age:" label, or a French eligibility list item, is about the applicant whatever precedes it.
+            heading = re.match(r"\s*(?:age\s*:|(?:[-•*]\s*)?de moins de \d)", m.group(0), re.IGNORECASE)
             if kind == "age" and not heading and (SERVED.search(own) or (
                     SERVED.search(before) and not re.search(APPLICANT, own, re.IGNORECASE))):
                 continue
-            start = max(text.rfind(c, 0, m.start()) for c in ".!?\n") + 1
-            ends = [i for i in (text.find(c, m.end()) for c in ".!?\n") if i >= 0]
-            sentence = text[start:min(ends) if ends else len(text)]
-            if kind == "nationality" and NOT_NATIONALITY.search(sentence):
+            sentence = _sentence(text, m)
+            if kind == "nationality" and (NOT_NATIONALITY.search(sentence) or NATIONAL_OR_RESIDENT.search(sentence) or (
+                    ENCOURAGED.search(sentence) and not MEMBERS_ONLY.search(sentence))):
                 continue
-            found.add(kind)
-            break
+            if kind == "residence" and (NOT_RESIDENCE.search(sentence) or ENCOURAGED.search(sentence)):
+                continue
+            if kind == "national_post" and GENERAL_NOTE.search(sentence):
+                continue
+            if kind == "photo_appearance" and NOT_SENT.search(sentence):
+                continue
+            strength = "preference" if PREFERRED.search(sentence) else "limit"
+            if found.get(kind) != "limit":
+                found[kind] = strength
+            if strength == "limit":
+                break
+    if "national_post" not in found and TITLE_NATIONAL_POST.search(title or ""):
+        found["national_post"] = "limit"
     return found
-FAIRNESS_CATEGORIES = [k for k in RESTRICTIONS if k != "national_post"]
+
+
+def restrictions_of(text: str, title: str = "") -> set[str]:
+    return set(restriction_labels(text, title))
+
+
+def restrictions_column(text: str, title: str = "") -> str:
+    """broad-adverts.csv's `restrictions`: each category, marked `~preference` when stated only as one."""
+    labels = restriction_labels(text, title)
+    return ";".join(sorted(k + (PREFERENCE if v == "preference" else "") for k, v in labels.items()))
+
+
+# Recorded for the survey; the fairness check flags only these (employer-side plan, section 20.2).
+FAIRNESS_CATEGORIES = [k for k in RESTRICTIONS if k not in ("national_post", "residence")]
 INCLUSION: dict[str, re.Pattern] = {
     "women_encouraged": re.compile(r"\b(?:women|female (?:candidates|applicants))[^.\n]{0,30}(?:strongly )?encouraged\b|"
                                    r"\bencourage[sd]? (?:applications from |)(?:women|female)\b|\bcandidatures? "
@@ -2685,7 +2789,7 @@ def measure(_args=None) -> int:
             "facts_given": ";".join(sorted(given & set(FACTS))), "facts_missing": ";".join(missing),
             "years_min": y_min, "years_alt": y_alt, "degree": degree_asked(req_text),
             "standards": ";".join(sorted(k for k, p in STANDARDS.items() if p.search(text))),
-            "restrictions": ";".join(sorted(restrictions_of(text))),
+            "restrictions": restrictions_column(text, ad.get("title", "")),
             "inclusion": ";".join(sorted(k for k, p in INCLUSION.items() if p.search(text))),
             "median_sentence": f"{med:.1f}", "score_decision_facts": s_df, "score_readability": s_rd,
             "score_length": "" if s_ln is None else s_ln, "score_findability": s_fd,
@@ -2759,7 +2863,7 @@ ALLOWED = {
     "section_type": set(SECTION_IDS), "degree": {"", "phd", "master", "bachelor", "secondary"},
 }
 LISTS = {"facts_given": set(FACTS), "facts_missing": set(FACTS), "standards": set(STANDARDS),
-         "restrictions": set(RESTRICTIONS), "inclusion": set(INCLUSION)}
+         "restrictions": set(RESTRICTIONS) | {k + PREFERENCE for k in RESTRICTIONS}, "inclusion": set(INCLUSION)}
 FORMS = {   # free-text columns: identifiers and codes only, never words from an advert
     "advert_id": re.compile(r"[0-9a-f]{16}"), "org_id": re.compile(r"[\w.:/-]{1,80}"),
     "system": re.compile(r"[A-Za-z][A-Za-z .()]{0,40}"), "grade": re.compile(r"(?:[A-Z]{1,4}-[0-9A-E]{1,2})?"),

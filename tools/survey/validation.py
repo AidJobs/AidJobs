@@ -16,7 +16,10 @@ Run on the user's machine; CI runs only `check` and the tests:
 Each command takes `--round N` (default 1). Round 1 (19.16) drew 100 adverts by seed 20261113 and
 validated the rules as they stood; round 2 (19.17) draws 100 fresh adverts by seed 20261114, never
 an earlier round's or the AI test set's, after the revised rules are frozen, and is coded on the same
-frozen guide (version 1.1) with no pilot.
+frozen guide (version 1.1) with no pilot. Round 3 (19.18) codes restrictions only, on guide 1.2,
+with residence apart from nationality: a targeted draw by seed 20261115 of the script's positives by
+category, a keyword net's adverts and others, ids from V201 in groups of 5; precision is judged on
+the script's positives, recall is an Estimate.
 
 Two coders, read-only agents of different model families, code each advert's cleaned text (the text
 `adverts.py measure` read, site furniture removed) with the guide, never seeing the script's answers
@@ -43,12 +46,24 @@ import adverts
 import roles
 
 HERE = Path(__file__).resolve().parent
+GUIDE_11 = "6e31517863d07cac8b21875401d973ddb17a06f8dab4045ffa61425d786ad3de"   # guide 1.1, as reconciled
+GUIDE_12 = ""                      # guide 1.2 (Part 7 revised, 19.18), set once it is frozen
+# Guide 1.1's restriction categories, in the order of rounds 1 and 2's committed files; it counted
+# residence as nationality, so a 1.1 round reads the script's `residence` as `nationality`.
+RESTRICTIONS_11 = ["sex", "age", "religion", "marital_family", "nationality", "national_post", "disability",
+                   "photo_appearance"]
+MERGED_11 = {"residence": "nationality"}
 ROUNDS = {1: {"seed": 20261113, "folder": "validation", "first_id": 1, "pilot": True, "batches": 4,
-              "output": "broad-validation.csv"},
+              "output": "broad-validation.csv", "guide": None, "restrictions": RESTRICTIONS_11, "scope": "all",
+              "draw": "stratified"},
           2: {"seed": 20261114, "folder": "validation-2", "first_id": 101, "pilot": False, "batches": 5,
-              "output": "broad-validation-2.csv"}}
+              "output": "broad-validation-2.csv", "guide": GUIDE_11, "restrictions": RESTRICTIONS_11, "scope": "all",
+              "draw": "stratified"},
+          # Round 3 (19.18): restrictions only, on guide 1.2, a targeted draw for precision.
+          3: {"seed": 20261115, "folder": "validation-3", "first_id": 201, "pilot": False, "group": 5,
+              "output": "broad-validation-3.csv", "guide": GUIDE_12, "restrictions": list(adverts.RESTRICTIONS),
+              "scope": "restrictions", "draw": "targeted"}}
 ROUND1_COMMIT = "d62f97e"          # the commit whose broad-adverts.csv round 1 was drawn from
-FROZEN_GUIDE = "6e31517863d07cac8b21875401d973ddb17a06f8dab4045ffa61425d786ad3de"   # guide 1.1, as reconciled
 RULE_FILES = ("adverts.py", "advert_set.py", "roles.py")
 STRATA = ("advert_id", "held_out", "org_id", "source", "system", "language")
 CHUNK = 1500                       # characters per piece of a long line in a packet
@@ -66,12 +81,15 @@ PILOT, BATCHES = 10, 4
 
 
 def use_round(n: int) -> None:
-    """Point the commands at round `n`: its seed, folder and committed file."""
+    """Point the commands at round `n`: its seed, folder, committed file, categories and answer form."""
     global ROUND, VALID, PACKETS, ANSWERS, OUTPUT, SEED
     cfg = ROUNDS[n]
     ROUND, SEED = n, cfg["seed"]
     VALID = adverts.WORK / cfg["folder"]
     PACKETS, ANSWERS, OUTPUT = VALID / "packets", VALID / "answers", roles.ROLES / cfg["output"]
+    set_measures(n)
+
+
 MIN_POSITIVES = 15
 TARGET_PRECISION, TARGET_RECALL, TARGET_YEARS = 0.9, 0.85, 0.9
 
@@ -85,25 +103,43 @@ FUNCTIONS = roles.FUNCTION_IDS + ["none"]
 SECTORS = roles.SECTOR_IDS
 LEVELS = roles.LEVEL_IDS + ["unknown"]
 LANGUAGES = sorted(adverts.STOPWORDS) + ["other"]
-RESTRICTION_IDS = list(adverts.RESTRICTIONS)
-ANSWER_KEYS = {"id", "headings", "given", "vague", "years_min", "years_alt", "degree", "function", "sector",
-               "level", "language", "restrictions", "note"}
-
-ITEM_KEYS = ([f"section:{t}" for t in SECTION_TYPES] + [f"fact:{f}" for f in FACT_IDS] +
-             ["years_min", "years_alt", "degree", "function", "sector", "level", "language"] +
-             [f"restriction:{c}" for c in RESTRICTION_IDS])
-MEASURES = ([f"section:{t}" for t in SECTION_TYPES] + [f"fact:{f}" for f in FACT_IDS] +
-            ["years_min", "years_alt", "degree:named"] + [f"degree:{d}" for d in DEGREES[:-1]] +
-            ["family", "function", "level"] + [f"level:{lv}" for lv in roles.LEVEL_IDS] +
-            ["language", "language:en", "language:fr", "restriction:any"] +
-            [f"restriction:{c}" for c in RESTRICTION_IDS])
-# Measures judged on precision alone (19.3: family, language, restrictions; level by the same rule),
-# so their 15 cases are the script's own positives.
-PRECISION_ONLY = {m for m in MEASURES if m.split(":")[0] in ("family", "function", "level", "language",
-                                                              "restriction")}
-FIELDS = ["measure", "positive_cases", "script_positives", "precision", "recall", "within_one_year",
-          "coder_agreement", "kappa", "result"]
+ANSWER_KEYS_ALL = {"id", "headings", "given", "vague", "years_min", "years_alt", "degree", "function", "sector",
+                   "level", "language", "restrictions", "note"}
+ANSWER_KEYS_RESTRICTIONS = {"id", "restrictions", "preferred", "note"}
+FIELDS_ALL = ["measure", "positive_cases", "script_positives", "precision", "recall", "within_one_year",
+              "coder_agreement", "kappa", "result"]
+# A targeted round: precision on the script's sampled positives; recall only as a weighted Estimate.
+FIELDS_TARGETED = ["measure", "script_positives_in_pool", "sampled_script_positives", "true_positives", "precision",
+                   "positive_cases", "recall_estimate", "coder_agreement", "kappa", "result"]
 RESULTS = {"validated", "Estimate", "not validated"}
+RESTRICTION_IDS, SCOPE, ANSWER_KEYS, ITEM_KEYS, MEASURES, PRECISION_ONLY, FIELDS = [], "all", set(), [], [], set(), []
+
+
+def set_measures(n: int) -> None:
+    """Round `n`'s restriction categories, answer form, items, measures and committed columns."""
+    global RESTRICTION_IDS, SCOPE, ANSWER_KEYS, ITEM_KEYS, MEASURES, PRECISION_ONLY, FIELDS
+    cfg = ROUNDS[n]
+    RESTRICTION_IDS, SCOPE = list(cfg["restrictions"]), cfg["scope"]
+    restriction_items = [f"restriction:{c}" for c in RESTRICTION_IDS]
+    if SCOPE == "restrictions":
+        ANSWER_KEYS, FIELDS = ANSWER_KEYS_RESTRICTIONS, FIELDS_TARGETED
+        ITEM_KEYS = restriction_items + [f"preferred:{c}" for c in RESTRICTION_IDS]
+        MEASURES = ["restriction:any"] + restriction_items + ["restriction:preferred"]
+    else:
+        ANSWER_KEYS, FIELDS = ANSWER_KEYS_ALL, FIELDS_ALL
+        ITEM_KEYS = ([f"section:{t}" for t in SECTION_TYPES] + [f"fact:{f}" for f in FACT_IDS] +
+                     ["years_min", "years_alt", "degree", "function", "sector", "level", "language"] + restriction_items)
+        MEASURES = ([f"section:{t}" for t in SECTION_TYPES] + [f"fact:{f}" for f in FACT_IDS] +
+                    ["years_min", "years_alt", "degree:named"] + [f"degree:{d}" for d in DEGREES[:-1]] +
+                    ["family", "function", "level"] + [f"level:{lv}" for lv in roles.LEVEL_IDS] +
+                    ["language", "language:en", "language:fr", "restriction:any"] + restriction_items)
+    # Measures judged on precision alone (19.3: family, language, restrictions; level by the same rule),
+    # so their 15 cases are the script's own positives.
+    PRECISION_ONLY = {m for m in MEASURES if m.split(":")[0] in ("family", "function", "level", "language",
+                                                                  "restriction")}
+
+
+set_measures(1)
 
 
 def utc_now() -> str:
@@ -315,7 +351,9 @@ def saved_draw_problems(saved: dict, rows: list[dict], exclude: set[str], earlie
     codes = saved.get("codes", {})
     missing = [c["advert_id"] for c in codes.values() if c["advert_id"] not in by_id]
     chosen = [by_id[c["advert_id"]] for c in codes.values() if c["advert_id"] in by_id]
-    problems = draw_problems(chosen, rows, exclude, earlier)
+    targeted = ROUNDS[ROUND]["draw"] == "targeted"
+    problems = targeted_problems(chosen, rows, exclude, earlier) if targeted else draw_problems(chosen, rows, exclude,
+                                                                                                earlier)
     if missing:
         problems.append(f"{len(missing)} drawn adverts are not in broad-adverts.csv")
     if saved.get("seed") != SEED:
@@ -329,11 +367,17 @@ def saved_draw_problems(saved: dict, rows: list[dict], exclude: set[str], earlie
         old = round1_strata()           # round 1 recorded the whole file: compare its strata through git
         if not old or old[1] != saved.get("drawn_from") or old[0] != strata_hash(rows):
             problems.append("broad-adverts.csv has changed since the draw was made")
-    if "rules" in saved and saved["rules"] != rules_hashes():
+    # The rules hold from a round's draw to its scoring: the latest round's. An earlier round, scored and
+    # committed, is rechecked on today's rules (recheck), so its draw stays usable after a revision.
+    latest = ROUND == max(ROUNDS)
+    if latest and "rules" in saved and saved["rules"] != rules_hashes():
         problems.append("the rules (" + ", ".join(RULE_FILES) + ") have changed since the draw was made")
+    if latest and targeted and saved.get("net") != net_hash():
+        problems.append("the keyword net has changed since the draw was made")
     first = ROUNDS[ROUND]["first_id"]
-    if sorted(codes) != [f"V{i:03d}" for i in range(first, first + SAMPLE)]:
-        problems.append(f"the neutral ids are not V{first:03d} to V{first + SAMPLE - 1:03d}")
+    size = len(codes) if targeted else SAMPLE
+    if not size or sorted(codes) != [f"V{i:03d}" for i in range(first, first + size)]:
+        problems.append(f"the neutral ids are not V{first:03d} to V{first + size - 1:03d}")
     return problems
 
 
@@ -348,6 +392,10 @@ def draw(_args=None) -> int:
         for p in problems:
             print(p)
         return 1 if problems else 0
+    if ROUNDS[ROUND]["draw"] == "targeted":
+        m = adverts.measured_adverts()
+        texts = {a["id"]: (a.get("title", ""), [ln["text"] for ln in a["lines"]]) for a in m["adverts"]}
+        return draw_targeted(rows, texts, exclude, earlier)
     chosen = draw_sample(rows, exclude, seed=SEED, earlier=earlier)
     problems = draw_problems(chosen, rows, exclude, earlier)
     if problems:
@@ -374,6 +422,186 @@ def load_draw() -> dict[str, dict]:
     if problems:
         raise SystemExit("the frozen draw is refused: " + "; ".join(problems))
     return saved["codes"]
+
+
+# --- a targeted draw (round 3, 19.18) ----------------------------------------------------------------
+#
+# Precision is measured on the script's own positives, so the draw takes them by category: up to
+# PER_CATEGORY of each common category and every positive of the rarer ones, at most ORG_MAX per
+# organisation in each. A broad keyword net, separate from the script's rules, and the rest of the
+# evidence give NET_SIZE and REST_SIZE adverts each, so the script's misses can be estimated; recall
+# is weighted by each stratum's size and is an Estimate only.
+
+COMMON = ("nationality", "residence", "national_post")
+PER_CATEGORY, NET_SIZE, REST_SIZE = 20, 20, 20
+NET_EEO = re.compile(r"regardless|irrespective|without regard|discriminat|national origin|diversit|all nationalities|"
+                     r"toutes nationalit|quel(?:le)?s? que soi|sans distinction|encourag|equal (?:opportunit|employment)|"
+                     r"[ée]galit[ée]|protected (?:characteristic|status|veteran)|harass|inclusi|under-?represent|"
+                     r"veteran|affirmative action", re.IGNORECASE)
+NET: dict[str, re.Pattern] = {
+    "nationality": re.compile(r"\bnationals\b|\bnational(?:\)|;|\s+(?:only|candidates?|applicants?)\b)|nationalit|"
+                              r"\bcitizen|ressortissant|passport holder|\bislanders?\b|oc[ée]anien|"
+                              r"international candidates|\bcitoyen|candidats? nationaux|member (?:states?|countr)",
+                              re.IGNORECASE),
+    "residence": re.compile(r"\bresid(?:ent|ents|ence|ing)\b|r[ée]siden|\blive (?:in|within|near)\b|\bcommut|"
+                            r"\btime ?zones?\b|fuseau horaire|\b(?:be|are|is|currently|already) (?:based|located) "
+                            r"(?:in|within|on|anywhere)\b|\bbased anywhere\b|\blocals\b|\blocal (?:candidates|applicants|"
+                            r"hire|recruit)|candidats? locaux|permanent address|\bwithin \d+ ?(?:km|miles)\b", re.IGNORECASE),
+    "national_post": re.compile(r"(?i:\bnational (?:position|post|officer|professional|staff|consultan\w*)\b|"
+                                r"\bposte national|locally[- ]engaged|local (?:contract|terms|hire|staff (?:position|post|"
+                                r"contract))|consultants? nationa(?:l|ux)|recrutement local|\bNPSA\b)|\bNO-?[A-E]\b"),
+    "religion": re.compile(r"\bchristian|\bmuslim|\bislamic|\bcatholic|\bfaith\b|\bchurch|\bspiritu|\bbiblical|"
+                           r"\bgospel|\bevangel|\bfoi\b|\bchr[ée]tien|\b[ée]glise", re.IGNORECASE),
+    "age": re.compile(r"\baged? (?:\d\d|between|under|over|below|above)|\bage limit|maximum age|minimum age|"
+                      r"years of age|\b(?:under|below|over) \d\d\b|\b\d\d (?:and|or) (?:above|over|older|younger)|"
+                      r"moins de \d\d ans|[âa]ge (?:maximum|limite|minimum)", re.IGNORECASE),
+    "sex": re.compile(r"\b(?:female|male|women|men|woman|man)\s+(?:candidates?|applicants?|only)\b|"
+                      r"\bonly (?:female|male|women|men)\b|femmes uniquement|candidat(?:e|ure)s? f[ée]minin|"
+                      r"r[ée]serv[ée]e? aux? (?:femmes|hommes)|pour les (?:hommes|femmes)|\bfor (?:men|women)\b",
+                      re.IGNORECASE),
+    "marital_family": re.compile(r"\b(?:married|unmarried|marital status|without (?:family|partner|dependants)|"
+                                 r"c[ée]libataire|sans (?:famille|partenaire|conjoint)|situation (?:familiale|"
+                                 r"matrimoniale)|single (?:candidates|applicants|status))", re.IGNORECASE),
+    "disability": re.compile(r"able[- ]bodied|free (?:from|of) (?:any )?(?:disabilit|physical)|no disabilit|"
+                             r"physically fit|medically fit", re.IGNORECASE),
+    "photo_appearance": re.compile(r"\b(?:passport[- ]?size[d]?|recent|colou?r) (?:photo|photograph|picture)|"
+                                   r"\b(?:send|submit|attach|include|enclose)\b[^.\n]{0,60}\b(?:photo|photograph|picture)"
+                                   r"\b|presentable|good appearance|\bheight\b", re.IGNORECASE),
+}
+NET_SPLIT = re.compile(r"(?<=[.!?;])\s+|\n")
+
+
+def net_hits(title: str, lines: list[str]) -> set[str]:
+    """The categories the keyword net catches in an advert: any sentence with a category's words, those
+    of an equal-opportunity sentence left out (they name every category)."""
+    out = set()
+    for s in [title] + [p for ln in lines for p in NET_SPLIT.split(ln)]:
+        for k, p in NET.items():
+            if s and k not in out and p.search(s) and (k in ("national_post", "photo_appearance") or
+                                                       not NET_EEO.search(s)):
+                out.add(k)
+    return out
+
+
+def net_hash() -> str:
+    parts = [f"{k}\t{p.pattern}\t{p.flags}" for k, p in NET.items()] + [NET_EEO.pattern, NET_SPLIT.pattern]
+    return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
+
+
+def script_categories(row: dict) -> tuple[set[str], set[str]]:
+    """The categories in a broad-adverts.csv row's `restrictions`, and those stated only as a preference."""
+    labels = [x for x in (row.get("restrictions") or "").split(";") if x]
+    return ({x.split("~")[0] for x in labels},
+            {x.split("~")[0] for x in labels if x.endswith(adverts.PREFERENCE)})
+
+
+def pool_info(rows: list[dict], texts: dict, exclude: set[str], earlier: set[str]) -> list[dict]:
+    """The evidence a targeted draw takes from (never the AI test set nor an earlier round's adverts),
+    each with its script categories, its net categories and its stratum: `positive` (the script finds a
+    restriction), `net` (only the net finds one) or `rest`."""
+    out = []
+    for r in sorted(rows, key=lambda r: r["advert_id"]):
+        if r["held_out"] != "false" or r["advert_id"] in exclude or r["advert_id"] in earlier:
+            continue
+        cats, preferred = script_categories(r)
+        net = net_hits(*texts.get(r["advert_id"], ("", [])))
+        out.append({"advert_id": r["advert_id"], "org_id": r["org_id"], "source": r["source"], "system": r["system"],
+                    "language": r["language"], "cats": cats, "preferred": preferred, "net": net,
+                    "stratum": "positive" if cats else "net" if net else "rest"})
+    return out
+
+
+def targeted_sample(pool: list[dict], seed: int) -> list[dict]:
+    """The targeted draw: the rarer categories' positives first (all of them, within the cap), then up to
+    PER_CATEGORY of each common one, counting those already drawn; then NET_SIZE net adverts and
+    REST_SIZE others. At most ORG_MAX per organisation among each category's positives and in each of
+    the other two strata. Fixed by its seed."""
+    rng = random.Random(seed)
+    chosen, ids, per = [], set(), Counter()
+
+    def take(r: dict, key: str) -> None:
+        chosen.append(r)
+        ids.add(r["advert_id"])
+        for c in r["cats"]:
+            per[(c, r["org_id"])] += 1
+        per[(key, r["org_id"])] += key in ("net", "rest")
+
+    cats = [c for c in adverts.RESTRICTIONS if c not in COMMON] + list(COMMON)
+    for c in cats:
+        cands = [r for r in pool if c in r["cats"]]
+        rng.shuffle(cands)
+        quota = PER_CATEGORY if c in COMMON else len(cands)
+        have = sum(c in r["cats"] for r in chosen)
+        for r in cands:
+            if have >= quota:
+                break
+            if r["advert_id"] not in ids and per[(c, r["org_id"])] < ORG_MAX:
+                take(r, c)
+                have += 1
+    for stratum, size in (("net", NET_SIZE), ("rest", REST_SIZE)):
+        cands = [r for r in pool if r["stratum"] == stratum]
+        rng.shuffle(cands)
+        got = 0
+        for r in cands:
+            if got >= size:
+                break
+            if r["advert_id"] not in ids and per[(stratum, r["org_id"])] < ORG_MAX:
+                take(r, stratum)
+                got += 1
+    return chosen
+
+
+def targeted_codes(chosen: list[dict], seed: int, first: int, group: int) -> dict[str, dict]:
+    """Neutral ids from `first` in a shuffled order across the strata, so neither an id nor a group
+    tells which stratum an advert came from; groups of `group` adverts."""
+    order = sorted(chosen, key=lambda r: r["advert_id"])
+    random.Random(seed + 1).shuffle(order)
+    return {f"V{first + i:03d}": {"advert_id": r["advert_id"], "batch": f"group-{1 + i // group:02d}",
+                                  "org_id": r["org_id"], "source": r["source"], "system": r["system"],
+                                  "french": r["language"] == "fr"} for i, r in enumerate(order)}
+
+
+def targeted_problems(chosen: list[dict], rows: list[dict], exclude: set[str], earlier: set[str]) -> list[str]:
+    """What a targeted draw must hold: evidence only, never the AI test set or an earlier round's advert,
+    each advert once."""
+    by_id = {r["advert_id"]: r for r in rows}
+    problems = []
+    if not chosen or len({r["advert_id"] for r in chosen}) != len(chosen):
+        problems.append("the draw is empty or holds an advert twice")
+    if any(by_id.get(r["advert_id"], {}).get("held_out") != "false" or r["advert_id"] in exclude for r in chosen):
+        problems.append("an advert of the AI test set, or not in the evidence, was drawn")
+    if any(r["advert_id"] in earlier for r in chosen):
+        problems.append("an advert of an earlier round was drawn")
+    return problems
+
+
+def draw_targeted(rows: list[dict], texts: dict, exclude: set[str], earlier: set[str]) -> int:
+    cfg = ROUNDS[ROUND]
+    pool = pool_info(rows, texts, exclude, earlier)
+    chosen = targeted_sample(pool, SEED)
+    problems = targeted_problems(chosen, rows, exclude, earlier)
+    if problems:
+        for p in problems:
+            print(p)
+        return 1
+    codes = targeted_codes(chosen, SEED, cfg["first_id"], cfg["group"])
+    VALID.mkdir(parents=True, exist_ok=True)
+    (VALID / "draw.json").write_text(json.dumps({
+        "made_at": utc_now(), "round": ROUND, "seed": SEED, "drawn_from": sha256(roles.ROLES / "broad-adverts.csv"),
+        "strata": strata_hash(rows), "rules": rules_hashes(), "net": net_hash(), "codes": codes}, indent=1),
+        encoding="utf-8")
+    # Which stratum each advert came from is kept apart, unopened until the reconciled set is sealed.
+    by_id = {r["advert_id"]: r for r in chosen}
+    script_pool = {c: sum(c in r["cats"] for r in pool) for c in RESTRICTION_IDS}
+    script_pool |= {"any": sum(bool(r["cats"]) for r in pool), "preferred": sum(bool(r["preferred"]) for r in pool)}
+    (VALID / "strata.json").write_text(json.dumps({
+        "pool": dict(Counter(r["stratum"] for r in pool)), "script_pool": script_pool,
+        "strata": {vid: by_id[c["advert_id"]]["stratum"] for vid, c in codes.items()}}, indent=1), encoding="utf-8")
+    drawn = Counter(c for r in chosen for c in r["cats"])
+    print(f"draw: {len(codes)} adverts at {len({c['org_id'] for c in codes.values()})} organisations; "
+          f"French {sum(c['french'] for c in codes.values())}; groups {len({c['batch'] for c in codes.values()})}; "
+          f"script positives drawn by category {dict(drawn)}")
+    return 0
 
 
 # --- the coders' packets ----------------------------------------------------------------------------
@@ -471,17 +699,21 @@ def packets(_args=None) -> int:
 def guide_problems(text: str) -> list[str]:
     """Every category a coder may answer must be defined in the guide, by its id in backticks."""
     ids = (HEADING_TYPES + FACT_IDS + DEGREES + FUNCTIONS + SECTORS + LEVELS + LANGUAGES + RESTRICTION_IDS +
-           ["given", "vague", "absent"])
+           ["given", "vague", "absent"] + (["preferred"] if SCOPE == "restrictions" else []))
     return [f"the guide does not define `{i}`" for i in dict.fromkeys(ids) if f"`{i}`" not in text]
 
 
 def frozen_guide_problems() -> list[str]:
-    """After round 1, every round is coded on guide 1.1 unchanged, the version round 1 reconciled."""
-    if ROUND == 1:
+    """After round 1, every round is coded on its frozen guide unchanged: rounds 2 on guide 1.1, the
+    version round 1 reconciled; round 3 on guide 1.2."""
+    want = ROUNDS[ROUND]["guide"]
+    if want is None:
         return []
     path = VALID / "guide.md"
-    if not path.exists() or sha256(path) != FROZEN_GUIDE:
-        return [f"round {ROUND}'s guide.md is not guide 1.1 as frozen ({FROZEN_GUIDE[:12]}…)"]
+    if not want:
+        return [f"round {ROUND}'s guide is not frozen yet (no hash in ROUNDS)"]
+    if not path.exists() or sha256(path) != want:
+        return [f"round {ROUND}'s guide.md is not its frozen guide ({want[:12]}…)"]
     return []
 
 
@@ -510,6 +742,16 @@ def answer_problems(a: dict, lines: int | None) -> list[str]:
     p = []
     if lines is None:
         p.append(f"{vid}: not an advert of this packet")
+    if SCOPE == "restrictions":
+        for k in ("restrictions", "preferred"):
+            if not isinstance(a[k], list) or not set(a[k]) <= set(RESTRICTION_IDS) or len(set(a[k])) != len(a[k]):
+                p.append(f"{vid}: {k} holds an unknown or repeated item")
+        if isinstance(a["restrictions"], list) and isinstance(a["preferred"], list) and \
+                not set(a["preferred"]) <= set(a["restrictions"]):
+            p.append(f"{vid}: preferred holds a category that is not in restrictions")
+        if "note" in a and (not isinstance(a["note"], str) or len(a["note"].split()) > 40):
+            p.append(f"{vid}: the note is not a short text")
+        return p
     seen = set()
     for h in a["headings"] if isinstance(a["headings"], list) else [None]:
         if not (isinstance(h, list) and len(h) == 2 and isinstance(h[0], int) and not isinstance(h[0], bool)
@@ -584,6 +826,9 @@ def coder_answers(coder: str) -> dict[str, dict]:
 
 def items_of(a: dict) -> dict:
     """One advert's answers as the items compared and reconciled."""
+    if SCOPE == "restrictions":
+        out = {f"restriction:{c}": c in a["restrictions"] for c in RESTRICTION_IDS}
+        return out | {f"preferred:{c}": c in a["preferred"] for c in RESTRICTION_IDS}
     types = {t for _, t in a["headings"]}
     out = {f"section:{t}": t in types for t in SECTION_TYPES}
     out |= {f"fact:{f}": "given" if f in a["given"] else "vague" if f in a["vague"] else "absent" for f in FACT_IDS}
@@ -619,6 +864,8 @@ def value_for(measure: str, items: dict):
     if kind == "restriction":
         if arg == "any":
             return any(items[f"restriction:{c}"] for c in RESTRICTION_IDS)
+        if arg == "preferred":
+            return any(items.get(f"preferred:{c}") for c in RESTRICTION_IDS)
         return items[measure]
     raise KeyError(measure)
 
@@ -691,7 +938,7 @@ def show(v) -> str:
 def parse_decision(item: str, text: str):
     """A reconciler's decision as the item's value; ValueError if it is not one of the item's values."""
     t = text.strip()
-    if item.startswith(("section:", "restriction:")):
+    if item.startswith(("section:", "restriction:", "preferred:")):
         if t not in ("yes", "no"):
             raise ValueError(t)
         return t == "yes"
@@ -785,8 +1032,10 @@ def item_problems(items: dict) -> list[str]:
             parse_decision(k, show(x))
         except ValueError:
             p.append(f"{k}={x!r} is not a value of this item")
-    if items["years_alt"] is not None and (items["years_min"] is None or items["years_alt"] <= items["years_min"]):
+    if items.get("years_alt") is not None and (items["years_min"] is None or items["years_alt"] <= items["years_min"]):
         p.append("years_alt needs a smaller years_min")
+    if any(items.get(f"preferred:{c}") and not items.get(f"restriction:{c}") for c in RESTRICTION_IDS):
+        p.append("a category is preferred but not a restriction")
     return p
 
 
@@ -820,7 +1069,9 @@ def reconcile(_args=None) -> int:
 def script_items(row: dict, section_types: set[str]) -> dict:
     """The script's answers for one advert, from the committed broad files, as items."""
     given = set(filter(None, row["facts_given"].split(";")))
-    restrictions = set(filter(None, row["restrictions"].split(";")))
+    cats, preferred = script_categories(row)
+    # A round on guide 1.1 reads the script's categories as 1.1 defined them (`residence` as `nationality`).
+    restrictions = {c if c in RESTRICTION_IDS else MERGED_11.get(c, c) for c in cats}
     out = {f"section:{t}": t in section_types for t in SECTION_TYPES}
     out |= {f"fact:{f}": "given" if f in given else "absent" for f in FACT_IDS}
     out |= {k: float(row[k]) if row[k] else None for k in ("years_min", "years_alt")}
@@ -828,6 +1079,7 @@ def script_items(row: dict, section_types: set[str]) -> dict:
             "sector": row["sector"], "level": row["level"],
             "language": row["language"] if row["language"] in LANGUAGES else "other"}
     out |= {f"restriction:{c}": c in restrictions for c in RESTRICTION_IDS}
+    out |= {f"preferred:{c}": c in preferred for c in RESTRICTION_IDS}
     out["family"] = row["family_id"]
     return out
 
@@ -923,6 +1175,8 @@ def score(_args=None) -> int:
     if ROUND < max(ROUNDS) and OUTPUT.exists():
         print(f"score: round {ROUND}'s committed results stand as the record of its rules; use recheck")
         return 1
+    if ROUNDS[ROUND]["draw"] == "targeted":
+        return score_targeted(OUTPUT, VALID / "errors.csv")
     return score_to(OUTPUT, VALID / "errors.csv")
 
 
@@ -933,17 +1187,34 @@ def recheck(_args=None) -> int:
     if ROUND == max(ROUNDS):
         print("recheck: only an earlier round is rechecked; the latest round is scored")
         return 1
-    return score_to(VALID / "recheck.csv", VALID / "errors-recheck.csv", local=True)
+    if ROUNDS[ROUND]["draw"] == "targeted":
+        print("recheck: a targeted round is not rechecked")
+        return 1
+    # Named by the rules it ran on, so a recheck under other rules is never written over.
+    tag = rules_hashes()["adverts.py"][:12]
+    if (VALID / f"recheck-{tag}.csv").exists():
+        print(f"recheck: recheck-{tag}.csv already holds this round on today's rules; not made again")
+        return 0
+    return score_to(VALID / f"recheck-{tag}.csv", VALID / f"errors-recheck-{tag}.csv", local=True)
 
 
-def score_to(output: Path, errors: Path, local: bool = False) -> int:
+def sealed_items() -> dict | None:
+    """The reconciled set's items, only when it is sealed and was made on the round's frozen guide."""
     path, seal = VALID / "reconciled.json", VALID / "reconciled.sha256"
     if not path.exists() or not seal.exists() or seal.read_text(encoding="utf-8").strip() != sha256(path):
         print("score: the reconciled set is not frozen with a matching seal; nothing scored")
+        return None
+    want = ROUNDS[ROUND]["guide"]
+    if want is not None and json.loads(path.read_text(encoding="utf-8")).get("guide") != want:
+        print("score: the reconciled set was not made on the round's frozen guide; nothing scored")
+        return None
+    return json.loads(path.read_text(encoding="utf-8"))["items"]
+
+
+def score_to(output: Path, errors: Path, local: bool = False) -> int:
+    if sealed_items() is None:
         return 1
-    if ROUND > 1 and json.loads(path.read_text(encoding="utf-8")).get("guide") != FROZEN_GUIDE:
-        print("score: the reconciled set was not made on guide 1.1 as frozen; nothing scored")
-        return 1
+    path = VALID / "reconciled.json"
     codes = load_draw()
     truth_by = json.loads(path.read_text(encoding="utf-8"))["items"]
     rows = {r["advert_id"]: r for r in read_rows(roles.ROLES / "broad-adverts.csv")}
@@ -967,6 +1238,61 @@ def score_to(output: Path, errors: Path, local: bool = False) -> int:
     return 0
 
 
+def targeted_rows(script: list[dict], truth: list[dict], strata: list[str], pool: dict, script_pool: dict,
+                  agree: dict[str, tuple]) -> list[dict]:
+    """A targeted round's rows: precision on the script's positives in the sample, judged by 19.3 (at
+    least 15 of them, precision 0.9); recall weighted by each stratum's size in the pool (an Estimate):
+    the script's true positives in the pool (its positives there times the precision) over those plus
+    its misses, each stratum's sampled misses scaled to the stratum."""
+    rows = []
+    for m in MEASURES:
+        s = [bool(script_of(m, x)) for x in script]
+        t = [bool(truth_of(m, x)) for x in truth]
+        sampled = sum(s)
+        tp = sum(a and b for a, b in zip(s, t, strict=True))
+        precision = round(tp / sampled, 3) if sampled else None
+        key = m.split(":", 1)[1]
+        recall = None
+        if precision is not None:
+            hits = precision * script_pool.get(key, 0)
+            misses = 0.0
+            for stratum, size in pool.items():
+                idx = [i for i, x in enumerate(strata) if x == stratum]
+                if idx:
+                    misses += sum(t[i] and not s[i] for i in idx) * size / len(idx)
+            recall = round(hits / (hits + misses), 3) if hits + misses else None
+        p, k = agree.get(m, (None, None))
+        rows.append({"measure": m, "script_positives_in_pool": script_pool.get(key, 0), "sampled_script_positives": sampled,
+                     "true_positives": tp, "precision": fmt(precision), "positive_cases": sum(t),
+                     "recall_estimate": fmt(recall), "coder_agreement": fmt(p), "kappa": fmt(k),
+                     "result": judged(m, sum(t), sampled, precision, None, None)})
+    return rows
+
+
+def score_targeted(output: Path, errors: Path) -> int:
+    truth_by = sealed_items()
+    if truth_by is None:
+        return 1
+    codes = load_draw()
+    saved = json.loads((VALID / "strata.json").read_text(encoding="utf-8"))
+    rows = {r["advert_id"]: r for r in read_rows(roles.ROLES / "broad-adverts.csv")}
+    ids = sorted(codes)
+    script = [script_items(rows[codes[v]["advert_id"]], set()) for v in ids]
+    truth = [truth_by[v] for v in ids]
+    a, b = coder_answers("a"), coder_answers("b")
+    agree = agreement_table([i for i in ids if i in a and i in b], a, b)
+    out = targeted_rows(script, truth, [saved["strata"][v] for v in ids], saved["pool"], saved["script_pool"], agree)
+    adverts.write_dicts(output, FIELDS, out)
+    adverts.write_local(errors, ["id", "advert_id", "measure", "script", "reconciled", "reconciled_detail"],
+                        error_rows(ids, script, truth, codes))
+    print(f"score: {dict(Counter(r['result'] for r in out))}")
+    for r in out:
+        print(f"{r['measure']:32} pool {r['script_positives_in_pool']:>4} sampled {r['sampled_script_positives']:>3} "
+              f"tp {r['true_positives']:>3} P {r['precision'] or '-':>5} pos {r['positive_cases']:>3} "
+              f"R~ {r['recall_estimate'] or '-':>5} agree {r['coder_agreement'] or '-':>5} {r['result']}")
+    return 0
+
+
 # --- the committed file's form (CI) ------------------------------------------------------------------
 
 DECIMAL = re.compile(r"(?:0\.\d{3}|1\.000)?")
@@ -985,23 +1311,30 @@ def check_problems(path: Path) -> list[str]:
     seen = [r["measure"] for r in rows]
     if seen != MEASURES:
         problems.append(f"{path.name}: the measures are not exactly {len(MEASURES)} known ones, in order")
+    targeted = FIELDS == FIELDS_TARGETED
     for i, r in enumerate(rows, 2):
         for k, v in r.items():
             v = v or ""
             if adverts.EMAIL.search(v) or re.search(r"https?://|www\.", v):
                 problems.append(f"{path.name}:{i}: {k} holds an email address or an address")
-            if k in ("positive_cases", "script_positives") and not v.isdigit():
+            if k in ("positive_cases", "script_positives", "script_positives_in_pool", "sampled_script_positives",
+                     "true_positives") and not v.isdigit():
                 problems.append(f"{path.name}:{i}: {k} is not a count")
-            if k in ("precision", "recall", "within_one_year", "coder_agreement") and not DECIMAL.fullmatch(v):
+            if k in ("precision", "recall", "within_one_year", "coder_agreement", "recall_estimate") and \
+                    not DECIMAL.fullmatch(v):
                 problems.append(f"{path.name}:{i}: {k}={v!r} is not a share")
             if k == "kappa" and not KAPPA.fullmatch(v):
                 problems.append(f"{path.name}:{i}: kappa={v!r} is not a kappa")
             if k == "result" and v not in RESULTS:
                 problems.append(f"{path.name}:{i}: result={v!r} is not one of {sorted(RESULTS)}")
         try:
-            share = {k: float(r[k]) if r[k] else None for k in ("precision", "recall", "within_one_year")}
-            expected = judged(r["measure"], int(r["positive_cases"]), int(r["script_positives"]), share["precision"],
-                              share["recall"], share["within_one_year"])
+            if targeted:
+                expected = judged(r["measure"], int(r["positive_cases"]), int(r["sampled_script_positives"]),
+                                  float(r["precision"]) if r["precision"] else None, None, None)
+            else:
+                share = {k: float(r[k]) if r[k] else None for k in ("precision", "recall", "within_one_year")}
+                expected = judged(r["measure"], int(r["positive_cases"]), int(r["script_positives"]), share["precision"],
+                                  share["recall"], share["within_one_year"])
         except (ValueError, TypeError):
             continue
         if r["result"] != expected:
@@ -1010,9 +1343,17 @@ def check_problems(path: Path) -> list[str]:
 
 
 def check(_args=None, path: Path | None = None) -> int:
-    """The committed file of every round (or only `path`): each must exist and pass its form."""
-    paths = [path] if path else [roles.ROLES / cfg["output"] for cfg in ROUNDS.values()]
-    problems = [q for p in paths for q in (check_problems(p) if p.exists() else [f"{p.name} is missing"])]
+    """The committed file of every round (or only `path`, in the current round's form): each must exist
+    and pass its own round's form."""
+    if path:
+        problems = check_problems(path) if path.exists() else [f"{path.name} is missing"]
+    else:
+        problems = []
+        for n, cfg in ROUNDS.items():
+            set_measures(n)
+            p = roles.ROLES / cfg["output"]
+            problems += check_problems(p) if p.exists() else [f"{p.name} is missing"]
+        set_measures(ROUND)
     for p in problems[:50]:
         print(p)
     print(f"check: {len(problems)} problems")

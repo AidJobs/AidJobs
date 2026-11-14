@@ -235,7 +235,11 @@ def test_the_guide_must_define_every_category_the_script_uses():
 
 def test_the_categories_are_the_scripts_own():
     assert set(v.FACT_IDS) == set(adverts.FACTS)
-    assert set(v.RESTRICTION_IDS) == set(adverts.RESTRICTIONS)
+    # The latest guide's categories are the script's; rounds 1 and 2 keep guide 1.1's, residence under
+    # nationality (19.18).
+    assert v.ROUNDS[max(v.ROUNDS)]["restrictions"] == list(adverts.RESTRICTIONS)
+    assert set(v.RESTRICTIONS_11) == set(adverts.RESTRICTIONS) - {"residence"}
+    assert v.RESTRICTION_IDS == v.RESTRICTIONS_11
     assert {adverts.section_type(h) for h in ("Key responsibilities", "About us", "How to apply")} <= set(v.SECTION_TYPES)
     assert set(v.SECTION_TYPES) <= set(adverts.SECTION_IDS)
     assert set(roles.LEVEL_IDS) < set(v.LEVELS) and set(roles.FUNCTION_IDS) < set(v.FUNCTIONS)
@@ -458,14 +462,20 @@ def test_round_two_leaves_out_round_one_and_holds_its_rules(round2, monkeypatch)
     second = v.load_draw()
     assert min(second) == "V101" and v.VALID.name == "validation-2"
     assert not {c["advert_id"] for c in first.values()} & {c["advert_id"] for c in second.values()}
-    # A rebuild that changes only measures keeps the draw; changed strata or rules refuse it.
+    # A rebuild that changes only measures keeps the draw; changed strata, or changed rules while the
+    # round is the latest, refuse it.
     rows = [dict(r, facts_given="pay") for r in round2]
     write_csv(roles.ROLES / "broad-adverts.csv", rows)
     assert v.load_draw() == second
     with monkeypatch.context() as m:
         m.setattr(v, "rules_hashes", lambda: {"adverts.py": "changed"})
+        m.setattr(v, "ROUNDS", {k: c for k, c in v.ROUNDS.items() if k <= 2})
         with pytest.raises(SystemExit, match="rules"):
             v.load_draw()
+    # Once a later round exists, round 2 is a scored record: its draw stays usable for recheck.
+    with monkeypatch.context() as m:
+        m.setattr(v, "rules_hashes", lambda: {"adverts.py": "changed"})
+        assert v.load_draw() == second
     rows[5]["language"] = "fr" if rows[5]["language"] == "en" else "en"
     write_csv(roles.ROLES / "broad-adverts.csv", rows)
     with pytest.raises(SystemExit, match="changed since"):
@@ -513,9 +523,10 @@ def test_round_one_survives_a_rebuild_of_measures_through_its_commits_file(work,
 
 
 def test_round_two_is_coded_on_the_frozen_guide_only(round2, monkeypatch):
+    assert v.ROUNDS[1]["guide"] is None and v.ROUNDS[2]["guide"] == v.GUIDE_11 != v.ROUNDS[3]["guide"]
     (v.VALID / "guide.md").write_text("A different guide.", encoding="utf-8")
     assert v.frozen_guide_problems() and v.guide() == 1
-    monkeypatch.setattr(v, "FROZEN_GUIDE", v.sha256(v.VALID / "guide.md"))
+    monkeypatch.setitem(v.ROUNDS[2], "guide", v.sha256(v.VALID / "guide.md"))
     assert v.frozen_guide_problems() == []
 
 
@@ -538,4 +549,164 @@ def test_check_needs_every_rounds_committed_file(tmp_path, monkeypatch):
     adverts.write_dicts(tmp_path / "broad-validation.csv", v.FIELDS, rows)
     assert v.check() == 1
     adverts.write_dicts(tmp_path / "broad-validation-2.csv", v.FIELDS, rows)
+    assert v.check() == 1                                    # round 3's file is missing
+    v.set_measures(3)
+    third = v.targeted_rows([v.script_items(script_row(), set())] * 3, [v.items_of(restriction_answer())] * 3,
+                            ["rest"] * 3, {"rest": 100}, {}, {})
+    adverts.write_dicts(tmp_path / "broad-validation-3.csv", v.FIELDS, third)
+    v.set_measures(1)
     assert v.check() == 0
+    # Each file is checked in its own round's form: round 1's rows in round 3's file fail.
+    adverts.write_dicts(tmp_path / "broad-validation-3.csv", v.FIELDS, rows)
+    assert v.check() == 1
+
+
+# --- round 3 (19.18): restrictions only, a targeted draw ------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def back_to_round_one():
+    yield
+    v.use_round(1)
+
+
+def restriction_answer(**kw) -> dict:
+    a = {"id": "V201", "restrictions": [], "preferred": []}
+    a.update(kw)
+    return a
+
+
+def test_round_three_codes_restrictions_only_with_residence_and_preferences():
+    v.set_measures(3)
+    assert v.RESTRICTION_IDS == list(adverts.RESTRICTIONS) and "residence" in v.RESTRICTION_IDS
+    assert v.ANSWER_KEYS == {"id", "restrictions", "preferred", "note"}
+    assert v.MEASURES[0] == "restriction:any" and v.MEASURES[-1] == "restriction:preferred"
+    assert all(m in v.PRECISION_ONLY for m in v.MEASURES)
+    assert v.answer_problems(restriction_answer(restrictions=["residence"], preferred=["residence"]), 5) == []
+    assert v.answer_problems(restriction_answer(restrictions=["residence"], note="short"), 5) == []
+    for bad in (restriction_answer(restrictions=["gender"]), restriction_answer(preferred=["residence"]),
+                restriction_answer(restrictions=["age", "age"]), {"id": "V201", "restrictions": []}):
+        assert v.answer_problems(bad, 5), bad
+    items = v.items_of(restriction_answer(restrictions=["nationality", "residence"], preferred=["residence"]))
+    assert items["restriction:residence"] and items["preferred:residence"] and not items["preferred:nationality"]
+    assert v.value_for("restriction:preferred", items) and v.value_for("restriction:any", items)
+    assert v.parse_decision("preferred:residence", "yes") is True
+    assert v.item_problems({**items, "restriction:residence": False}) == ["a category is preferred but not a restriction"]
+
+
+def test_a_recheck_is_named_by_its_rules_and_never_written_over(work, monkeypatch):
+    calls = []
+    monkeypatch.setattr(v, "score_to", lambda out, err, local=False: calls.append((out.name, err.name, local)) or 0)
+    monkeypatch.setattr(v, "rules_hashes", lambda: {"adverts.py": "abcdef0123456789"})
+    assert v.recheck() == 0 and calls == [("recheck-abcdef012345.csv", "errors-recheck-abcdef012345.csv", True)]
+    v.VALID.mkdir(parents=True, exist_ok=True)
+    (v.VALID / "recheck-abcdef012345.csv").write_text("kept", encoding="utf-8")
+    assert v.recheck() == 0 and len(calls) == 1
+    assert (v.VALID / "recheck-abcdef012345.csv").read_text(encoding="utf-8") == "kept"
+
+
+def test_a_round_on_guide_one_one_reads_residence_as_nationality():
+    v.set_measures(2)
+    s = v.script_items(script_row(restrictions="residence~preference;age"), set())
+    assert s["restriction:nationality"] and s["restriction:age"] and "restriction:residence" not in s
+    v.set_measures(3)
+    s = v.script_items(script_row(restrictions="residence~preference;age"), set())
+    assert s["restriction:residence"] and s["preferred:residence"] and not s["restriction:nationality"]
+    assert not s["preferred:age"]
+
+
+def pool_rows() -> list[dict]:
+    """A made-up evidence pool: 60 nationality positives at 30 organisations, 4 religion positives at
+    one, 50 adverts the net catches and 200 others."""
+    rows = []
+    for i in range(60):
+        rows.append({"advert_id": f"a{i:015x}", "org_id": f"nat-{i % 30}", "restrictions": "nationality"})
+    for i in range(4):
+        rows.append({"advert_id": f"b{i:015x}", "org_id": "faith-org", "restrictions": "religion"})
+    for i in range(250):
+        rows.append({"advert_id": f"c{i:015x}", "org_id": f"other-{i % 60}", "restrictions": ""})
+    for r in rows:
+        r.update(source="archive", system="own site", language="en", held_out="false")
+    return rows
+
+
+def test_a_targeted_draw_takes_each_categorys_positives_then_net_and_rest():
+    rows = pool_rows()
+    texts = {r["advert_id"]: ("Officer", ["Applicants must live within commuting distance."]
+                              if r["advert_id"].startswith("c") and int(r["advert_id"][1:], 16) < 50
+                              else ["Keep the stock records."]) for r in rows}
+    earlier = {rows[0]["advert_id"]}
+    exclude = {rows[1]["advert_id"]}
+    pool = v.pool_info(rows, texts, exclude, earlier)
+    assert len(pool) == len(rows) - 2
+    assert Counter(r["stratum"] for r in pool) == {"positive": 62, "net": 50, "rest": 200}
+    chosen = v.targeted_sample(pool, 20261115)
+    ids = {r["advert_id"] for r in chosen}
+    assert not ids & (earlier | exclude)
+    assert sum("nationality" in r["cats"] for r in chosen) == v.PER_CATEGORY
+    # Every religion positive is wanted, but at most 3 from one organisation.
+    assert sum("religion" in r["cats"] for r in chosen) == v.ORG_MAX
+    assert Counter(r["stratum"] for r in chosen)["net"] == v.NET_SIZE
+    assert Counter(r["stratum"] for r in chosen)["rest"] == v.REST_SIZE
+    for stratum in ("net", "rest"):
+        assert max(Counter(r["org_id"] for r in chosen if r["stratum"] == stratum).values()) <= v.ORG_MAX
+    assert [r["advert_id"] for r in v.targeted_sample(pool, 20261115)] == [r["advert_id"] for r in chosen]
+    codes = v.targeted_codes(chosen, 20261115, 201, 5)
+    assert sorted(codes) == [f"V{i:03d}" for i in range(201, 201 + len(chosen))]
+    assert max(Counter(c["batch"] for c in codes.values()).values()) == 5
+    assert not any("stratum" in c or "cats" in c for c in codes.values())
+    assert v.targeted_problems([r for r in rows if r["advert_id"] in ids], rows, exclude, earlier) == []
+    assert v.targeted_problems([rows[0]], rows, exclude, earlier) == ["an advert of an earlier round was drawn"]
+
+
+def test_the_keyword_net_leaves_out_equal_opportunity_sentences():
+    assert v.net_hits("Officer", ["Applicants must live within commuting distance."]) == {"residence"}
+    assert v.net_hits("Officer", ["We hire regardless of nationality, age or religion."]) == set()
+    assert v.net_hits("National Consultant", ["Keep records."]) == {"national_post"}
+    assert len(v.net_hash()) == 64
+
+
+def test_a_targeted_round_is_judged_on_the_scripts_positives_and_weights_recall():
+    v.set_measures(3)
+    pos = v.script_items(script_row(restrictions="residence"), set())
+    neg = v.script_items(script_row(), set())
+    yes = v.items_of(restriction_answer(restrictions=["residence"]))
+    no = v.items_of(restriction_answer())
+    # 18 of 20 script positives are true; one miss among 10 net adverts (pool 100) and none among 10
+    # others (pool 1,000); the script finds 50 residence adverts in the pool.
+    script = [pos] * 20 + [neg] * 20
+    truth = [yes] * 18 + [no] * 2 + [yes] + [no] * 19
+    strata = ["positive"] * 20 + ["net"] * 10 + ["rest"] * 10
+    rows = {r["measure"]: r for r in v.targeted_rows(script, truth, strata, {"positive": 60, "net": 100, "rest": 1000},
+                                                       {"residence": 50, "any": 60}, {})}
+    r = rows["restriction:residence"]
+    assert (r["sampled_script_positives"], r["true_positives"], r["positive_cases"]) == (20, 18, 19)
+    assert r["precision"] == "0.900" and r["result"] == "validated"
+    # Recall: 45 found (0.9 of 50) over 45 plus 10 estimated misses (1 of 10 net adverts, pool 100).
+    assert r["recall_estimate"] == f"{45 / 55:.3f}"
+    assert rows["restriction:age"]["result"] == "not validated"
+
+
+def test_a_targeted_draw_is_refused_once_its_rules_or_net_change(work, monkeypatch):
+    v.use_round(3)
+    monkeypatch.setattr(v, "VALID", adverts.WORK / "validation-3")
+    for k in (1, 2):
+        folder = adverts.WORK / v.ROUNDS[k]["folder"]
+        folder.mkdir(parents=True)
+        (folder / "draw.json").write_text(json.dumps({"codes": {}}), encoding="utf-8")
+    rows = pool_rows()
+    write_csv(roles.ROLES / "broad-adverts.csv", rows)
+    texts = {r["advert_id"]: ("Officer", ["Keep the stock records."]) for r in rows}
+    assert v.draw_targeted(rows, texts, set(), set()) == 0
+    codes = v.load_draw()
+    assert min(codes) == "V201"
+    strata = json.loads((v.VALID / "strata.json").read_text(encoding="utf-8"))
+    assert set(strata["strata"]) == set(codes) and strata["script_pool"]["nationality"] == 60
+    with monkeypatch.context() as m:
+        m.setattr(v, "rules_hashes", lambda: {"adverts.py": "changed"})
+        with pytest.raises(SystemExit, match="rules"):
+            v.load_draw()
+    with monkeypatch.context() as m:
+        m.setattr(v, "net_hash", lambda: "changed")
+        with pytest.raises(SystemExit, match="net"):
+            v.load_draw()
+    assert v.draw() == 0                                      # frozen: kept as it is
