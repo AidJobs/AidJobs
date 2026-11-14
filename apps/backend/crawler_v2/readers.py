@@ -66,7 +66,7 @@ class PageUpReader(_WalkReader):
             return False
         lower = page.lower()
         return (
-            "list-view--item" in page
+            "list-view--item" in lower
             or "careers-static.pageuppeople.com" in lower
             or "powered by pageup" in lower
         )
@@ -79,7 +79,12 @@ class SitesReader(_WalkReader):
 
     def marks(self, page: str) -> bool:
         # Weaker than acceptance (pager + cards): the Sites pager attribute alone.
-        return bool(page) and 'engine="Sites::Engine"' in page
+        if not page:
+            return False
+        return (
+            'engine="Sites::Engine"' in page
+            or "engine='Sites::Engine'" in page
+        )
 
 
 class GeneralReader(Reader):
@@ -102,6 +107,7 @@ class GeneralReader(Reader):
         LISTING_STRATEGY.set(None)
         jobs = self._crawler.extract_jobs_from_html(first.body, source["careers_url"])
         return ListingResult(self.name, jobs, strategy=LISTING_STRATEGY.get())
+
 
 def html_readers(crawler) -> List[Reader]:
     return [PageUpReader(crawler), SitesReader(crawler), GeneralReader(crawler)]

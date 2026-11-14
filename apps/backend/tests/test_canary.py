@@ -35,6 +35,9 @@ def test_sites_marks_pager_alone():
     assert SitesReader(_FakeCrawler()).marks(
         '<nav class="pagination" engine="Sites::Engine"><ul></ul></nav>'
     )
+    assert SitesReader(_FakeCrawler()).marks(
+        "<nav class=\"pagination\" engine='Sites::Engine'><ul></ul></nav>"
+    )
     assert not SitesReader(_FakeCrawler()).marks(
         '<article class="job-search-results-card-col"></article>'
     )

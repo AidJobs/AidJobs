@@ -2485,6 +2485,9 @@ class SimpleCrawler:
                 
                 if not use_new_extractor:
                     jobs, listing_report = await self._listing_jobs(html, careers_url)
+
+                # Listing size before job-page caps hold rows back (canary rows_read, W-35).
+                listing_row_count = len(jobs)
                 
                 logger.info(f"Job extraction complete: {len(jobs)} jobs extracted from listing page")
                 
@@ -2631,7 +2634,7 @@ class SimpleCrawler:
                     page=html or "",
                     readers=readers,
                     reader_name=reader_name,
-                    rows_read=len(jobs),
+                    rows_read=listing_row_count,
                     admitted=len(admitted),
                     observed=int(counts.get("observed") or 0),
                     previous_kept=previous_kept,
