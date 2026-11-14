@@ -199,7 +199,7 @@ export type Grouping = { groupOrder?: GroupKey[]; groupOf?: Record<string, Group
  * A fixed text on one job, in one language (section 19, phase 6, D and E): a wording for this job only (the user's, or a machine
  * translation, marked until approved).
  */
-export type FixedOwn = { text?: string; machine?: boolean; approved?: boolean };
+export type FixedOwn = { text?: string; machine?: boolean; approved?: boolean; fromLang?: JobLang };
 
 /** A section that a linked change could not reach without the AI: marked "to update", with the language the change came from. */
 export type ToUpdate = Record<string, JobLang>;
@@ -384,21 +384,16 @@ export type UndoStep = {
   before: Content;
   keys?: string[];
   removed?: { key: string; title: string; after: string | null };
-  also?: { langs: JobLang[]; change: LinkedChange };
+  /** The languages not linked to `from`, offered once to follow this change; taken, it joins this Undo step. */
+  also?: { langs: JobLang[]; from: JobLang };
   /** Changed Organisation settings too ("Use this wording for every job"), which Undo does not undo. */
   settings?: boolean;
   /** A linked text change still being written by the AI: Undo waits until it is done. */
   writing?: boolean;
 };
 
-/** A change carried into other languages, linked or by "Also in …" (section 19, phase 6, E). */
-export type LinkedChange =
-  | { kind: 'text'; key: string; from: JobLang }
-  | { kind: 'add'; key: string; after: string | null; group: GroupKey; from: JobLang }
-  | { kind: 'remove'; key: string; from: JobLang }
-  | { kind: 'move'; key: string; after: string | null; group: GroupKey; from: JobLang }
-  | { kind: 'group'; order: GroupKey[]; from: JobLang }
-  | { kind: 'fixed'; key: string; op: 'edit' | 'reset' | 'leave' | 'bring' | 'order'; from: JobLang };
+/** Text a linked change asked the AI to carry into other languages (section 19, phase 6, E), until it is written. */
+export type Carrying = { from: JobLang; keys: string[]; fixed: string[]; langs: JobLang[] };
 
 export type DemoJob = {
   id: string;
@@ -491,6 +486,8 @@ export type DemoJob = {
   toUpdate?: ToUpdate;
   /** The last change made with the icons, the outline, or a version's editor, with its Undo. */
   undoStep?: UndoStep;
+  /** A linked change's text, waiting for the AI to write it in the other languages. */
+  carrying?: Carrying;
   /** "Use this wording for every job?" after a fixed text was worded for this job, shown until answered or passed by twice. */
   wordingOffer?: { key: string; lang: JobLang; left: number };
   /** After a version with machine-translated fixed texts is approved, the owner is asked once to keep them for every job. */

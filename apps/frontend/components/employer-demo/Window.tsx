@@ -1,10 +1,10 @@
 'use client';
 
-import { ArrowLeft, ChevronDown, Eye, FileText, History, X } from 'lucide-react';
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { ArrowLeft, ChevronDown, Eye, FileText, History, Link2, X } from 'lucide-react';
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
-import { applyFormat, applyOrgSdgs, applyOutline, applyTemplate, bringDocument, canDelete, chatNote, closeJob, createFormat, downloadBlock, downloadCopy, formatOf, goOn, greetState, headingOf, hireAgain, isReviewable, LINK_REPLY, markFlyerMade, parkingReply, remindReviewers, sendChat, setChoice, setJobLang, setPart, setSdgs, settleAsk, unparkPart, windowSays, writeNow } from './actions';
+import { applyFormat, applyOrgSdgs, applyOutline, applyTemplate, bringDocument, canDelete, chatNote, closeJob, createFormat, downloadBlock, downloadCopy, formatOf, goOn, greetState, headingOf, hireAgain, isReviewable, LINK_REPLY, carried, carryByRules, markFlyerMade, parkingReply, remindReviewers, setLinked, sendChat, setChoice, setJobLang, setPart, setSdgs, settleAsk, unparkPart, windowSays, writeNow } from './actions';
 import { FlyerPanel } from './Flyer';
 import { isPublished, STATE_LABEL, stateActionsOf, type StateAction } from './lifecycle';
 import { JobDialog, type Kind } from './Jobs';
@@ -18,7 +18,7 @@ import { conflictQuestion, KEEP_PROFILE_ABOUT, keepProfileAbout, openConflicts, 
 import { planCount } from './invites';
 import { ReviewForm, ReviewPanel } from './Review';
 import type { ChatMsg } from './types';
-import { aiOn, askAi, GO_ON, probeAi, useAi, whenAnswered, writeVersion } from './ai';
+import { aiOn, askAi, carryMessage, GO_ON, probeAi, useAi, whenAnswered, writeVersion } from './ai';
 import { amplifying, FIXED_SECTIONS, flyerStale, nextStep, partOfStep, reachOpen, stepKey } from './flow';
 import { readJobFile } from './readFile';
 import { CHOOSE_SDGS, INVITE, OTHER_WORDING, SHOW_FLYER, SKIP_APPROVAL, stateOffer } from './walkChat';
@@ -32,7 +32,7 @@ import { FactDialog, typeLabel, type FactKey } from './FactBar';
 import { statusLine } from './Home';
 import { DeleteDialog } from './JobActions';
 import { LangDoc } from './LangDoc';
-import MenuButton from './MenuButton';
+import MenuButton, { placeFor } from './MenuButton';
 import { currentPart, hasFields, lineFit, onLine, partsOf, sectionOf, type Part } from './parts';
 import { GooglePreview, JobPageLangs, ShareCards } from './Publish';
 import { VersionsDialog } from './Review';
@@ -192,10 +192,67 @@ function PartsList({ parts, current, onGo }: { parts: Part[]; current: string; o
   );
 }
 
-type TabDef = { key: string; label: string; lang?: string };
+type TabDef = { key: string; label: string; lang?: string; linked?: boolean };
+
+/**
+ * 🔗 Link languages (section 19, phase 6, E): one icon at the end of the panel's tabs, only when the job has versions, with a tick box
+ * for each language, the job's own included. Linked, a change in one follows into the others.
+ */
+function LinkLangs({ job, disabled }: { job: DemoJob; disabled: boolean }) {
+  const [open, setOpen] = useState<CSSProperties | null>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const btn = useRef<HTMLButtonElement>(null);
+  const langs = [jobLang(job), ...versionsOf(job)];
+  const linked = job.linked ?? [];
+  useEffect(() => {
+    if (!open) return;
+    const down = (e: PointerEvent) => {
+      if (!box.current?.contains(e.target as Node) && !btn.current?.contains(e.target as Node)) setOpen(null);
+    };
+    document.addEventListener('pointerdown', down);
+    return () => document.removeEventListener('pointerdown', down);
+  }, [open]);
+  return (
+    <>
+      <Tip label={linked.length ? `Linked: ${linked.map((l) => langOf(l).label).join(', ')}. A change in one follows into the others` : 'Link languages, so a change in one follows into the others'} side="bottom">
+        <button ref={btn} type="button" className="ej-w-tab ej-link-btn" aria-label="Link languages" aria-haspopup="dialog" aria-expanded={Boolean(open)} data-on={linked.length > 1 || undefined} disabled={disabled} onClick={(e) => setOpen(open ? null : placeFor(e.currentTarget, 'right', false))}>
+          <Link2 size={14} strokeWidth={1.9} aria-hidden />
+        </button>
+      </Tip>
+      {open && (
+        <div
+          ref={box}
+          className="ej-menu"
+          data-fixed
+          style={open}
+          role="dialog"
+          aria-label="Link languages"
+          onKeyDown={(e) => {
+            if (e.key !== 'Escape') return;
+            e.stopPropagation();
+            setOpen(null);
+            btn.current?.focus();
+          }}
+        >
+          <span className="ej-menu-label">Linked languages</span>
+          {langs.map((l, i) => (
+            <label key={l} className="ej-menu-item flex items-center gap-2">
+              <input type="checkbox" checked={linked.includes(l)} autoFocus={i === 0} onChange={() => setLinked(job.id, linked.includes(l) ? linked.filter((x) => x !== l) : [...linked, l])} />
+              <span lang={l}>{langOf(l).native}</span>
+              {l === jobLang(job) && <span className="aj-faint">the job&apos;s own</span>}
+            </label>
+          ))}
+          <span className="aj-faint block px-2.5 pb-1" style={{ fontSize: 11.5 }}>
+            A change in one then follows into the others: structure, fixed texts, and text. Linking changes nothing already different.
+          </span>
+        </div>
+      )}
+    </>
+  );
+}
 
 /** The output panel's tabs, shown only when there is a second view: a language version, or the preview. */
-function PanelTabs({ tabs, active, onPick }: { tabs: TabDef[]; active: string; onPick: (k: string) => void }) {
+function PanelTabs({ tabs, active, onPick, end }: { tabs: TabDef[]; active: string; onPick: (k: string) => void; end?: ReactNode }) {
   const keys = (e: ReactKeyboardEvent<HTMLElement>) => {
     const at = tabs.findIndex((t) => t.key === active);
     const to = e.key === 'ArrowRight' ? at + 1 : e.key === 'ArrowLeft' ? at - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : null;
@@ -206,12 +263,23 @@ function PanelTabs({ tabs, active, onPick }: { tabs: TabDef[]; active: string; o
     document.getElementById(`ej-wtab-${next.key}`)?.focus();
   };
   return (
-    <div className="ej-w-tabs" role="tablist" aria-label="What the panel shows" onKeyDown={keys}>
-      {tabs.map((t) => (
-        <button key={t.key} type="button" role="tab" id={`ej-wtab-${t.key}`} aria-selected={t.key === active} aria-controls="ej-w-panel" tabIndex={t.key === active ? 0 : -1} className="ej-w-tab" lang={t.lang} onClick={() => onPick(t.key)}>
-          {t.label}
-        </button>
-      ))}
+    <div className="flex items-center">
+      <div className="ej-w-tabs min-w-0 flex-1" role="tablist" aria-label="What the panel shows" onKeyDown={keys}>
+        {tabs.map((t) => (
+          <button key={t.key} type="button" role="tab" id={`ej-wtab-${t.key}`} aria-selected={t.key === active} aria-controls="ej-w-panel" tabIndex={t.key === active ? 0 : -1} className="ej-w-tab" lang={t.lang} onClick={() => onPick(t.key)}>
+            {t.label}
+            {t.linked && (
+              <>
+                <Link2 size={11} strokeWidth={2} className="ej-tab-link" aria-hidden />
+                <span className="sr-only" lang="en">
+                  , linked
+                </span>
+              </>
+            )}
+          </button>
+        ))}
+      </div>
+      {end}
     </div>
   );
 }
@@ -984,6 +1052,18 @@ function JobWindow({ id }: { id: string }) {
     void askAi(job.id, writeVersion(label), { silent: `the ${label} version`, version: toWrite, open: (x) => openRef.current(x) });
   }, [toWrite, reading, s.reviewerAs, busyAi, job.id]);
 
+  // A linked change's text (section 19, phase 6, E): written by the AI when it is on; when it is off or cannot answer, by the rules.
+  const carryKey = job.carrying ? JSON.stringify(job.carrying) : '';
+  const askedCarry = useRef('');
+  useEffect(() => {
+    if (!carryKey || reading || s.reviewerAs || busyAi || askedCarry.current === carryKey) return;
+    askedCarry.current = carryKey;
+    const c = getState().jobs.find((x) => x.id === job.id)?.carrying;
+    if (!c) return;
+    if (ai.status !== 'on') return carryByRules(job.id);
+    void askAi(job.id, carryMessage(c), { silent: 'the linked languages', carry: c, open: (x) => openRef.current(x) }).then((done) => (done ? carried(job.id) : carryByRules(job.id)));
+  }, [carryKey, reading, s.reviewerAs, busyAi, ai.status, job.id]);
+
   const reviewing = Boolean(s.reviewerAs);
   const inVersion = tab.startsWith('lang:') && job.translations?.[tab.slice(5) as JobLang] ? (tab.slice(5) as JobLang) : undefined;
   const version = inVersion ? job.translations?.[inVersion] : undefined;
@@ -995,8 +1075,8 @@ function JobWindow({ id }: { id: string }) {
   const focus = sectionOf(current);
   const langs = versionsOf(job).map((k) => langOf(k));
   const tabs: TabDef[] = [
-    { key: 'doc', label: 'Job description' },
-    ...langs.map((l) => ({ key: `lang:${l.key}`, label: l.native, lang: l.key })),
+    { key: 'doc', label: 'Job description', linked: (job.linked ?? []).includes(jobLang(job)) },
+    ...langs.map((l) => ({ key: `lang:${l.key}`, label: l.native, lang: l.key, linked: (job.linked ?? []).includes(l.key) })),
     ...(preview ? [{ key: 'preview', label: 'Preview' }] : []),
     ...extra.map((k) => ({ key: k, label: EXTRA_TABS[k] ?? k })),
   ];
@@ -1012,11 +1092,8 @@ function JobWindow({ id }: { id: string }) {
     settleAsk(job.id);
     setPartsOpen(false);
     if (!reviewing) unparkPart(job.id, key);
-    // Reviewers read the outline in the job description itself; they cannot reorder it.
-    if (key === 'outline' && reviewing) {
-      if (phone) setView('job');
-      return scrollToId(`ej-sec-${job.tags[0]}`);
-    }
+    // Reviewers see the outline read only, in the same design (section 19, phase 6, B).
+    if (key === 'outline' && reviewing) return phone ? setOutlineOpen(true) : openPick('sections');
     if (key === 'outline') {
       if (phone && !job.setup) return setOutlineOpen(true);
       return openPick(job.setup ? 'templates' : 'sections');
@@ -1263,7 +1340,7 @@ function JobWindow({ id }: { id: string }) {
           }}
         />
       ) : lang ? (
-        <LangDoc job={job} lang={lang} readOnly={reviewing} />
+        <LangDoc job={job} s={s} lang={lang} readOnly={reviewing} />
       ) : EXTRA_TABS[active] ? (
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
@@ -1402,7 +1479,7 @@ function JobWindow({ id }: { id: string }) {
             </div>
             {tabs.length > 1 && (
               <div className="shrink-0 border-b aj-hair">
-                <PanelTabs tabs={tabs} active={active} onPick={setTab} />
+                <PanelTabs tabs={tabs} active={active} onPick={setTab} end={langs.length ? <LinkLangs job={job} disabled={reviewing} /> : undefined} />
               </div>
             )}
             {panel}
@@ -1416,17 +1493,19 @@ function JobWindow({ id }: { id: string }) {
         {outlineOpen && (
           <Dialog title={formatOf(s, job.format).label} subtitle="This job's sections" onClose={() => setOutlineOpen(false)} half>
             <div className="flex flex-col gap-3">
-              <button
-                type="button"
-                className="aj-pill self-start"
-                onClick={() => {
-                  setOutlineOpen(false);
-                  openPick('templates');
-                }}
-              >
-                Change the template
-              </button>
-              <JobOutline job={job} s={s} />
+              {!reviewing && (
+                <button
+                  type="button"
+                  className="aj-pill self-start"
+                  onClick={() => {
+                    setOutlineOpen(false);
+                    openPick('templates');
+                  }}
+                >
+                  Change the template
+                </button>
+              )}
+              <JobOutline job={job} s={s} lang={inVersion} />
             </div>
           </Dialog>
         )}
@@ -1475,7 +1554,7 @@ function JobWindow({ id }: { id: string }) {
           </div>
           {tabs.length > 1 && (
             <div className="shrink-0 border-b aj-hair">
-              <PanelTabs tabs={tabs} active={active} onPick={setTab} />
+              <PanelTabs tabs={tabs} active={active} onPick={setTab} end={langs.length ? <LinkLangs job={job} disabled={reviewing} /> : undefined} />
             </div>
           )}
           {panel}
@@ -1488,6 +1567,7 @@ function JobWindow({ id }: { id: string }) {
             setPick={setPick}
             onApply={applyPick}
             onClose={() => setPick(null)}
+            lang={inVersion}
             start={{ x: body.left + 12, y: Math.round(body.top + (body.h || 700) * 0.08), w: Math.min(520, Math.max(360, chatW - 24)), h: Math.round((body.h || 700) * 0.88) - 12 }}
           />
         )}

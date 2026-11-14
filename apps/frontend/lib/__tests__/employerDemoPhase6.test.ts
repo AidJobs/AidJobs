@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { addTranslation, applyFormat, applyTemplate, approveSection, bringBackFixed, chooseStyle, editFixed, editSection, goOn, hireAgain, keepForAll, keepWordingForAll, leaveOutFixed, leavePoint, moveFixed, NEXT_QUESTION, outlineOp, publish, publishBlock, removeVersionSection, resetFixed, restoreVersion, sendChat, setFacts, setJobLang, setPace, settleQuestion, startJob, toggleCommitment, toggleSection, undoStep, unparkPart } from '../../components/employer-demo/actions';
+import { addTranslation, alsoIn, applyFormat, applyTemplate, approveFixed, approveSection, bringBackFixed, chooseStyle, editFixed, editSection, editVersionSection, goOn, hireAgain, keepForAll, keepWordingForAll, leaveOutFixed, leavePoint, moveFixed, NEXT_QUESTION, outlineOp, publish, publishBlock, removeVersionSection, resetFixed, restoreVersion, reviewTranslation, sendChat, setApply, setFacts, setJobLang, setLinked, setPace, settleQuestion, startJob, toggleCommitment, toggleSection, translateFixed, undoStep, unparkPart, USE_WORDINGS, versionOp } from '../../components/employer-demo/actions';
 import { fixedShown } from '../../components/employer-demo/fixed';
+import { differences } from '../../components/employer-demo/langs';
+import { stale, untranslated } from '../../components/employer-demo/translate';
 import { applyAiTurn, type OpenTarget } from '../../components/employer-demo/aiActions';
 import { contextFor, resetAi } from '../../components/employer-demo/ai';
 import { inOutlineOrder, outlineOrder, SECTION_BY_KEY } from '../../components/employer-demo/engine';
-import { nextStep, type Step } from '../../components/employer-demo/flow';
+import { checkPoints, nextStep, type Step } from '../../components/employer-demo/flow';
 import { grouped, groupingFrom, groupOrderOf, moveAfter, moveBy, moveGroupBy, moveInReading } from '../../components/employer-demo/outline';
 import { partsOf } from '../../components/employer-demo/parts';
 import { getState, normalise, resetDemo, update } from '../../components/employer-demo/store';
@@ -449,6 +451,144 @@ describe('fixed texts from the draft (section 19, phase 6, D)', () => {
     update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === 'job-cps' ? { ...j, fixedPublished: undefined } : j)) }));
     const back = normalise({ ...getState() }).jobs.find((j) => j.id === 'job-cps')!;
     expect(Object.keys(back.fixedPublished?.en ?? {})).toEqual(back.commitments);
+  });
+});
+
+describe('languages, each independent (section 19, phase 6, E)', () => {
+  const fr = () => job('job-comms').translations!.fr!;
+  const own = (k: string) => job('job-comms').sections.find((x) => x.key === k)!;
+  beforeEach(() => {
+    addTranslation('job-comms', 'fr');
+    addTranslation('job-comms', 'es');
+  });
+
+  it('an edit by the user reaches no other language unless linked, and marks none behind; the change note offers the others once', () => {
+    const before = fr().sections.find((x) => x.key === 'responsibilities')!.lines;
+    editSection('job-comms', 'responsibilities', '- A new duty written by hand', true);
+    expect(fr().sections.find((x) => x.key === 'responsibilities')!.lines).toEqual(before);
+    expect(stale(job('job-comms'), fr())).toBe(false);
+    expect(job('job-comms').undoStep?.also).toEqual({ langs: ['fr', 'es'], from: 'en' });
+    alsoIn('job-comms', ['fr']);
+    expect(fr().sections.find((x) => x.key === 'responsibilities')!.lines).toEqual(['- A new duty written by hand']);
+    expect(fr().reviewed).toBe(false);
+    expect(job('job-comms').undoStep?.also).toEqual({ langs: ['es'], from: 'en' });
+    expect(job('job-comms').translations?.es?.sections.find((x) => x.key === 'responsibilities')!.lines).not.toEqual(['- A new duty written by hand']);
+  });
+
+  it('a change by the rules or the facts still marks a version behind, with its banner', () => {
+    setApply('job-comms', { method: 'email', address: 'jobs@riverstone.example.org' });
+    expect(stale(job('job-comms'), fr())).toBe(true);
+  });
+
+  it('linked, every change follows: structure copied, text drafted by the table and marked for review; the note names the languages', () => {
+    setLinked('job-comms', ['en', 'fr']);
+    outlineOp('job-comms', { op: 'add', key: 'firstweeks' });
+    expect(fr().sections.some((x) => x.key === 'firstweeks')).toBe(true);
+    expect(fr().sections.find((x) => x.key === 'firstweeks')?.title).toBe('Vos premières semaines');
+    expect(job('job-comms').translations?.es?.sections.some((x) => x.key === 'firstweeks')).toBe(false);
+    expect(job('job-comms').undoStep?.text).toMatch(/also in French$/);
+    outlineOp('job-comms', { op: 'groupBefore', group: 'offer', before: 'job' });
+    expect(fr().groupOrder).toEqual(job('job-comms').groupOrder);
+    editSection('job-comms', 'offer', '- Annual leave, medical insurance, and a learning budget\n- A brand new line only English has', true);
+    const offer = fr().sections.find((x) => x.key === 'offer')!.lines;
+    expect(offer[0]).toBe('- Congés annuels, assurance médicale et budget de formation');
+    expect(offer[1]).toBe('- A brand new line only English has');
+    expect(untranslated(job('job-comms'), fr())).toBeGreaterThan(0);
+    expect(fr().reviewed).toBe(false);
+  });
+
+  it('a linked edit from a version into the job’s own language, with the AI off, marks the section “to update”, with where it came from', () => {
+    setLinked('job-comms', ['en', 'fr']);
+    editVersionSection('job-comms', 'fr', 'responsibilities', '- Une nouvelle tâche');
+    expect(job('job-comms').toUpdate).toEqual({ responsibilities: 'fr' });
+    expect(checkPoints(job('job-comms'), getState()).some((p) => p.key === 'to-update-responsibilities')).toBe(true);
+    editSection('job-comms', 'responsibilities', own('responsibilities').lines.join('\n'), false);
+    expect(job('job-comms').toUpdate).toBeUndefined();
+  });
+
+  it('a linked language that lacks the section is skipped', () => {
+    removeVersionSection('job-comms', 'fr', 'offer');
+    setLinked('job-comms', ['en', 'fr']);
+    editSection('job-comms', 'offer', '- Something new', true);
+    expect(fr().sections.some((x) => x.key === 'offer')).toBe(false);
+  });
+
+  it('Undo puts every language back, with the links', () => {
+    setLinked('job-comms', ['en', 'fr']);
+    const before = { tags: job('job-comms').tags, fr: fr() };
+    outlineOp('job-comms', { op: 'remove', key: 'offer' });
+    expect(fr().sections.some((x) => x.key === 'offer')).toBe(false);
+    undoStep('job-comms');
+    expect(job('job-comms').tags).toEqual(before.tags);
+    expect(fr()).toEqual(before.fr);
+    expect(job('job-comms').linked).toEqual(['en', 'fr']);
+  });
+
+  it('a version is edited with the same editor: as many lines as it needs, the lines still in the job’s language counted by their text', () => {
+    const src = own('responsibilities').lines;
+    editVersionSection('job-comms', 'fr', 'responsibilities', [src[2], 'Une ligne de plus', src[0]].join('\n'));
+    expect(fr().sections.find((x) => x.key === 'responsibilities')!.lines).toHaveLength(3);
+    expect(untranslated(job('job-comms'), { ...fr(), sections: fr().sections.filter((x) => x.key === 'responsibilities') })).toBe(2);
+    expect(job('job-comms').undoStep).toMatchObject({ tab: 'fr', keys: ['responsibilities'] });
+  });
+
+  it('a version’s own structure: a section only French has, and one not in Spanish, are marked in the outline', () => {
+    versionOp('job-comms', 'fr', { op: 'add', key: 'conditions' });
+    versionOp('job-comms', 'es', { op: 'remove', key: 'offer' });
+    expect(differences(job('job-comms'), 'fr')).toEqual({ conditions: 'French only' });
+    expect(differences(job('job-comms')).offer).toBe('Not in Spanish');
+  });
+
+  it('a template change reaches every language; This job’s sections only the language in view and the linked ones', () => {
+    const other = getState().formats.find((f) => f.key !== job('job-comms').format && !f.key.startsWith('pasted-') && f.order.some((o) => o.key === 'background'))!;
+    applyFormat('job-comms', other.key);
+    expect(fr().sections.map((x) => x.key).sort()).toEqual([...job('job-comms').tags].sort());
+    versionOp('job-comms', 'fr', { op: 'remove', key: 'background' });
+    expect(job('job-comms').tags).toContain('background');
+    expect(job('job-comms').translations?.es?.sections.some((x) => x.key === 'background')).toBe(true);
+  });
+
+  it('fixed texts per language: the organisation’s wording word for word; else, with the AI off, its text marked to translate; a machine translation marked until the version is approved, then offered for every job', () => {
+    const k = job('job-comms').commitments.find((x) => !getState().org.standard.find((c) => c.key === x)?.locked)!;
+    expect(fixedShown(job('job-comms'), getState(), k, 'fr')).toMatchObject({ toTranslate: true, textLang: 'en' });
+    update((s) => ({ ...s, org: { ...s.org, fixedWording: { fr: { [k]: 'Notre formulation.' } } } }));
+    expect(fixedShown(job('job-comms'), getState(), k, 'fr')).toMatchObject({ text: 'Notre formulation.', toTranslate: false, machine: false });
+    const locked = job('job-comms').commitments.find((x) => getState().org.standard.find((c) => c.key === x)?.locked)!;
+    translateFixed('job-comms', locked, 'Traduction automatique.', 'fr');
+    expect(fixedShown(job('job-comms'), getState(), locked, 'fr')).toMatchObject({ text: 'Traduction automatique.', machine: true });
+    reviewTranslation('job-comms', 'fr');
+    expect(fixedShown(job('job-comms'), getState(), locked, 'fr').machine).toBe(false);
+    expect(job('job-comms').wordingAsk).toBe('fr');
+    sendChat('job-comms', USE_WORDINGS);
+    expect(getState().org.fixedWording?.fr?.[locked]).toBe('Traduction automatique.');
+    expect(job('job-comms').wordingAsk).toBeUndefined();
+  });
+
+  it('in a job whose own language is not the organisation’s, the fixed texts are shown, marked, and approved there with a check point', () => {
+    const id = startJob('Nous recherchons un chargé de logistique à Goma, CDD de 12 mois', undefined, [], true);
+    const k = job(id).commitments[0];
+    expect(fixedShown(job(id), getState(), k)).toMatchObject({ toTranslate: true });
+    translateFixed(id, k, 'Texte traduit.', 'fr');
+    expect(checkPoints(job(id), getState()).some((p) => p.key === 'fixed-machine')).toBe(true);
+    approveFixed(id, k);
+    expect(checkPoints(job(id), getState()).some((p) => p.key === 'fixed-machine')).toBe(false);
+  });
+
+  it('the AI never changes the link, and its changes in a language follow the linked ones', () => {
+    applyAiTurn('job-comms', 'link French and Spanish', { reply: 'Linked.', actions: [{ type: 'set_link', languages: ['fr', 'es'] }] }, open);
+    expect(job('job-comms').linked).toBeUndefined();
+    expect(job('job-comms').chat.filter((m) => m.ai).at(-1)?.text).toContain('an action the demo does not have');
+    setLinked('job-comms', ['en', 'fr']);
+    applyAiTurn('job-comms', 'add First weeks', { reply: 'Added.', actions: [{ type: 'add_section', section: 'firstweeks' }] }, open);
+    expect(fr().sections.some((x) => x.key === 'firstweeks')).toBe(true);
+  });
+
+  it('the context of a full job with versions and per-language data stays within 80,000 characters', () => {
+    setLinked('job-comms', ['en', 'fr', 'es']);
+    for (const k of ['team', 'background', 'setting', 'deliverables', 'relationships', 'firstweeks', 'competencies', 'languages', 'practical', 'conditions', 'funding', 'assessment']) outlineOp('job-comms', { op: 'add', key: k });
+    for (const k of job('job-comms').commitments) translateFixed('job-comms', k, 'Une traduction assez longue du texte de cet engagement, pour la taille. '.repeat(4), 'fr');
+    const body = JSON.stringify({ message: 'x', first: false, context: contextFor(getState(), job('job-comms'), 'responsibilities', false, 'fr', undefined, { from: 'en', keys: job('job-comms').tags, fixed: job('job-comms').commitments, langs: ['fr', 'es'] }) });
+    expect(body.length).toBeLessThan(80_000);
   });
 });
 

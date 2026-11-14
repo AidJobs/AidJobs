@@ -3,10 +3,12 @@
 import { AlertCircle, Check, CheckCircle2, ChevronUp, Info, Lock, MessageSquare, Pencil, Plus, Settings2, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import Tip from '@/components/site/Tip';
-import { addRemark, answerFact, approveSection, bringBackFixed, changedSinceLastRound, dismissChange, editSection, formatOf, groupingOf, markGenuine, outlineOp, sendChat, setApply, setFacts, setMethod, settleRemark, subId, undoLastChange, undoStep } from './actions';
+import { addRemark, alsoIn, answerFact, approveSection, bringBackFixed, changedSinceLastRound, dismissChange, editSection, formatOf, groupingOf, markGenuine, outlineOp, sendChat, setApply, setFacts, setMethod, settleRemark, subId, undoLastChange, undoStep, versionOp } from './actions';
 import Grip, { dropAt, type GripAction } from './Grip';
 import FixedBlock from './FixedBlock';
-import { fixedLabel, offeredFixed } from './fixed';
+import { fixedLabel, fixedList, offeredFixed } from './fixed';
+import { viewOf } from './langs';
+import { jobLang, langOf } from './translate';
 import { placeFor } from './MenuButton';
 import { groupOfKey, groupOrderOf, KEPT } from './outline';
 import { contractPicks, deadlinePicks, eligibilityPicks, gradePicks, languagePicks, methodPicks, placePatch, placePicks, salaryPicks, safeguardingPicks, type Pick } from './answers';
@@ -14,7 +16,7 @@ import { DOCUMENTS } from './apply';
 import { saveAboutForOrg } from './context';
 import Composer, { type ComposerHandle } from './Composer';
 import { addDays, commitmentText, COMMITMENTS, completeText, findInclusive, GROUPS, headingFor, inOutlineOrder, longDate, looseLocation, PLACES, quality, recommendSections, SECTIONS, suggestTitle, titleSuggestions, type QualityItem } from './engine';
-import type { ApplySettings, ChatMsg, DemoJob, Facts, GroupKey, Section as Sec, State } from './types';
+import type { ApplySettings, ChatMsg, DemoJob, Facts, GroupKey, JobLang, Section as Sec, State } from './types';
 import { RevealBlock } from './Reveal';
 import { getState } from './store';
 import { Dialog, Field, inputStyle, scrollInside } from './ui';
@@ -212,8 +214,11 @@ type SectionProps = { job: DemoJob; sec: Sec; s: State; notes: QualityItem[]; on
 /** What the window's draft gives each section (section 19, phase 6, C): its grip's moves and the + panel opened from it. */
 type DraftTools = { grip: (sec: Sec) => GripAction[]; onKey: (key: string, by: -1 | 1) => void; onDrag: (key: string, y: number | null, done: boolean) => void; dropAfter: string | null | undefined };
 
-/** The change note for the last change made with the icons, with its Undo; while a linked translation is written, Undo waits. */
-function StepNote({ job, onSeeChat }: { job: DemoJob; onSeeChat?: () => void }) {
+/**
+ * The change note for the last change made with the icons, with its Undo; while a linked translation is written, Undo waits. After a
+ * change the other languages do not follow, it offers them once, quietly: "Also in French · Arabic".
+ */
+export function StepNote({ job, onSeeChat }: { job: DemoJob; onSeeChat?: () => void }) {
   const st = job.undoStep;
   if (!st) return null;
   return (
@@ -222,6 +227,23 @@ function StepNote({ job, onSeeChat }: { job: DemoJob; onSeeChat?: () => void }) 
       <span className="min-w-0 flex-1">
         {st.text}
         {st.settings ? '. Organisation settings changed too; Undo leaves them' : ''}
+        {st.writing ? '. Writing the linked languages…' : ''}
+        {st.also && (
+          <span className="ej-also">
+            {' '}
+            Also in{' '}
+            {st.also.langs.map((l, i) => (
+              <Fragment key={l}>
+                {i > 0 && <span aria-hidden> · </span>}
+                <Tip label={`Make the same change in ${langOf(l).label}`}>
+                  <button type="button" className="aj-text-btn ej-also-btn" onClick={() => alsoIn(job.id, [l])}>
+                    {langOf(l).label}
+                  </button>
+                </Tip>
+              </Fragment>
+            ))}
+          </span>
+        )}
       </span>
       <Tip label={st.writing ? 'Waits until the linked translation is written' : 'Put it back as it was, in every language'}>
         <button type="button" className="aj-text-btn" style={{ height: 24 }} onClick={() => undoStep(job.id)} aria-disabled={st.writing || undefined}>
@@ -580,14 +602,17 @@ export function TitleEditor({ job, disabled }: { job: DemoJob; disabled?: boolea
  * The + panel (section 19, phase 6, C): the outline's own chips, the group of the place it was opened first, then the other groups,
  * then any fixed text left out, to bring it back. A section goes where the + was opened (from the last +, at the end of its group).
  */
-function AddPanel({ job, s, at, onClose }: { job: DemoJob; s: State; at: { after: string | null; anchor: HTMLElement; end: boolean }; onClose: () => void }) {
+export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State; at: { after: string | null; anchor: HTMLElement; end: boolean }; onClose: () => void; lang?: JobLang }) {
   const box = useRef<HTMLDivElement>(null);
   const [place] = useState(() => placeFor(at.anchor, 'left', at.end));
-  const g = groupingOf(job);
+  const view = viewOf(job, lang);
+  const g = view?.grouping ?? groupingOf(job);
+  const keys = view?.keys ?? job.tags;
   const here = at.after ? groupOfKey(g, at.after) : groupOrderOf(g)[0];
   const groups = [here, ...groupOrderOf(g).filter((x) => x !== here)];
   const rec = recommendSections(formatOf(s, job.format), job.facts);
-  const left = offeredFixed(s.org).filter((k) => !job.commitments.includes(k));
+  const left = offeredFixed(s.org).filter((k) => !fixedList(job, lang).includes(k));
+  const version = lang && lang !== jobLang(job) ? lang : undefined;
   useEffect(() => {
     requestAnimationFrame(() => box.current?.querySelector<HTMLElement>('button')?.focus({ preventScroll: true }));
     const down = (e: PointerEvent) => {
@@ -597,10 +622,12 @@ function AddPanel({ job, s, at, onClose }: { job: DemoJob; s: State; at: { after
     return () => document.removeEventListener('pointerdown', down);
   }, [onClose]);
   const add = (key: string) => {
-    outlineOp(job.id, at.end ? { op: 'add', key } : { op: 'add', key, after: at.after });
+    const op = at.end ? ({ op: 'add', key } as const) : ({ op: 'add', key, after: at.after } as const);
+    if (version) versionOp(job.id, version, op);
+    else outlineOp(job.id, op);
     onClose();
     requestAnimationFrame(() => {
-      scrollInside(document.getElementById(`ej-sec-${key}`));
+      scrollInside(document.getElementById(`${version ? 'ej-ver-' : 'ej-sec-'}${key}`));
       document.querySelector<HTMLElement>(`[data-grip-key="${key}"]`)?.focus({ preventScroll: true });
     });
   };
@@ -620,7 +647,7 @@ function AddPanel({ job, s, at, onClose }: { job: DemoJob; s: State; at: { after
       }}
     >
       {groups.map((gk) => {
-        const missing = SECTIONS.filter((d) => d.group === gk && !job.tags.includes(d.key));
+        const missing = SECTIONS.filter((d) => d.group === gk && !keys.includes(d.key));
         if (!missing.length) return null;
         return (
           <div key={gk} className="flex flex-col gap-1" role="group" aria-label={GROUPS.find((x) => x.key === gk)?.label}>
@@ -649,7 +676,7 @@ function AddPanel({ job, s, at, onClose }: { job: DemoJob; s: State; at: { after
                   type="button"
                   className="ej-add"
                   onClick={() => {
-                    bringBackFixed(job.id, k);
+                    bringBackFixed(job.id, k, lang);
                     onClose();
                   }}
                 >

@@ -3,14 +3,16 @@
 import { ChevronDown, GripHorizontal, MessagesSquare, Plus, Sparkles, X } from 'lucide-react';
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import Tip from '@/components/site/Tip';
-import { createFormat, formatOf, groupingOf, headingOf, outlineOp, setFacts as changeFacts } from './actions';
+import { createFormat, formatOf, groupingOf, headingOf, outlineOp, setFacts as changeFacts, versionOp } from './actions';
+import { differences } from './langs';
+import { jobLang, langOf, versionsOf } from './translate';
 import { CONTRACTS, ENGAGEMENTS, FAMILIES_ORDER, GROUPS, headingFor, orderSections, recommendSections, SECTION_BY_KEY } from './engine';
 import { addToGroup, applyToEntries, formatGrouping, groupedEntries, groupOfKey, groupOrderOf } from './outline';
 import OutlineEditor from './OutlineEditor';
 import MenuButton from './MenuButton';
 import { recommendation, TYPE_REASONS, wordsFor } from './setup';
 import { getState } from './store';
-import type { DemoJob, Format, Recruitment, State } from './types';
+import type { DemoJob, Format, JobLang, Recruitment, State } from './types';
 import { inputStyle } from './ui';
 
 /**
@@ -270,15 +272,24 @@ function TemplateFields({ s, job, pick, setPick }: { s: State; job: DemoJob; pic
  * This job's own sections, once a template is in use (section 19, phase 6, B): the same outline, each change applied at once to the
  * job, text already written kept with its section; read only for reviewers.
  */
-export function JobOutline({ s, job }: { s: State; job: DemoJob }) {
-  const rows = job.tags.map((k) => ({ key: k, heading: headingOf(s, job, k) }));
+export function JobOutline({ s, job, lang }: { s: State; job: DemoJob; lang?: JobLang }) {
+  const version = lang && lang !== jobLang(job) ? job.translations?.[lang] : undefined;
+  const rows = version ? version.sections.map((x) => ({ key: x.key, heading: x.title })) : job.tags.map((k) => ({ key: k, heading: headingOf(s, job, k) }));
   const ro = Boolean(s.reviewerAs);
+  const where = version && lang ? ` They apply to the ${langOf(lang).label} version and the languages linked to it.` : versionsOf(job).length ? ' They apply to this language and the languages linked to it.' : '';
   return (
     <div className="flex flex-col gap-2">
       <span className="aj-faint" style={{ fontSize: 12 }}>
-        {ro ? 'Read only for reviewers.' : 'Drag a section, or press its grip for more; click a heading to rename it. Each change applies at once, and text already written stays with its section.'}
+        {ro ? 'Read only for reviewers.' : `Drag a section, or press its grip for more; click a heading to rename it. Each change applies at once, and text already written stays with its section.${where}`}
       </span>
-      <OutlineEditor rows={rows} grouping={groupingOf(job)} recommended={recommendSections(formatOf(s, job.format), job.facts)} label="This job's sections, by group" onOp={ro ? undefined : (op) => outlineOp(job.id, op)} />
+      <OutlineEditor
+        rows={rows}
+        grouping={version ? groupingOf(version) : groupingOf(job)}
+        recommended={recommendSections(formatOf(s, job.format), job.facts)}
+        marks={differences(job, version && lang ? lang : jobLang(job))}
+        label={version && lang ? `${langOf(lang).label} version's sections, by group` : "This job's sections, by group"}
+        onOp={ro ? undefined : (op) => (version && lang ? versionOp(job.id, lang, op) : outlineOp(job.id, op))}
+      />
     </div>
   );
 }
@@ -336,7 +347,7 @@ function viewport(): { w: number; h: number } {
  * arrow keys on its handle), resized from its corner (dragged, or the arrow keys on that handle), and closed at any time; its place and
  * size are remembered and kept on screen. Closing it while the first template is chosen leaves the chat's question open.
  */
-export function TemplatePanel({ job, s, pick, setPick, onApply, onClose, start }: { job: DemoJob; s: State; pick: Pick; setPick: (p: Pick) => void; onApply: () => void; onClose: () => void; start: Box }) {
+export function TemplatePanel({ job, s, pick, setPick, onApply, onClose, start, lang }: { job: DemoJob; s: State; pick: Pick; setPick: (p: Pick) => void; onApply: () => void; onClose: () => void; start: Box; lang?: JobLang }) {
   const [box, setBox] = useState<Box>(() => savedBox() ?? start);
   const [view, setView] = useState(viewport);
   const [small, setSmall] = useState(false);
@@ -395,7 +406,7 @@ export function TemplatePanel({ job, s, pick, setPick, onApply, onClose, start }
   }, []);
   const setup = Boolean(job.setup);
   const ro = Boolean(s.reviewerAs);
-  const tabs: Array<[Pick['tab'], string]> = setup ? [['templates', 'Templates'], ['own', 'Create your own']] : [['sections', "This job's sections"], ['templates', 'Templates'], ['own', 'Create your own']];
+  const tabs: Array<[Pick['tab'], string]> = setup ? [['templates', 'Templates'], ['own', 'Create your own']] : ro ? [['sections', "This job's sections"]] : [['sections', "This job's sections"], ['templates', 'Templates'], ['own', 'Create your own']];
   const main = applyLabel(s, job, pick);
   const title = setup ? 'Choose a template' : `Template: ${formatOf(s, job.format).label}`;
   const arrows = (e: ReactKeyboardEvent<HTMLElement>, kind: 'move' | 'size') => {
@@ -454,7 +465,7 @@ export function TemplatePanel({ job, s, pick, setPick, onApply, onClose, start }
             <PanelTabs tabs={tabs} pick={pick} setPick={setPick} />
           </div>
           <div className="aj-scroll min-h-0 flex-1 px-4 py-3" role="tabpanel" aria-labelledby={`ej-tp-${pick.tab}`}>
-            {pick.tab === 'sections' ? <JobOutline s={s} job={job} /> : pick.tab === 'own' ? <OwnFields job={job} s={s} pick={pick} setPick={setPick} /> : <TemplateFields s={s} job={job} pick={pick} setPick={setPick} />}
+            {pick.tab === 'sections' ? <JobOutline s={s} job={job} lang={lang} /> : pick.tab === 'own' ? <OwnFields job={job} s={s} pick={pick} setPick={setPick} /> : <TemplateFields s={s} job={job} pick={pick} setPick={setPick} />}
           </div>
           {pick.tab !== 'sections' && (
             <div className="flex shrink-0 flex-col gap-1.5 border-t px-4 py-2.5 aj-hair">

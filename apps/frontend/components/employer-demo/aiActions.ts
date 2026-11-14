@@ -51,6 +51,7 @@ import {
   editFixed,
   leaveOutFixed,
   translateFixed,
+  followLinks,
 } from './actions';
 import { GROUP_KEYS, groupOfKey, KEPT } from './outline';
 import { canWord, fixedLabel, isLocked, ORG_LANG, orgWording } from './fixed';
@@ -459,7 +460,7 @@ export type Applied = { refused: string[]; opened: OpenTarget[] };
  * null for the reply to the first message, and empty when the window asked the AI to go on by itself (to write the next section). `open`
  * brings a part, a panel, or a dialog into view in the window.
  */
-export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open: (t: OpenTarget) => void, by?: string, inVersionTab?: JobLang, fromPage?: boolean): Applied {
+export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open: (t: OpenTarget) => void, by?: string, inVersionTab?: JobLang, fromPage?: boolean, carrying?: boolean): Applied {
   const inVersion = inVersionTab && getState().jobs.find((j) => j.id === id)?.translations?.[inVersionTab] ? inVersionTab : undefined;
   const refused: string[] = [];
   const opened: OpenTarget[] = [];
@@ -869,6 +870,8 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
     }
   }
   if (writes.length) writeSections(id, writes, note);
+  // The AI's changes in the language in view follow into the languages linked to it (section 19, phase 6, F); a carry is the following.
+  if (!carrying) followLinks(id, start, inVersion ?? jobLang(start));
   const now = job();
   if (!now) return { refused, opened };
   const before = said === null ? now.chat.slice(0, firstUser + 1) : start.chat;

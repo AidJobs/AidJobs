@@ -166,7 +166,7 @@ function FixedRow({ job, s, lang, k, first, last, drop, onDrag }: { job: DemoJob
           </div>
         </div>
       ) : (
-        <p className="ej-commitment m-0" lang={f.toTranslate ? ORG_LANG : lang} dir={f.toTranslate ? 'ltr' : langOf(lang).dir}>
+        <p className="ej-commitment m-0" lang={f.textLang ?? lang} dir={langOf(f.textLang ?? lang).dir}>
           {f.text}
         </p>
       )}

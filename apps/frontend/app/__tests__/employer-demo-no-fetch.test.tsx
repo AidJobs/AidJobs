@@ -2186,7 +2186,10 @@ describe('employer demo: round 7, phase 4 (returning employers, jobs in their st
     press(Array.from(panel().querySelectorAll('button')).find((b) => b.textContent === `Add to ${resp.title}`));
     expect(job('job-fin').review.remarks.at(-1)).toMatchObject({ section: 'responsibilities', author: 'Daniel Mwangi', text: 'Please name the two field offices' });
     part(formatOf(getState(), job('job-fin').format).label);
-    expect(container.querySelector('section.ej-float')).toBeNull();
+    // Changed by phase 6 (section 19, B): reviewers see the outline in the same design, read only.
+    expect(container.querySelector('section.ej-float .ej-ol')).not.toBeNull();
+    expect(container.querySelector('section.ej-float .ej-grip, section.ej-float .ej-ol-x, section.ej-float .ej-add')).toBeNull();
+    press(container.querySelector('[aria-label="Close the template panel"]'));
     press(Array.from(panel().querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Approve'));
     expect(job('job-fin').review.reviewers.find((r) => r.name === 'Daniel Mwangi')?.decision).toBe('approved');
     expect(job('job-fin').chat.some((m) => m.state)).toBe(false);

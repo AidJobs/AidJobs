@@ -14,7 +14,8 @@ import { ChatPanel, DocumentView, TitleEditor } from './DocPane';
 import FactBar from './FactBar';
 import { statusLine } from './Home';
 import { DeleteDialog } from './JobActions';
-import { LangDoc, LangSwitch } from './LangDoc';
+import { LangSwitch } from './LangDoc';
+import { LangDocArchived } from './LangDocArchived';
 import MenuButton, { type MenuAction } from './MenuButton';
 import { ReviewDialog, ReviewPanel, VersionsDialog } from './Review';
 import { go, goBack, goToPart, useDemo } from './store';
@@ -274,7 +275,7 @@ export default function Create({ id }: { id?: string }) {
           </div>
         )}
         {job.sections.length && docLang ? (
-          <LangDoc job={job} lang={docLang} readOnly={reviewing} />
+          <LangDocArchived job={job} lang={docLang} readOnly={reviewing} />
         ) : job.sections.length ? (
           <DocumentView job={job} s={s} onSeeChat={reviewing ? undefined : () => (phone ? setSheet('chat') : setPanel('chat'))} />
         ) : (

@@ -2724,3 +2724,52 @@ button.ej-step:hover {
   color: var(--text-2);
   font-size: 12.5px;
 }
+
+/* A version (section 19, phase 6, E): the job's own section faintly below each one, as one block for reference. */
+.ej-ref {
+  margin-top: 6px;
+  padding: 6px 10px;
+  border-inline-start: 2px solid var(--hair);
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+.ej-ref p,
+.ej-ref ul {
+  margin: 2px 0;
+}
+
+.ej-ref-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.ej-also {
+  white-space: normal;
+}
+
+.aj-root .ej-also-btn {
+  height: auto;
+  padding: 0 2px;
+  text-decoration: underline;
+}
+
+.aj-root .ej-link-btn {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 36px;
+  color: var(--text-3);
+}
+
+.aj-root .ej-link-btn[data-on='true'] {
+  color: var(--sage-7);
+}
+
+.ej-tab-link {
+  display: inline;
+  margin-inline-start: 4px;
+  color: var(--sage-7);
+  vertical-align: -1px;
+}

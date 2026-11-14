@@ -41,7 +41,7 @@ import { changeWithUndo, getState, go, nextId, notify, update, updateJob } from 
 import { changeSummary, tellOffer } from './changes';
 import { addRound, invitedCount, planFor, REACH_EMAILS, reachRoom, reachUsed } from './invites';
 import { canReopen, isPublished } from './lifecycle';
-import { detectLang, draftTranslation, draftVersionSection, headingIn, inLanguage, jobLang, keptTranslation, langOf, redraftTranslation, sourceOf, versionChoices, versionsOf } from './translate';
+import { advancedSource, detectLang, draftTranslation, draftVersionSection, headingIn, inLanguage, jobLang, keptTranslation, langOf, redraftTranslation, sourceOf, versionChoices, versionsOf } from './translate';
 import { contentOf, describeStyle, proposedStyle, recommendation, styleFromReply, styleWords, toneOf, TYPE_REASONS, usualTemplate, wordsFor } from './setup';
 import { profileFor, profileName, profileOf } from './profiles';
 import { aiWrites, ASKS, asksOf, checkPoints, contentPrint, essentials, ESSENTIAL_WORDS, FIXED_SECTIONS, isSettled, isWritten, nextStep, parkedIn, parkKey, stepKey, type Step } from './flow';
@@ -49,6 +49,7 @@ import { AGAIN_DATE, AGAIN_PLACE, AGAIN_POSITIONS, INVITE, KEEP_ALL, KEEP_AS_IS,
 import { ALL_GOOD, APPROVE_FIXED, ASK_TEXT as WALK_ASK, CHANGE_NO, DISMISS_MARK, CHANGE_YES, CHOOSE_SDGS, fixedNamed, NO_SDGS, orgGoalsAnswer, GENUINE, GOOD, KEEP_FIXED, LEAVE_IT, NO_THANKS, NONE_OF_THESE, OTHER_WORDING, overview, paceIn, PACE_QUICK, promptFor, readAnswer, readDetails, STYLE_QUICK, styleQuestion } from './walkChat';
 import { addToGroup, applyOp, formatGrouping, grouped, groupingFrom, groupOfKey, isGrouped, KEPT, type OutlineOp } from './outline';
 import { canWord, fixedLabel, fixedList, fixedMarked, fixedShown, fixedStore, fixedWordingNow, isLocked, offeredFixed, ORG_LANG, orgWording } from './fixed';
+import { diffViews, isEmpty, langsOf, linkedTo, mirror, viewOf, withView, type Diff, type LangView } from './langs';
 import type { ApplySettings, AskKind, ChatMsg, Content, DeletedJob, Delivery, DemoJob, Facts, FixedOwn, Format, Grouping, JobLang, Pace, PayRequest, Person, Plan, ReachPlan, Recipient, Review, Section, State, Tone, Translation, UndoStep } from './types';
 
 /** A job's or a version's grouping (section 19, phase 6, B). */
@@ -83,7 +84,227 @@ export function contentSnap(j: DemoJob): Content {
 export function stepped(before: DemoJob, after: DemoJob, text: string, tab: UndoStep['tab'], extra: Partial<UndoStep> = {}): DemoJob {
   if (JSON.stringify(contentSnap(before)) === JSON.stringify(contentSnap(after))) return after;
   const offer = after.wordingOffer && !extra.settings ? (after.wordingOffer.left > 1 ? { ...after.wordingOffer, left: after.wordingOffer.left - 1 } : undefined) : after.wordingOffer;
-  return { ...after, lastChange: undefined, wordingOffer: offer, undoStep: { text, tab, before: contentSnap(before), ...extra } };
+  const step: DemoJob = { ...after, lastChange: undefined, wordingOffer: offer, undoStep: { text, tab, before: contentSnap(before), ...extra } };
+  return afterChange(getState(), before, step, tab === 'doc' ? jobLang(after) : tab);
+}
+
+/** The section a language gains by a linked change or its own +: written by the rules in the job's own language, else drafted from it. */
+function draftIn(s: State, j: DemoJob, key: string, lang: JobLang): Section {
+  if (lang === jobLang(j)) {
+    const sec = withTemplateSubs(s, j, built(key, ctxFor(s, j), j));
+    return j.renamed?.[key] ? { ...sec, title: j.renamed[key] } : sec;
+  }
+  return draftVersionSection(j, key, lang, englishFor(s, j)) ?? { key, title: headingIn(key, lang) ?? headingFor(key, formatOf(s, j.format)), lines: [] };
+}
+
+/** A version's reference moved forward for `keys`, so it is not marked behind for an edit it does not follow. */
+function advanceVersion(j: DemoJob, lang: JobLang, keys: string[]): DemoJob {
+  const t = j.translations?.[lang];
+  if (!t || lang === jobLang(j)) return j;
+  const source = advancedSource(j, t, keys);
+  return source === t.source ? j : { ...j, translations: { ...j.translations, [lang]: { ...t, source } } };
+}
+
+/** Sections a linked change could not reach without the AI, marked "to update" with the language it came from. */
+function markToUpdate(j: DemoJob, lang: JobLang, keys: string[], from: JobLang): DemoJob {
+  if (!keys.length) return j;
+  const marks = Object.fromEntries(keys.map((k) => [k, from]));
+  if (lang === jobLang(j)) return { ...j, toUpdate: { ...j.toUpdate, ...marks } };
+  const t = j.translations?.[lang];
+  return t ? { ...j, translations: { ...j.translations, [lang]: { ...t, toUpdate: { ...t.toUpdate, ...marks } } } } : j;
+}
+
+/**
+ * A change in `from` followed into `langs` (section 19, phase 6, E). Structure always follows. Text follows into a version by the
+ * demo's table when the AI is off (what it cannot translate stays in the job's language, marked); into the job's own language, or from
+ * one version into another, the section is marked "to update"; with the AI on the text waits for the AI (`carrying`). A wording for the
+ * job of a fixed text follows as written, to translate. A language that lacks a section is skipped for it.
+ */
+function carryInto(s: State, j: DemoJob, from: JobLang, d: Diff, src: LangView, langs: JobLang[], rules = !aiWrites()): DemoJob {
+  let out = j;
+  const own = jobLang(j);
+  const ai = { keys: new Set<string>(), fixed: new Set<string>(), langs: new Set<JobLang>() };
+  for (const l of langs) {
+    const tv = viewOf(out, l);
+    if (!tv) continue;
+    const next = mirror(tv, src, d, (key) => draftIn(s, out, key, l));
+    const marks: string[] = [];
+    for (const key of d.text) {
+      if (!tv.keys.includes(key) || !next.keys.includes(key)) continue;
+      if (!rules) {
+        ai.keys.add(key);
+        ai.langs.add(l);
+      } else if (from === own && l !== own) {
+        const sec = draftVersionSection(out, key, l, englishFor(s, out));
+        if (sec) next.sections = next.sections.map((x) => (x.key === key ? sec : x));
+      } else marks.push(key);
+    }
+    for (const key of d.fixedText) {
+      if (!next.commitments.includes(key)) continue;
+      const w = src.fixed[key];
+      if (!w?.text) {
+        const rest = { ...next.fixed };
+        delete rest[key];
+        next.fixed = rest;
+      } else if (!rules) {
+        ai.fixed.add(key);
+        ai.langs.add(l);
+      } else if (canWord(s.org, key, l)) next.fixed = { ...next.fixed, [key]: { text: w.text, fromLang: from } };
+    }
+    out = markToUpdate(withView(out, l, next), l, marks, from);
+    if (from === own && l !== own) out = advanceVersion(out, l, [...d.text, ...d.added, ...d.removed]);
+  }
+  if (!ai.langs.size) return out;
+  const was = out.carrying;
+  return { ...out, carrying: { from, keys: Array.from(new Set([...(was?.keys ?? []), ...ai.keys])), fixed: Array.from(new Set([...(was?.fixed ?? []), ...ai.fixed])), langs: Array.from(new Set([...(was?.langs ?? []), ...ai.langs])) } };
+}
+
+/**
+ * After a change made with the icons, the outline, or a version's editor in `from` (section 19, phase 6, E): the languages linked to
+ * it follow, and the change note names them (on a live job, saying that linked versions leave the page until reviewed again). The
+ * others keep their text and are not marked behind for it; the change note offers them once, quietly ("Also in …").
+ */
+function afterChange(s: State, before: DemoJob, after: DemoJob, from: JobLang): DemoJob {
+  const a = viewOf(before, from);
+  const b = viewOf(after, from);
+  if (!a || !b) return after;
+  const d = diffViews(a, b);
+  if (isEmpty(d)) return after;
+  const linked = linkedTo(after, from);
+  let j = carryInto(s, after, from, d, b, linked);
+  const own = jobLang(after);
+  const others = langsOf(after).filter((l) => l !== from && !linked.includes(l));
+  if (from === own) for (const l of others) j = advanceVersion(j, l, [...d.text, ...d.added, ...d.removed]);
+  const reaches = (l: JobLang) => d.structure || d.added.length > 0 || d.removed.length > 0 || d.fixedList || d.fixedText.length > 0 || d.text.some((k) => viewOf(j, l)?.keys.includes(k));
+  const offer = others.filter(reaches);
+  if (!j.undoStep) return j;
+  const names = linked.map((l) => langOf(l).label);
+  const live = linked.some((l) => l !== own) && j.status === 'live' ? '; the linked versions leave the live page until they are reviewed again' : '';
+  return { ...j, undoStep: { ...j.undoStep, text: names.length ? `${j.undoStep.text}, also in ${names.join(' and ')}${live}` : j.undoStep.text, ...(offer.length ? { also: { langs: offer, from } } : {}), ...(j.carrying ? { writing: true } : {}) } };
+}
+
+/** "Also in French · Arabic", taken: the change follows into those languages as a linked one would, in the same Undo step. */
+export function alsoIn(id: string, langs?: JobLang[]) {
+  if (!ownerOnly()) return;
+  update((s) => ({
+    ...s,
+    jobs: s.jobs.map((j) => {
+      const st = j.undoStep;
+      if (j.id !== id || !st?.also) return j;
+      const before = { ...j, ...st.before } as DemoJob;
+      const a = viewOf(before, st.also.from);
+      const b = viewOf(j, st.also.from);
+      if (!a || !b) return j;
+      const to = (langs ?? st.also.langs).filter((l) => st.also!.langs.includes(l));
+      const next = carryInto(s, { ...touched(j), ...liveEdit(j) }, st.also.from, diffViews(a, b), b, to);
+      const left = st.also.langs.filter((l) => !to.includes(l));
+      return { ...next, undoStep: { ...st, also: left.length ? { ...st.also, langs: left } : undefined, text: `${st.text}, also in ${to.map((l) => langOf(l).label).join(' and ')}`, ...(next.carrying ? { writing: true } : {}) } };
+    }),
+  }));
+}
+
+/** The text a linked change asked the AI for, written by the rules instead (the AI is off, or it could not answer). */
+export function carryByRules(id: string) {
+  update((s) => ({
+    ...s,
+    jobs: s.jobs.map((j) => {
+      const c = j.carrying;
+      if (j.id !== id || !c) return j;
+      const src = viewOf(j, c.from);
+      if (!src) return { ...j, carrying: undefined, undoStep: j.undoStep ? { ...j.undoStep, writing: undefined } : j.undoStep };
+      const d: Diff = { removed: [], added: [], text: c.keys, structure: false, fixedList: false, fixedText: c.fixed };
+      const next = carryInto(s, { ...j, carrying: undefined }, c.from, d, src, c.langs, true);
+      return { ...next, undoStep: next.undoStep ? { ...next.undoStep, writing: undefined } : next.undoStep };
+    }),
+  }));
+}
+
+/** The AI wrote the linked text: Undo is offered again. */
+export function carried(id: string) {
+  updateJob(id, (j) => (j.carrying || j.undoStep?.writing ? { ...j, carrying: undefined, undoStep: j.undoStep ? { ...j.undoStep, writing: undefined } : j.undoStep } : j));
+}
+
+/** The AI's own changes in a language follow into the languages linked to it; the AI never changes the link (section 19, phase 6, F). */
+export function followLinks(id: string, before: DemoJob, from: JobLang) {
+  update((s) => ({
+    ...s,
+    jobs: s.jobs.map((j) => {
+      if (j.id !== id) return j;
+      const a = viewOf(before, from);
+      const b = viewOf(j, from);
+      const linked = linkedTo(j, from);
+      if (!a || !b || !linked.length) return j;
+      const d = diffViews(a, b);
+      return isEmpty(d) ? j : carryInto(s, j, from, d, b, linked);
+    }),
+  }));
+}
+
+/** 🔗 The languages linked to each other, the job's own included; linking brings no existing difference into line. */
+export function setLinked(id: string, langs: JobLang[]) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => {
+    const keep = langs.filter((l, i) => langs.indexOf(l) === i && langsOf(j).includes(l));
+    return { ...j, linked: keep.length ? keep : undefined };
+  });
+}
+
+/**
+ * One change from a version's outline or its icons (section 19, phase 6, E): the same operations as the job's own, on that version's
+ * sections and grouping; a section added is drafted from the job's own text where it has it. One Undo step, in that version's tab.
+ */
+export function versionOp(id: string, lang: JobLang, op: OutlineOp) {
+  if (!ownerOnly()) return;
+  update((s) => ({
+    ...s,
+    jobs: s.jobs.map((j) => {
+      const t = j.translations?.[lang];
+      if (j.id !== id || !t) return j;
+      const v = viewOf(j, lang)!;
+      if (op.op === 'rename') {
+        const heading = op.heading.trim();
+        if (!heading || !v.keys.includes(op.key)) return j;
+        const next = withView({ ...touched(j), ...liveEdit(j) }, lang, { ...v, sections: v.sections.map((x) => (x.key === op.key ? { ...x, title: heading } : x)) });
+        return next === j ? j : stepped(j, next, `Renamed ${t.sections.find((x) => x.key === op.key)?.title ?? op.key}`, lang, { keys: [op.key] });
+      }
+      if (op.op === 'remove' && (KEPT.includes(op.key) || !v.keys.includes(op.key) || v.keys.length < 2)) return j;
+      if (op.op === 'add' && (v.keys.includes(op.key) || !SECTION_BY_KEY[op.key])) return j;
+      const placed = applyOp(v.keys, v.grouping, op);
+      const sections = op.op === 'add' ? [...v.sections, draftIn(s, j, op.key, lang)] : v.sections.filter((x) => placed.keys.includes(x.key));
+      const next = withView({ ...touched(j), ...liveEdit(j) }, lang, { ...v, keys: placed.keys, grouping: placed.grouping, sections });
+      if (next === j) return j;
+      const title = 'key' in op ? (t.sections.find((x) => x.key === op.key)?.title ?? sections.find((x) => x.key === op.key)?.title ?? op.key) : '';
+      const text = op.op === 'add' ? `Added ${title}` : op.op === 'remove' ? `Removed ${title}` : 'key' in op ? `Moved ${title}` : `Moved the group ${groupName(op.group)}`;
+      const at = v.keys.indexOf('key' in op ? op.key : '');
+      return stepped(j, next, text, lang, op.op === 'remove' ? { removed: { key: op.key, title, after: at > 0 ? v.keys[at - 1] : null } } : { keys: 'key' in op ? [op.key] : [] });
+    }),
+  }));
+}
+
+/**
+ * A version's section edited with the same editor as the job's own (section 19, phase 6, E): its heading, its lines (as many as it
+ * needs), and the headings inside it. It needs a new review; its "to update" mark, if any, clears.
+ */
+export function editVersionSection(id: string, lang: JobLang, key: string, text: string, extra: { title?: string; subs?: Array<{ id: string; title?: string; text: string }> } = {}) {
+  if (!ownerOnly()) return;
+  update((s) => ({
+    ...s,
+    jobs: s.jobs.map((j) => {
+      const t = j.translations?.[lang];
+      const sec = t?.sections.find((x) => x.key === key);
+      if (j.id !== id || !t || !sec) return j;
+      const subs = extra.subs ? extra.subs.map((x) => ({ id: x.id, title: (x.title ?? sec.subs?.find((y) => y.id === x.id)?.title ?? '').trim() || 'More', lines: linesOf(x.text) })).filter((x) => x.lines.length || x.title !== 'More') : sec.subs;
+      const nextSec: Section = { ...sec, title: extra.title?.trim() || sec.title, lines: linesOf(text), edited: true, subs: subs?.length ? subs : undefined };
+      const v = viewOf(j, lang)!;
+      const changed = JSON.stringify([nextSec.title, nextSec.lines, nextSec.subs ?? []]) !== JSON.stringify([sec.title, sec.lines, sec.subs ?? []]);
+      const marks = { ...t.toUpdate };
+      delete marks[key];
+      const cleared: DemoJob = t.toUpdate?.[key] ? { ...j, translations: { ...j.translations, [lang]: { ...t, toUpdate: Object.keys(marks).length ? marks : undefined } } } : j;
+      if (!changed) return cleared;
+      const next = withView({ ...touched(cleared), ...liveEdit(cleared) }, lang, { ...v, sections: v.sections.map((x) => (x.key === key ? nextSec : x)) });
+      return stepped(j, next, `Edited ${nextSec.title}`, lang, { keys: [key] });
+    }),
+  }));
 }
 
 function msg(from: ChatMsg['from'], text: string, quick?: string[], ask?: ChatMsg['ask']): ChatMsg {
@@ -1027,7 +1248,8 @@ function replaceOld(lines: string[], was: Facts, now: Facts): string[] {
  * set answer their questions; text written by the AI or by hand takes the new fact in place of the old; and a section already approved
  * keeps its text until the user agrees to the changed lines (section 19, step 4).
  */
-function withFacts(s: State, j: DemoJob, facts: Facts): DemoJob {
+function withFacts(s: State, j0: DemoJob, facts: Facts): DemoJob {
+  const j = starterRetranslated(s, j0, facts);
   const format = formatOf(s, j.format);
   const tags = j.sections.length ? j.tags : orderSections(Array.from(new Set([...j.tags, ...recommendSections(format, facts)])), format);
   const own = j.walk ? { ...j, sections: j.sections.map((x) => (x.ai || x.edited ? { ...x, lines: replaceOld(x.lines, j.facts, facts) } : x)) } : j;
@@ -1050,6 +1272,23 @@ function withFacts(s: State, j: DemoJob, facts: Facts): DemoJob {
     }),
     walk: { ...walk, pending: { what, changes: [...earlier, ...changes.map((c) => ({ key: c.key, lines: c.now }))] } },
   };
+}
+
+/**
+ * A starter's wording depends on the facts (the safeguarding level, the country): when they change, its machine translations are
+ * dropped, so it is translated again and marked again (section 19, phase 6, E).
+ */
+function starterRetranslated(s: State, j: DemoJob, facts: Facts): DemoJob {
+  if (facts.safeguarding === j.facts.safeguarding && facts.country === j.facts.country) return j;
+  const starters = j.commitments.filter((k) => !s.org.standard.some((c) => c.key === k));
+  if (!starters.length) return j;
+  const drop = (f?: Record<string, FixedOwn>) => {
+    if (!f) return f;
+    const out = Object.fromEntries(Object.entries(f).filter(([k, x]) => !(x.machine && starters.includes(k))));
+    return Object.keys(out).length ? out : undefined;
+  };
+  const translations = j.translations ? (Object.fromEntries(Object.entries(j.translations).map(([l, t]) => [l, t ? { ...t, fixed: drop(t.fixed) } : t])) as DemoJob['translations']) : undefined;
+  return { ...j, fixed: drop(j.fixed), ...(translations ? { translations } : {}) };
 }
 
 /** The changed lines of approved sections, put in or left out as the user says. */
@@ -1676,6 +1915,9 @@ function chatTurn(id: string, text: string, focus?: string) {
     updateJob(id, (x) => ({ ...x, chat: [...x.chat, userMsg, msg('ai', 'Fine: this job only.')] }));
     return;
   }
+  // An offer, asked once: "not now" declines it (section 19, phase 6, A).
+  if (j.wordingAsk && (text.trim() === USE_WORDINGS || /^(?:yes|ok|okay|sure|please do)\b/i.test(text.trim()))) return keepVersionWordings(id, true, text);
+  if (j.wordingAsk && (text.trim() === NOT_NOW || /^(?:no|not now|just this job)\b/i.test(text.trim()))) return keepVersionWordings(id, false, text);
   if (setupTurn(s, j, text)) return;
   if (j.walk && LINK.test(text)) {
     updateJob(id, (x) => ({ ...x, chat: [...x.chat, userMsg, msg('ai', LINK_REPLY)] }));
@@ -1941,7 +2183,13 @@ export function applyFormat(id: string, formatKey: string) {
         ? wanted.filter((k) => !j.tags.includes(k)).reduce((acc, k) => addToGroup(acc.keys, acc.grouping, k), { keys: j.tags.filter((k) => wanted.includes(k)), grouping: groupingOf(j) })
         : { keys: grouped(wanted, formatGrouping(format)), grouping: formatGrouping(format) };
       const next = { ...regrouped(touched(j), placed.grouping, placed.keys), renamed: undefined, ordered: undefined, format: format.key, tone: format.tone, commitments: fixedFor(s, format), chat: [...j.chat, msg('ai', `Applied ${format.label}: its headings, order, and tone. Sections you edited by hand keep your text.`)] };
-      return rebuilt(s, { ...next, sections: j.sections.length ? j.sections.map((x) => ({ ...x, title: headingFor(x.key, format) })) : [] });
+      const after = rebuilt(s, { ...next, sections: j.sections.length ? j.sections.map((x) => ({ ...x, title: headingFor(x.key, format) })) : [] });
+      // The template is shared (section 19, phase 6, B): its sections and grouping reach every language; each keeps its own text.
+      const a = viewOf(j);
+      const b = viewOf(after);
+      if (!a || !b) return after;
+      const d: Diff = { ...diffViews(a, b), text: [], fixedText: [] };
+      return carryInto(s, after, jobLang(after), d, b, langsOf(after).filter((l) => l !== jobLang(after)), true);
     }),
   }));
 }
@@ -2118,10 +2366,13 @@ export function editSection(id: string, key: string, text: string, note = false,
           .filter((x) => x.title || x.lines.length)
           .map((x) => ({ ...x, title: x.title || 'More' }))
       : old?.subs;
-    if (JSON.stringify(lines) === JSON.stringify(old?.lines) && JSON.stringify(subs ?? []) === JSON.stringify(old?.subs ?? [])) return start && j !== start ? stepped(start, j, `Renamed ${was?.title ?? key}`, 'doc', { keys: [key] }) : j;
+    // Saved from the editor, a section marked "to update" is taken as brought in line, even unchanged.
+    const unmarked = j.toUpdate?.[key] ? { ...j, toUpdate: Object.keys(j.toUpdate).length > 1 ? Object.fromEntries(Object.entries(j.toUpdate).filter(([k]) => k !== key)) : undefined } : j;
+    if (JSON.stringify(lines) === JSON.stringify(old?.lines) && JSON.stringify(subs ?? []) === JSON.stringify(old?.subs ?? [])) return start && j !== start ? stepped(start, unmarked, `Renamed ${was?.title ?? key}`, 'doc', { keys: [key] }) : unmarked;
     const sections = j.sections.map((x) => (x.key === key ? { ...x, lines, edited: true, subs: subs?.length ? subs : undefined } : x));
     const title = j.sections.find((x) => x.key === key)?.title ?? key;
-    const next: DemoJob = stepped(start ?? j, { ...touched(j), sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${title}`, sections }], ...liveEdit(j) }, `Edited ${title}`, 'doc', { keys: [key] });
+    const marks = Object.fromEntries(Object.entries(j.toUpdate ?? {}).filter(([k]) => k !== key));
+    const next: DemoJob = stepped(start ?? j, { ...touched(j), toUpdate: Object.keys(marks).length ? marks : undefined, sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${title}`, sections }], ...liveEdit(j) }, `Edited ${title}`, 'doc', { keys: [key] });
     return note ? { ...next, part: `s:${key}`, chat: [...j.chat, msg('ai', `You changed **${title}** by hand. I'll keep your wording; ask me if another section should change to match.`)] } : next;
   });
   if (note) ensureAsk(id);
@@ -2609,12 +2860,39 @@ export function buyLanguages(id: string, n: number, beforePublishing = false): b
   return true;
 }
 
+/**
+ * A version marked as reviewed; its machine-translated fixed texts are approved with it (section 19, phase 6, E), and the owner is then
+ * asked once whether to keep those wordings for every job in that language.
+ */
 export function reviewTranslation(id: string, lang: JobLang) {
   if (!ownerOnly()) return;
+  const s = getState();
   updateJob(id, (j) => {
     const t = j.translations?.[lang];
-    return t ? { ...j, translations: { ...j.translations, [lang]: { ...t, reviewed: true } }, audit: [...j.audit, { at: Date.now(), who: getState().me.name, what: `${langOf(lang).label} version reviewed` }] } : j;
+    if (!t) return j;
+    const machine = Object.entries(t.fixed ?? {}).filter(([, f]) => f.machine && !f.approved).map(([k]) => k);
+    const fixed = machine.length ? Object.fromEntries(Object.entries(t.fixed ?? {}).map(([k, f]) => [k, machine.includes(k) ? { ...f, approved: true } : f])) : t.fixed;
+    const ask = machine.length > 0 && s.me.role === 'owner' && !s.reviewerAs;
+    const chat = ask ? [...j.chat, { ...msg('ai', `The ${langOf(lang).label} version is reviewed, with its translated fixed texts (${machine.map(fixedLabel).join(', ')}). Use these ${langOf(lang).label} wordings for every job? Later ${langOf(lang).label} jobs then use them without a mark.`, [USE_WORDINGS, NOT_NOW]), step: `wordings:${lang}` }] : j.chat;
+    return { ...j, chat, ...(ask ? { wordingAsk: lang } : {}), translations: { ...j.translations, [lang]: { ...t, reviewed: true, fixed } }, audit: [...j.audit, { at: Date.now(), who: s.me.name, what: `${langOf(lang).label} version reviewed` }] };
   });
+}
+
+export const USE_WORDINGS = 'Yes, for every job';
+
+/** "Use these French wordings for every job?": Yes saves them in Organisation settings for that language; asked once. */
+export function keepVersionWordings(id: string, yes: boolean, said?: string) {
+  const s0 = getState();
+  const j0 = s0.jobs.find((j) => j.id === id);
+  const lang = j0?.wordingAsk;
+  if (!j0 || !lang || s0.me.role !== 'owner' || s0.reviewerAs) return;
+  const words = Object.fromEntries(Object.entries(fixedStore(j0, lang)).filter(([, f]) => f.machine && f.text).map(([k, f]) => [k, f.text!]));
+  update((s) => ({
+    ...s,
+    org: yes ? { ...s.org, fixedWording: { ...s.org.fixedWording, [lang]: { ...s.org.fixedWording?.[lang], ...words } } } : s.org,
+    jobs: s.jobs.map((j) => (j.id === id ? { ...j, wordingAsk: undefined, chat: said ? [...j.chat, msg('user', said), msg('ai', yes ? `Kept: later ${langOf(lang).label} jobs use these wordings, word for word. Change them in Organisation settings.` : 'Fine: this job only.')] : j.chat } : j)),
+  }));
+  ensureAsk(id);
 }
 
 /** Who may publish without approval: only where approval is required, only the owner, and never when the organisation says nobody can skip it. */

@@ -286,7 +286,7 @@ export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: Stat
             const f = fixedShown(job, s, k, shownLang);
             return (
               <p key={k} className="ej-commitment">
-                <strong>{commitmentLabel(k, COMMITMENTS.find((c) => c.key === k)?.label ?? k, l)}.</strong> <span lang={f.toTranslate ? ORG_LANG : shownLang}>{f.text}</span>
+                <strong>{commitmentLabel(k, COMMITMENTS.find((c) => c.key === k)?.label ?? k, l)}.</strong> <span lang={f.textLang ?? shownLang}>{f.text}</span>
               </p>
             );
           })}

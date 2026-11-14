@@ -64,6 +64,8 @@ export type FixedShown = {
   toTranslate: boolean;
   /** The organisation's text is a starter (it wrote none of its own). */
   starter: boolean;
+  /** The language the text shown is in, when it is not the one asked for. */
+  textLang?: JobLang;
 };
 
 /**
@@ -75,12 +77,14 @@ export function fixedShown(job: DemoJob, s: Pick<State, 'org'>, key: string, lan
   const base = commitmentText(key, s.org, job.facts);
   const locked = isLocked(s.org, key);
   const shared = { key, label: fixedLabel(key), locked, starter: !base.own };
+  // A wording for the job carried from another language without the AI: shown as it was written there, to translate.
+  if (mine?.text && mine.fromLang) return { ...shared, text: mine.text, own: false, machine: false, toTranslate: true, textLang: mine.fromLang };
   if (mine?.text && (mine.machine || canWord(s.org, key, lang))) return { ...shared, text: mine.text, own: !mine.machine, machine: Boolean(mine.machine && !mine.approved), toTranslate: false };
   const published = job.fixedPublished?.[lang]?.[key];
   if (published) return { ...shared, text: published, own: false, machine: false, toTranslate: false };
   const wording = lang === ORG_LANG ? base.text : orgWording(s.org, key, lang);
   if (wording) return { ...shared, text: wording, own: false, machine: false, toTranslate: false };
-  return { ...shared, text: base.text, own: false, machine: false, toTranslate: true };
+  return { ...shared, text: base.text, own: false, machine: false, toTranslate: true, textLang: ORG_LANG };
 }
 
 /** Every fixed text's wording in every language the job has, as it would be published now. */

@@ -491,6 +491,16 @@ export function sourceOf(job: DemoJob): string {
   return JSON.stringify(job.sections.map((sec) => (sec.subs?.length ? [sec.key, sec.lines, sec.subs.map((sb) => [sb.title, sb.lines])] : [sec.key, sec.lines])));
 }
 
+/**
+ * The version's reference to the job's own text moved forward for `keys` (section 19, phase 6, E): after an edit by the user that the
+ * version does not follow, it is not marked behind for it. The order and the sections the version does not have follow the job.
+ */
+export function advancedSource(job: DemoJob, t: Translation, keys: string[]): string {
+  const old = new Map((JSON.parse(t.source) as unknown[][]).map((e) => [e[0] as string, e]));
+  const now = JSON.parse(sourceOf(job)) as unknown[][];
+  return JSON.stringify(now.map((e) => (keys.includes(e[0] as string) || !old.has(e[0] as string) || !t.sections.some((x) => x.key === e[0]) ? e : old.get(e[0] as string))));
+}
+
 /** The sections of the job's own text that changed since the version was last brought up to date. */
 export function changedFor(job: DemoJob, t: Translation): string[] {
   const before = new Map<string, string[]>(JSON.parse(t.source) as Array<[string, string[]]>);
@@ -508,7 +518,11 @@ export function redraftTranslation(job: DemoJob, old: Translation, lang: JobLang
     if (!sec) return oldSec;
     const fresh = draftSection(job, sec, lang, english);
     const oldSrc = before.get(sec.key) ?? [];
-    return { ...fresh, title: oldSec.title, lines: fresh.lines.map((l, i) => (oldSrc[i] === sec.lines[i] && oldSec.lines[i] !== undefined ? oldSec.lines[i] : l)) };
+    // Lines still in the source are matched by their text, not their place (section 19, phase 6, E): a version's lines may differ in number.
+    return { ...fresh, title: oldSec.title, lines: fresh.lines.map((l, i) => {
+      const m = oldSrc.indexOf(sec.lines[i]);
+      return m >= 0 && oldSec.lines[m] !== undefined ? oldSec.lines[m] : l;
+    }) };
   });
   return { ...old, sections, reviewed: false, source: sourceOf(job), kept: undefined };
 }
@@ -518,12 +532,14 @@ export function keptTranslation(job: DemoJob, t: Translation): Translation {
   return { ...t, kept: sourceOf(job) };
 }
 
+/** Whether a version's line is still word for word a line of the job's own section, counted by its text wherever it is. */
+export function stillOwn(job: DemoJob, key: string, line: string): boolean {
+  return Boolean(job.sections.find((x) => x.key === key)?.lines.includes(line)) && /\p{L}{3}/u.test(line);
+}
+
 /** Lines still word for word as in the job's own language, for the review. */
 export function untranslated(job: DemoJob, t: Translation): number {
-  return t.sections.reduce((n, sec) => {
-    const own = job.sections.find((x) => x.key === sec.key);
-    return n + sec.lines.filter((l, i) => own?.lines[i] === l && /\p{L}{3}/u.test(l)).length;
-  }, 0);
+  return t.sections.reduce((n, sec) => n + sec.lines.filter((l) => stillOwn(job, sec.key, l)).length, 0);
 }
 
 export function totalLines(t: Translation): number {

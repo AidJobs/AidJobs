@@ -16,7 +16,7 @@ import { surveyCard } from './context';
 import { getState } from './store';
 import { groupOfKey, groupOrderOf } from './outline';
 import { fixedList, fixedShown, isLocked } from './fixed';
-import type { DemoJob, Facts, Format, JobLang, State } from './types';
+import type { Carrying, DemoJob, Facts, Format, JobLang, State } from './types';
 
 /**
  * The AI chat's one way out of the browser: the demo's own route, and nothing else (employer-side plan, section 19, "The AI chat in
@@ -219,7 +219,7 @@ function publishingFor(s: State, j: DemoJob, version?: JobLang) {
  * What the AI is told: the job, the template and its sections, the organisation, the choices it may make, and the conversation; the
  * context pack and the survey card (section 19, phase 5, A); and a page's text only while its draft is written.
  */
-export function contextFor(s: State, j: DemoJob, focus: string | undefined, first: boolean, version?: JobLang, page?: { kind: string; text: string }) {
+export function contextFor(s: State, j: DemoJob, focus: string | undefined, first: boolean, version?: JobLang, page?: { kind: string; text: string }, carry?: Carrying) {
   const format = formatOf(s, j.format);
   const rec = recommendation(s, j.format);
   const recFormat = formatOf(s, rec.key);
@@ -284,6 +284,7 @@ export function contextFor(s: State, j: DemoJob, focus: string | undefined, firs
     card: surveyCard(s, j),
     suggestions: (j.suggestions ?? []).map((x) => ({ fact: x.fact, value: x.value, source: x.source, state: x.state })),
     ...(page ? { page } : {}),
+    ...(carry ? { carry: carryFor(j, s, carry) } : {}),
     publishing: publishingFor(s, j, version && j.translations?.[version] ? version : undefined),
     returning: returningFor(s, j),
     recommendation: {
@@ -311,12 +312,30 @@ export const GO_ON = 'Go on with the next step: write it now.';
 /** What the window says when a language version is added with the AI on (the user's decision, 12 November 2026): the AI writes it. */
 export const writeVersion = (label: string) => `Write the ${label} version now: every section in context.job.versionInView, in ${label}.`;
 
+/** What the window says to carry a linked change's text into the other languages (section 19, phase 6, E). */
+export function carryMessage(c: Carrying): string {
+  const to = c.langs.map((l) => langOf(l).label).join(', ');
+  return `Carry the change just made in ${langOf(c.from).label} into ${to}: the sections and fixed texts in context.carry, each a faithful translation of the ${langOf(c.from).label} text, with the same facts.`;
+}
+
+/** The source text of a linked change, for the AI to carry: the sections and fixed texts changed, as they now read in the source language. */
+function carryFor(j: DemoJob, s: State, c: Carrying) {
+  const from = c.from;
+  const sections = from === jobLang(j) ? j.sections : (j.translations?.[from]?.sections ?? []);
+  return {
+    from,
+    into: c.langs.map((l) => ({ key: l, label: langOf(l).label, own: l === jobLang(j) })),
+    sections: c.keys.map((k) => sections.find((x) => x.key === k)).filter(Boolean).map((x) => ({ key: x!.key, heading: x!.title, text: x!.lines.join('\n') })),
+    fixed: c.fixed.map((k) => ({ key: k, label: fixedShown(j, s, k, from).label, text: fixedShown(j, s, k, from).text })),
+  };
+}
+
 /**
  * Sends one message to the AI and carries out its answer. Returns what was applied, or null when the AI is off or failed, in which
  * case the caller answers with the rules. `first`: the reply to the role typed on the Create a job page, which is already in the chat.
  * `silent`: the window asks the AI to go on by itself (to write the next section), named in the chat while it writes.
  */
-export async function askAi(id: string, text: string, opts: { focus?: string; first?: boolean; silent?: string; version?: JobLang; page?: { kind: string; text: string }; open: (t: OpenTarget) => void }): Promise<Applied | null> {
+export async function askAi(id: string, text: string, opts: { focus?: string; first?: boolean; silent?: string; version?: JobLang; page?: { kind: string; text: string }; carry?: Carrying; open: (t: OpenTarget) => void }): Promise<Applied | null> {
   const first = Boolean(opts.first);
   const silent = opts.silent;
   const s = getState();
@@ -329,7 +348,7 @@ export async function askAi(id: string, text: string, opts: { focus?: string; fi
     const res = await fetch(AI_ROUTE, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ message: text, first, ...(silent ? { silent: true } : {}), context: contextFor(s, j, opts.focus, first, opts.version, opts.page), ...(snap.model ? { model: snap.model } : {}) }),
+      body: JSON.stringify({ message: text, first, ...(silent ? { silent: true } : {}), context: contextFor(s, j, opts.focus, first, opts.version, opts.page, opts.carry), ...(snap.model ? { model: snap.model } : {}) }),
       signal: stop.signal,
       cache: 'no-store',
     });
@@ -337,7 +356,7 @@ export async function askAi(id: string, text: string, opts: { focus?: string; fi
     const data = res.ok ? ((await res.json()) as { reply?: unknown; actions?: unknown; model?: unknown }) : null;
     if (!data || typeof data.reply !== 'string' || !data.reply.trim()) throw new Error('no reply');
     const by = snap.models.find((m) => m.key === data.model)?.label;
-    return applyAiTurn(id, first ? null : silent ? '' : text, { reply: data.reply, actions: Array.isArray(data.actions) ? data.actions : [] }, opts.open, by, opts.version, Boolean(opts.page));
+    return applyAiTurn(id, first ? null : silent ? '' : text, { reply: data.reply, actions: Array.isArray(data.actions) ? data.actions : [] }, opts.open, by, opts.version, Boolean(opts.page), Boolean(opts.carry));
   } catch {
     set({ fallback: { ...snap.fallback, [id]: !aiOn() ? "The AI is off here, so the demo's own rules answered." : "The AI could not answer just now, so the demo's own rules did." } });
     return null;
