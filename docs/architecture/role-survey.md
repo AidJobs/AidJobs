@@ -942,3 +942,137 @@ Everything else in `broad-adverts.csv` and `broad-sections.csv` stays an Estimat
 
 **Next:** the restrictions, as their own proposal: first the user's decision on whether residence and locality limits count as nationality, then a targeted sample to reach 15 cases. Then Phase 0's guide and wave 1a's deep layer, and the wave-1 families, proposed from the role map. A later round could take the headings, contract lengths and years (89.2%, just under target), each on a fresh draw.
 
+### 19.18 The restrictions: residence apart from nationality, and a targeted round (14 November 2026)
+
+**Decided by the user on 14 November 2026:**
+- **Residence and location limits are their own category,** `residence`, not nationality. It covers a post limited to people already living in, or based in, a country, region, city or time zone, and commuting distance.
+- **Nationality, citizenship and ethnicity stay** `nationality`. UN-style national posts stay `national_post`. The right to work and a valid work permit stay not a restriction at all, as in guide 1.1.
+- **The user's reasons:**
+  - the fairness check (`employer-side-plan.md` 20.2) flags nationality as possible discrimination, while a residence limit is usually lawful and often required by law;
+  - counting residence as nationality would raise false alarms, and 19.3 asks restrictions for 0.9 precision because false positives matter;
+  - job seekers need the difference: a foreigner living legally in a country can apply for a post based there, but not for one open to its nationals only;
+  - two categories can always be combined later, while one merged category cannot be split without re-reading every advert.
+
+**The user's answers to the plan's questions (the same day), each as the agent recommended:**
+- "local candidates only" and the French "candidats locaux" are `residence`;
+- "national candidates" is `nationality`;
+- "local hire", "locally engaged" and "a local contract" are `national_post`, as round 2's sealed set had coded them;
+- a limit that nationality or residence can each meet ("nationals or residents", "citizens or permanent residents") is `residence`.
+
+The note in `employer-side-plan.md` 20.2 says residence limits are recorded and not flagged, as national posts are.
+
+**One addition, chosen by the agent at the user's request.** The user asked for the most useful and flexible result for employers, and for NGOs not to feel restricted by options they may not know about. So each restriction is also marked as a limit or a preference, and a preference can be treated more softly than a limit. The scope of a residence limit (country, city, commuting distance, time zone) is not recorded: the product can offer every scope without a measured frequency, and it can be measured later from the residence positives alone.
+
+Approved by the user the same day: investigate read-only, then the plan. No request was made. Advert text, the guide, packets, answers and the reconciled set stay in `survey-raw-archive/role-survey-reading/work/validation-3/`; the committed result is `role-survey/broad-validation-3.csv`, counts only.
+
+**Rounds 1 and 2's cases, re-sorted for reporting only.** Each round has a local file, `resort-1.2.csv`; the sealed sets are untouched.
+- **Round 1:** the 11 nationality items are 3 nationality and 8 residence (4 of the residence ones are "nationals or residents" limits).
+- **Round 2:** the 15 nationality items are 9 nationality and 7 residence; one advert carries both.
+- **Preferences:** 7 of the 26 adverts state their limit only as a preference.
+- **A correction to 19.17:** "mostly residence or locality limits" holds for round 1, not round 2 (6 of 15 adverts).
+- **Inconsistencies found:** the sealed 1.1 sets code the same wording differently in 4 adverts. These are commuting distance, a Pacific Islander tie-break, and a local contract; the re-sort files record them.
+
+**What the rules could reach in the 1,294 evidence adverts** (a broad keyword net, separate from the rules, and 200 random adverts; Estimate):
+- nationality about 75 adverts, residence 65 to 90, national post about 58;
+- religion about 30, at one employer;
+- age about 20;
+- photographs, sex and marital status 6 to 13 each;
+- disability none.
+
+Religion, age, sex, marital status, disability and photographs could not reach 15 positives within the cap of 3 per organisation; they stay "not validated", and were not chased.
+
+**The rule revision** (`adverts.py`, measures only; `test_restrictions.py`, 42 tests, 34 of which fail on 2e8ed49's rules; the 8 that pass guard against false positives the old rules did not make, the "Not" list and four of review 11's cases):
+- **Nationality:**
+  - a nationality in brackets;
+  - international candidates only;
+  - citizenship required;
+  - citizens of member states;
+  - host-country nationals excluded;
+  - a preference by nationality or people;
+  - national candidates.
+- **Residence:**
+  - commuting distance, with the applicant as the one limited;
+  - applicants based or located somewhere;
+  - a residence line among the requirements;
+  - a home address in a country;
+  - a remote role within a country;
+  - a preference for local people;
+  - limits met by nationality or residence;
+  - a time zone;
+  - an official residence;
+  - local candidates;
+  - open to applicants in a place.
+- **National post:** national consultants, and locally engaged posts, counted only when the sentence is about this post; a national category in a general note is left out.
+- **Religion, age and photographs:** a faith required, but not an organisation describing itself; a minimum age, and a French age line under an eligibility list; a passport photograph among the documents.
+- **The "Not" list, tested never to be flagged:** the right to work, work permits and visa sponsorship (also as an alternative to citizenship); "open to all nationalities"; encouragements; where the job is based; relocation; working hours across time zones; and the people served.
+- **Not attempted:**
+  - the job-posting data's applicant location, which the script does not read: a recall miss, 3 of the 1,294 adverts;
+  - different pass marks by sex;
+  - going without family, one employer's wording.
+
+**The advert set kept fixed.** `advert_set.py` is unchanged, so the rebuild changes only `broad-adverts.csv`'s `restrictions` column (187 cells against 2e8ed49). These are byte-identical to before:
+- `broad-sections.csv`;
+- the AI test set;
+- the local `measured.jsonl`;
+- the role map.
+
+`validation.py` gives each round its own categories, guide hash and answer form. It reads the script's `residence` as `nationality` for a round on guide 1.1. Its rules lock holds for the latest round only, so round 2 can be rechecked. It also gains a targeted draw with a frozen keyword net, and recheck files named by their rules, so no recheck is written over.
+
+**Rounds 1 and 2 rechecked, as a check, not a test** (the patterns came from them; on guide 1.1's categories). No non-restriction measure changed in either round, so the stop rule did not fire.
+- Round 2: any restriction 24 of 24, nationality 15 of 15.
+- Round 1: any restriction 16 of 19, nationality 10 of 12, national post 3 of 4. The misses are the wordings the sealed set codes inconsistently.
+
+**Review** (`role-survey/review-11.md`, Grok 4.7, three rounds before the draw; Gemini 4 Hydrogen was refused on the account):
+- first round: changes needed (6 must-fix, 5 should-fix, 1 minor);
+- second round: changes needed (2 must-fix, 4 should-fix, 1 minor);
+- third round: approve, with 2 minor points.
+
+All points were taken, except two answered with reasons: the guide's opening answer example, and CI requiring every round's file.
+
+**Guide 1.2** (`guide.md` in `validation-3/`, sha 1e2b6407…): Part 7 revised. Outside it, only the version lines and a list of changes differ. In a restrictions-only round the answer holds `id`, `restrictions`, `preferred` and `note`.
+
+**Round 3, a targeted draw** (seed 20261115, made after the rules were frozen at `7a5e64f`). It was drawn from the 1,094 evidence adverts outside rounds 1 and 2 and the AI test set:
+- 63 of the script's positives: up to 20 or more of each common category, every rarer one, at most 3 per organisation per category;
+- 20 adverts that only the keyword net catches;
+- 20 others.
+
+That is 103 adverts at 50 organisations, 8 of them French, ids V201 to V303 in 21 groups of up to 5. Which stratum each advert came from was kept in a separate file, unopened until the reconciled set was sealed.
+
+**Why a targeted draw is valid for precision and not for recall:**
+- **Precision** is the share of the script's own positives that are correct, and each category's positives are drawn at random, so their share estimates precision directly.
+- **Recall** needs every true case. The sample over-represents the script's positives, the keyword net was designed after reading rounds 1 and 2, and only 20 adverts come from the rest. So recall is weighted by each stratum's size and reported as an Estimate only.
+
+**The coders.** Grok 4.7 (coder A) and Composer 2.5 (coder B) coded restrictions only, on guide 1.2, blind to each other and to the script. Every advert was coded twice, the five single-line ones included, with no loop, stall or form slip. The answers were copied from the run transcripts by script.
+
+**Agreement:** 0.94 to 1.00 per category (kappa 0.83 to 1.00).
+
+**Reconciliation:** 14 items in 11 adverts, each settled by reading the advert, with a one-line reason. It was sealed on 14 November 2026 at 22:54 IST, before any of the script's answers for the round were read.
+
+**Results** (19.3: precision 0.9 on at least 15 of the script's positives; recall an Estimate):
+- **Validated:**
+  - any restriction 0.937 (59 of 63);
+  - residence 0.905 (19 of 21);
+  - national post 0.944 (17 of 18).
+- **Estimate:** nationality 0.857 (18 of 21). Its three false positives:
+  - a welcome to national candidates;
+  - national candidates as people the job deals with;
+  - one bank's member-country wording, which the sealed set codes both ways (yes in one advert after a disagreement, no in another by agreement). On the other reading the share would be 0.905.
+- **Not validated:**
+  - religion 3 of 3, age 5 of 5, sex 2 of 2, photographs 2 of 2;
+  - marital status and disability with none;
+  - the preference mark, 10 of 10 (fewer than 15 each).
+- **Recall Estimates:** about 0.45 to 0.55 per common category. The misses are mostly in adverts the script does not flag at all: national posts named other ways, minimum ages without a subject, a citizenship-or-residence line written with "of", and preferences for a region's candidates.
+
+With 18 to 21 positives, each precision carries a 95% margin of about ±0.13 (Estimate).
+
+**Which restriction measures may now be used as validated:** any restriction, residence and national post. Nationality stays an Estimate, and so do the restriction frequencies for the fairness check, labelled so wherever used.
+
+**The broad layer, rebuilt** (1,294 evidence adverts; Estimates except as above): 193 adverts state a restriction, against 32 under the old rules:
+- nationality 65, 33 of them only as a preference;
+- residence 62, 12 as a preference;
+- national post 35;
+- religion 30, at one employer;
+- age 9, photographs 4, sex 2.
+
+**Next:** Phase 0's guide and wave 1a's deep layer; the wave-1 families, proposed from the role map. A later round could take nationality's remaining wordings (the national-candidates welcome, member-country wording), the headings, contract lengths and years, each on a fresh draw.
+

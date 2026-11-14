@@ -16,3 +16,8 @@ Key conventions, detailed in the ledger:
 - Never stage `apps/backend/scripts/diagnose_enrichment_bias.py` or `tests/test_link_heuristics.py`.
 - Never print a secret or the contents of an `.env` file. To check a setting, run `node scripts/env_check.mjs NAME` (it shows only whether it is set, its length, and a URL's shape). The project's secret guard (`.cursor/hooks.json`) refuses the usual ways of printing one; do not look for another way round it.
 - Update the ledger, and the UX plan for UX steps, when a step is finished.
+- Be thorough up front (the user, 14 November 2026):
+  - Before handing over a plan, a prompt for a new chat, or a finished step, think through every scenario and every action it needs, and put all of them in that one deliverable, in order. Never add a step after the user has acted on what was given.
+  - Before writing a prompt for a new chat, check the state it will start from: the main folder and every worktree up to date with `origin/main` (checked first, so local changes are not touched), no leftover branches or temporary clones, and the ledger's records complete. Fix what can be fixed first; put the rest in the prompt as its first step.
+  - Recommend; don't hand decisions back. When there is a choice, give a clear recommendation with reasons. Ask the user only for decisions that are genuinely theirs, with the recommendation alongside. When the user decided something earlier, remind them plainly what they chose and when.
+  - After a merge, as part of the step and within the approval rules: fast-forward the main folder (checking first that the incoming commits don't touch local changes), delete the merged branch and any temporary clones, and confirm the local archives are intact.
