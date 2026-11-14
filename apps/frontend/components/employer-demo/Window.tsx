@@ -1481,7 +1481,7 @@ function JobWindow({ id }: { id: string }) {
             </div>
             {tabs.length > 1 && (
               <div className="shrink-0 border-b aj-hair">
-                <PanelTabs tabs={tabs} active={active} onPick={setTab} end={langs.length ? <LinkLangs job={job} disabled={reviewing} /> : undefined} />
+                <PanelTabs tabs={tabs} active={active} onPick={setTab} end={langs.length && !reviewing ? <LinkLangs job={job} disabled={false} /> : undefined} />
               </div>
             )}
             {panel}
@@ -1556,7 +1556,7 @@ function JobWindow({ id }: { id: string }) {
           </div>
           {tabs.length > 1 && (
             <div className="shrink-0 border-b aj-hair">
-              <PanelTabs tabs={tabs} active={active} onPick={setTab} end={langs.length ? <LinkLangs job={job} disabled={reviewing} /> : undefined} />
+              <PanelTabs tabs={tabs} active={active} onPick={setTab} end={langs.length && !reviewing ? <LinkLangs job={job} disabled={false} /> : undefined} />
             </div>
           )}
           {panel}

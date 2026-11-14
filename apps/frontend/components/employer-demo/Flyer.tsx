@@ -29,7 +29,7 @@ export function QrCode({ text, size = 132, label }: { text: string; size?: numbe
 }
 
 /** The one-page notice for a field office or community board: printed, or saved as a PDF. */
-function Notice({ job, s, url, lang }: { job: DemoJob; s: State; url: string; lang?: JobLang }) {
+export function FlyerNotice({ job, s, url, lang }: { job: DemoJob; s: State; url: string; lang?: JobLang }) {
   const version = lang ? job.translations?.[lang] : undefined;
   const shown: JobLang = version && lang ? lang : jobLang(job);
   const l = tableLang(shown);
@@ -74,11 +74,6 @@ function Notice({ job, s, url, lang }: { job: DemoJob; s: State; url: string; la
           </a>
         </div>
       </div>
-      {fixedList(job, shown).length > 0 && (
-        <p className="ej-flyer-text" style={{ fontSize: 12 }}>
-          <strong>{say('Our commitments', 'commitments')}:</strong> {fixedList(job, shown).map((k) => commitmentLabel(k, fixedLabel(k), shown)).join(' · ')}
-        </p>
-      )}
       {fixedList(job, shown).length > 0 && (
         <p className="ej-flyer-text" style={{ fontSize: 12 }}>
           <strong>{say('Our commitments', 'commitments')}:</strong> {fixedList(job, shown).map((k) => commitmentLabel(k, fixedLabel(k), shown)).join(' · ')}
@@ -141,7 +136,7 @@ function FlyerBody({ job, s, url, lang, setLang, ready, waiting }: { job: DemoJo
       </div>
       {waiting.length > 0 && <span className="aj-faint">{waiting.join(' and ')}: review the language version first, then it can be printed.</span>}
       <div className="ej-flyer-frame">
-        <Notice job={job} s={s} url={url} lang={lang ?? undefined} />
+        <FlyerNotice job={job} s={s} url={url} lang={lang ?? undefined} />
       </div>
     </div>
   );

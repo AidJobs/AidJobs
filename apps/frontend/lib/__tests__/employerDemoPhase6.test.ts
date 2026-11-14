@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { addTranslation, alsoIn, applyFormat, applyTemplate, approveFixed, approveSection, bringBackFixed, chooseStyle, editFixed, editSection, editVersionSection, goOn, hireAgain, keepForAll, keepWordingForAll, leaveOutFixed, leavePoint, moveFixed, NEXT_QUESTION, outlineOp, publish, publishBlock, removeVersionSection, resetFixed, restoreVersion, reviewTranslation, sendChat, setApply, setFacts, setJobLang, setLinked, setPace, settleQuestion, startJob, toggleCommitment, toggleSection, translateFixed, undoStep, unparkPart, USE_WORDINGS, versionOp } from '../../components/employer-demo/actions';
-import { fixedShown } from '../../components/employer-demo/fixed';
+import { addTranslation, alsoIn, applyFormat, applyTemplate, approveFixed, approveSection, bringBackFixed, chooseStyle, editFixed, editSection, editVersionSection, goOn, hireAgain, keepForAll, keepWordingForAll, leaveOutFixed, leavePoint, moveFixed, NEXT_QUESTION, outlineOp, publish, publishBlock, publishNow, removeVersionSection, resetFixed, restoreVersion, reviewTranslation, sendChat, setApply, setFacts, setJobLang, setLinked, setPace, settleQuestion, startJob, toggleCommitment, toggleSection, translateFixed, undoStep, unparkPart, USE_WORDINGS, versionOp } from '../../components/employer-demo/actions';
+import { fixedShown, fixedWordingNow } from '../../components/employer-demo/fixed';
+import { FlyerNotice } from '../../components/employer-demo/Flyer';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { differences } from '../../components/employer-demo/langs';
 import { stale, untranslated } from '../../components/employer-demo/translate';
 import { applyAiTurn, type OpenTarget } from '../../components/employer-demo/aiActions';
@@ -180,20 +183,27 @@ describe('when none of the offered answers fits (section 19, phase 6, A)', () =>
     expect(job(id).walk?.hold).toBeUndefined();
   });
 
-  it('“skip”, “later”, “not now”, and “leave it” park the question at every question, and the next is asked at once; “no” still declines', () => {
+  it('“skip”, “later”, “not now”, and “leave it” park the question at once and hold the next until the user replies to the flow; “no” still declines', () => {
     const id = started();
     sendChat(id, 'later');
     expect(job(id).walk?.parked).toEqual(['grade']);
+    expect(job(id).walk?.hold).toBe('grade');
+    expect(job(id).chat.at(-1)?.quick).toContain(NEXT_QUESTION);
+    // While held, nothing further is written or asked.
+    expect(job(id).sections.filter((x) => x.key !== 'apply')).toHaveLength(0);
+    sendChat(id, 'ok');
     expect(job(id).walk?.hold).toBeUndefined();
     const at = step(id);
     expect(at?.kind).toBe('approve');
     sendChat(id, 'skip');
     expect(job(id).walk?.parked).toContain(`approve:${(at as { section: string }).section}`);
+    expect(job(id).walk?.hold).toBe(`approve:${(at as { section: string }).section}`);
+    sendChat(id, NEXT_QUESTION);
     advance(id, (st) => st.kind === 'details');
     sendChat(id, 'not now');
     expect(job(id).walk?.parked).toContain('details');
     expect(job(id).walk?.settled).not.toContain('details');
-    advance(id, (st) => st.kind === 'check' || st.kind === 'plan' || st.kind === 'ask');
+    expect(job(id).walk?.hold).toBe('details');
   });
 
   it('skip is not none: “skip” at pay parks it and leaves the pay as it is; “none” hides it', () => {
@@ -230,6 +240,27 @@ describe('when none of the offered answers fits (section 19, phase 6, A)', () =>
     expect(publishBlock(getState(), id, { plan: 'free', schedule: null })).toBe('Missing: an email address to apply to');
   });
 
+  it('Publish now refuses when an essential is missing after scheduling', () => {
+    update((st) => ({
+      ...st,
+      jobs: st.jobs.map((j) =>
+        j.id === 'job-comms'
+          ? {
+              ...j,
+              status: 'scheduled' as const,
+              plan: 'amplify' as const,
+              paidFor: true,
+              scheduledFor: '2099-01-15',
+              facts: { ...j.facts, deadline: '' },
+            }
+          : j,
+      ),
+    }));
+    expect(publishNow('job-comms')).toBe(false);
+    expect(job('job-comms').status).toBe('scheduled');
+    expect(getState().notice?.text).toBe('Missing: the closing date');
+  });
+
   it('parked questions survive a reload; opening their part from the line un-parks them, their count starting again', () => {
     const id = started();
     sendChat(id, 'hmm');
@@ -249,7 +280,9 @@ describe('when none of the offered answers fits (section 19, phase 6, A)', () =>
   it('the AI is told what is parked, and a parked section is still approved by name', () => {
     const id = started();
     sendChat(id, 'later');
+    sendChat(id, 'ok');
     const at = step(id) as { kind: 'approve'; section: string };
+    expect(at.kind).toBe('approve');
     sendChat(id, 'skip');
     const ctx = contextFor(getState(), job(id), undefined, false) as { walk: { parked: string[] } };
     expect(ctx.walk.parked).toEqual(['grade', `approve:${at.section}`]);
@@ -304,6 +337,28 @@ describe('the outline and the draft: structure from anywhere, one Undo step (sec
     goOn(id);
     const st = advance(id, (x) => x.kind === 'ask' && x.fact === 'grade');
     expect(st).toMatchObject({ kind: 'ask', fact: 'grade' });
+  });
+
+  it('typing “undo” after an icon change restores the widened undo step, not an older version', () => {
+    const before = { tags: job('job-comms').tags, sections: job('job-comms').sections };
+    outlineOp('job-comms', { op: 'toGroup', key: 'offer', group: 'employer' });
+    expect(job('job-comms').groupOf?.offer).toBe('employer');
+    expect(job('job-comms').undoStep).toBeDefined();
+    expect(job('job-comms').lastChange).toBeUndefined();
+    sendChat('job-comms', 'undo');
+    expect(job('job-comms').tags).toEqual(before.tags);
+    expect(job('job-comms').groupOf?.offer).toBeUndefined();
+    expect(job('job-comms').sections).toEqual(before.sections);
+    expect(job('job-comms').undoStep).toBeUndefined();
+    expect(job('job-comms').chat.some((m) => /^Undone:/.test(m.text))).toBe(true);
+  });
+
+  it('the AI’s undo uses the widened step when the chat’s lastChange is empty', () => {
+    const before = job('job-comms').tags;
+    outlineOp('job-comms', { op: 'remove', key: 'offer' });
+    applyAiTurn('job-comms', 'undo that', { reply: 'Undone.', actions: [{ type: 'undo' }] }, open);
+    expect(job('job-comms').tags).toEqual(before);
+    expect(job('job-comms').undoStep).toBeUndefined();
   });
 
   it('a section removed is noted where it was and brought back with Undo, in every language; also from Earlier versions', () => {
@@ -448,6 +503,27 @@ describe('fixed texts from the draft (section 19, phase 6, D)', () => {
     expect(job('job-comms').fixedPublished?.en).toBeDefined();
   });
 
+  it('a published starter’s machine translation is cleared when safeguarding changes, so it is marked again', () => {
+    update((s) => ({ ...s, org: { ...s.org, standard: s.org.standard.filter((c) => c.key !== 'safeguarding') } }));
+    expect(job('job-comms').commitments).toContain('safeguarding');
+    addTranslation('job-comms', 'fr');
+    translateFixed('job-comms', 'safeguarding', 'Traduction machine du safeguarding.', 'fr');
+    update((s) => ({
+      ...s,
+      jobs: s.jobs.map((j) => (j.id === 'job-comms' ? { ...j, fixedPublished: fixedWordingNow(j, s) } : j)),
+    }));
+    expect(job('job-comms').fixedPublished?.fr?.safeguarding).toBe('Traduction machine du safeguarding.');
+    setFacts('job-comms', { safeguarding: 'high' });
+    expect(job('job-comms').translations?.fr?.fixed?.safeguarding).toBeUndefined();
+    expect(job('job-comms').fixedPublished?.fr?.safeguarding).toBeUndefined();
+    expect(fixedShown(job('job-comms'), getState(), 'safeguarding', 'fr')).toMatchObject({ toTranslate: true });
+  });
+
+  it('the flyer names Our commitments once', () => {
+    const html = renderToStaticMarkup(createElement(FlyerNotice, { job: job('job-comms'), s: getState(), url: 'https://example.test/j' }));
+    expect(html.match(/Our commitments/g)).toHaveLength(1);
+  });
+
   it('a phase 5 published job takes its fixed texts’ wording from the settings on load', () => {
     update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === 'job-cps' ? { ...j, fixedPublished: undefined } : j)) }));
     const back = normalise({ ...getState() }).jobs.find((j) => j.id === 'job-cps')!;
@@ -523,6 +599,31 @@ describe('languages, each independent (section 19, phase 6, E)', () => {
     expect(job('job-comms').tags).toEqual(before.tags);
     expect(fr()).toEqual(before.fr);
     expect(job('job-comms').linked).toEqual(['en', 'fr']);
+  });
+
+  it('linking languages is its own undo step: Undo restores the previous link set', () => {
+    expect(job('job-comms').linked).toBeUndefined();
+    setLinked('job-comms', ['en', 'fr']);
+    expect(job('job-comms').undoStep?.text).toMatch(/^Linked English and French/);
+    setLinked('job-comms', ['en', 'fr', 'es']);
+    expect(job('job-comms').linked).toEqual(['en', 'fr', 'es']);
+    undoStep('job-comms');
+    expect(job('job-comms').linked).toEqual(['en', 'fr']);
+    setLinked('job-comms', []);
+    expect(job('job-comms').undoStep?.text).toMatch(/^Unlinked/);
+    undoStep('job-comms');
+    expect(job('job-comms').linked).toEqual(['en', 'fr']);
+  });
+
+  it('with a French tab open and languages not linked, the AI’s move and rename act on that version only', () => {
+    const enOfferAt = job('job-comms').tags.indexOf('offer');
+    applyAiTurn('job-comms', 'move What we offer into About the employer', { reply: 'Moved.', actions: [{ type: 'move_section', section: 'offer', group: 'employer', after: 'about' }] }, open, undefined, 'fr');
+    expect(fr().groupOf?.offer).toBe('employer');
+    expect(job('job-comms').groupOf?.offer).toBeUndefined();
+    expect(job('job-comms').tags.indexOf('offer')).toBe(enOfferAt);
+    applyAiTurn('job-comms', 'rename the role purpose', { reply: 'Renamed.', actions: [{ type: 'rename_section', section: 'purpose', heading: 'Le but du poste' }] }, open, undefined, 'fr');
+    expect(fr().sections.find((x) => x.key === 'purpose')?.title).toBe('Le but du poste');
+    expect(own('purpose').title).not.toBe('Le but du poste');
   });
 
   it('a version is edited with the same editor: as many lines as it needs, the lines still in the job’s language counted by their text', () => {

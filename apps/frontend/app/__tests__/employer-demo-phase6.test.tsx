@@ -234,11 +234,15 @@ describe('the four icons on the draft (section 19, phase 6, C and D)', () => {
     expect(byText('By email', q('#ej-sec-apply')!)).toBeDefined();
   });
 
-  it('reviewers see none of the four icons', () => {
-    act(() => update((s) => ({ ...s, reviewerAs: 'amina' })));
+  it('reviewers see none of the four icons, including 🔗 when the job has versions', () => {
+    act(() => {
+      addTranslation('job-fin', 'fr');
+      update((s) => ({ ...s, reviewerAs: 'amina' }));
+    });
     render();
     route('#job/job-fin');
     expect(q('.ej-doc .ej-sec-tools, .ej-doc .ej-grip, .ej-addend-btn, .ej-addline')).toBeNull();
+    expect(q('[aria-label="Link languages"]')).toBeNull();
   });
 
   it('fixed texts: one block after the sections; a locked text’s pencil and Leave out stay focusable with their reason; Change for every job opens Settings at that text, where every fixed text is listed', () => {
@@ -247,12 +251,13 @@ describe('the four icons on the draft (section 19, phase 6, C and D)', () => {
     const block = q('.ej-fixed')!;
     expect(block.querySelector('h3')?.textContent).toContain('Our commitments');
     const locked = getState().org.standard.find((c) => c.locked && job('job-comms').commitments.includes(c.key))!;
-    const pencil = block.querySelector(`[aria-label="Edit ${locked.label} for this job"]`) as HTMLButtonElement;
+    const pencil = block.querySelector(`[aria-label="Edit ${locked.label} for this job, locked: change it for every job"]`) as HTMLButtonElement;
     expect(pencil.getAttribute('aria-disabled')).toBe('true');
     expect(pencil.disabled).toBe(false);
     press(block.querySelector(`[data-grip-key="fixed:en:${locked.key}"]`));
     const leave = byText('Leave out of this job', document.querySelector('[role="menu"]')!)!;
     expect(leave.getAttribute('aria-disabled')).toBe('true');
+    expect(leave.getAttribute('aria-label')).toMatch(/locked: change it for every job/i);
     press(leave);
     expect(job('job-comms').commitments).toContain(locked.key);
     press(byText('Change for every job ↗', document.querySelector('[role="menu"]')!)!);

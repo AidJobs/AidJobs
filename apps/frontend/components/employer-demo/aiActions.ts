@@ -52,8 +52,14 @@ import {
   leaveOutFixed,
   translateFixed,
   followLinks,
+  undoStep,
+  versionOp,
+  reorderVersionSections,
+  editVersionSection,
+  subId,
 } from './actions';
 import { GROUP_KEYS, groupOfKey, KEPT } from './outline';
+import { viewOf } from './langs';
 import { canWord, fixedLabel, isLocked, ORG_LANG, orgWording } from './fixed';
 import { approvalRequired } from './approval';
 import { checkSuggestion, offerSuggestion, showPageDraft } from './context';
@@ -492,7 +498,8 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
     const name = j.sections.find((x) => x.key === section)?.title ?? j.renamed?.[section] ?? (SECTION_BY_KEY[section] ? headingFor(section, format) : section);
     switch (a.type) {
       case 'undo':
-        if (j.lastChange) undoLastChange(id);
+        if (j.undoStep && !j.undoStep.writing) undoStep(id);
+        else if (j.lastChange) undoLastChange(id);
         else refused.push('undo: there is no change to undo');
         break;
       case 'set_facts': {
@@ -547,17 +554,26 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         break;
       case 'reorder_sections': {
         // Within their groups only; a section goes into another group with move_section (section 19, phase 6, B).
+        // On a version tab, the version's own order (section 19, phase 6, F).
         const order = Array.isArray(a.order) ? a.order.filter((k): k is string => typeof k === 'string') : [];
-        if (order.length < 2 || new Set(order).size !== order.length || !order.every((k) => j.tags.includes(k))) refused.push('the new order');
+        const keys = inVersion ? viewOf(j, inVersion)?.keys ?? [] : j.tags;
+        if (order.length < 2 || new Set(order).size !== order.length || !order.every((k) => keys.includes(k))) refused.push('the new order');
+        else if (inVersion) reorderVersionSections(id, inVersion, order);
         else reorderSections(id, order);
         break;
       }
       case 'move_section': {
+        const v = inVersion ? viewOf(j, inVersion) : null;
+        const keys = v?.keys ?? j.tags;
+        const grouping = v?.grouping ?? groupingOf(j);
         const group = oneOf(a.group, GROUP_KEYS);
-        const after = a.after === null || a.after === undefined ? null : typeof a.after === 'string' && j.tags.includes(a.after) ? a.after : undefined;
-        if (!j.tags.includes(section) || !group || after === undefined || (after && groupOfKey(groupingOf(j), after) !== group)) refused.push(`moving ${name || 'a section'}`);
+        const after = a.after === null || a.after === undefined ? null : typeof a.after === 'string' && keys.includes(a.after) ? a.after : undefined;
+        if (!keys.includes(section) || !group || after === undefined || (after && groupOfKey(grouping, after) !== group)) refused.push(`moving ${name || 'a section'}`);
         else if (!MOVE_ASKED.test(said ?? '')) refused.push('moving a section into another group: only when you ask for it');
-        else if (after) outlineOp(id, { op: 'drop', key: section, after, group });
+        else if (inVersion) {
+          if (after) versionOp(id, inVersion, { op: 'drop', key: section, after, group });
+          else versionOp(id, inVersion, { op: 'toGroup', key: section, group });
+        } else if (after) outlineOp(id, { op: 'drop', key: section, after, group });
         else outlineOp(id, { op: 'toGroup', key: section, group });
         break;
       }
@@ -566,16 +582,36 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         const before = a.before === null || a.before === undefined ? null : oneOf(a.before, GROUP_KEYS);
         if (!group || before === undefined || (a.before !== null && a.before !== undefined && !before)) refused.push('moving a group');
         else if (!MOVE_ASKED.test(said ?? '')) refused.push('moving a group: only when you ask for it');
+        else if (inVersion) versionOp(id, inVersion, { op: 'groupBefore', group, before });
         else outlineOp(id, { op: 'groupBefore', group, before });
         break;
       }
       case 'sub': {
         const op = oneOf(a.op, ['add', 'rename', 'write', 'remove'] as const);
-        const sec = j.sections.find((x) => x.key === section);
+        const sec = inVersion ? j.translations?.[inVersion]?.sections.find((x) => x.key === section) : j.sections.find((x) => x.key === section);
         const want = typeof a.sub === 'string' ? a.sub.toLowerCase() : '';
         const sub = sec?.subs?.find((x) => x.id === a.sub || x.title.toLowerCase() === want);
-        if (!op || !sec || !isWritten(j, section)) refused.push(`a sub-section of ${name || 'a section'}: it is not written yet`);
-        else if (op === 'add') {
+        const written = inVersion ? Boolean(sec) : isWritten(j, section);
+        if (!op || !sec || !written) refused.push(`a sub-section of ${name || 'a section'}: it is not written yet`);
+        else if (inVersion) {
+          const asText = (lines: string[]) => lines.join('\n');
+          const asSubs = (list: NonNullable<typeof sec.subs>) => list.map((x) => ({ id: x.id, title: x.title, text: asText(x.lines) }));
+          if (op === 'add') {
+            const heading = str(a.heading, 60);
+            if (!heading) refused.push('a sub-section without a heading');
+            else editVersionSection(id, inVersion, section, asText(sec.lines), { title: sec.title, subs: [...asSubs(sec.subs ?? []), { id: subId(), title: heading, text: `[${heading}]` }] });
+          } else if (!sub) refused.push(`a sub-section ${name} does not have`);
+          else if (op === 'remove') editVersionSection(id, inVersion, section, asText(sec.lines), { title: sec.title, subs: asSubs((sec.subs ?? []).filter((x) => x.id !== sub.id)) });
+          else if (op === 'rename') {
+            const heading = str(a.heading, 60);
+            if (!heading) refused.push('renaming a sub-section');
+            else editVersionSection(id, inVersion, section, asText(sec.lines), { title: sec.title, subs: asSubs((sec.subs ?? []).map((x) => (x.id === sub.id ? { ...x, title: heading } : x))) });
+          } else {
+            const out = checkLines(a.lines, section, s, j, said ?? '');
+            if ('refused' in out) refused.push(out.refused);
+            else editVersionSection(id, inVersion, section, asText(sec.lines), { title: sec.title, subs: asSubs((sec.subs ?? []).map((x) => (x.id === sub.id ? { ...x, lines: out.lines } : x))) });
+          }
+        } else if (op === 'add') {
           const heading = str(a.heading, 60);
           if (!heading) refused.push('a sub-section without a heading');
           else changeSub(id, section, { add: heading });
@@ -594,7 +630,9 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
       }
       case 'rename_section': {
         const heading = str(a.heading, 60);
-        if (!heading || !j.tags.includes(section) || j.setup) refused.push(`renaming ${name || 'a section'}`);
+        const keys = inVersion ? viewOf(j, inVersion)?.keys ?? [] : j.tags;
+        if (!heading || !keys.includes(section) || (!inVersion && j.setup)) refused.push(`renaming ${name || 'a section'}`);
+        else if (inVersion) versionOp(id, inVersion, { op: 'rename', key: section, heading });
         else renameSection(id, section, heading);
         break;
       }

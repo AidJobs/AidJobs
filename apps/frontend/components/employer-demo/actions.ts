@@ -240,12 +240,15 @@ export function followLinks(id: string, before: DemoJob, from: JobLang) {
   }));
 }
 
-/** 🔗 The languages linked to each other, the job's own included; linking brings no existing difference into line. */
+/** 🔗 The languages linked to each other, the job's own included; linking brings no existing difference into line. One Undo step. */
 export function setLinked(id: string, langs: JobLang[]) {
   if (!ownerOnly()) return;
   updateJob(id, (j) => {
     const keep = langs.filter((l, i) => langs.indexOf(l) === i && langsOf(j).includes(l));
-    return { ...j, linked: keep.length ? keep : undefined };
+    const linked = keep.length ? keep : undefined;
+    if (JSON.stringify(linked ?? null) === JSON.stringify(j.linked ?? null)) return j;
+    const text = linked ? `Linked ${linked.map((l) => langOf(l).label).join(' and ')}` : 'Unlinked the languages';
+    return stepped(j, { ...j, linked }, text, 'doc');
   });
 }
 
@@ -511,11 +514,13 @@ export function parkingReply(j: DemoJob, s: State, text: string): boolean {
 }
 
 /**
- * A question parked (section 19, phase 6, A): it keeps its "to do" mark on the line and can be answered at any time. `hold`: it was
- * left unanswered rather than skipped, so the next question waits until the user replies to the flow.
+ * A question parked (section 19, phase 6, A): it keeps its "to do" mark on the line and can be answered at any time. With `hold`, the
+ * next question waits until the user replies to the flow ("ok", "next", or the parked answer), with a quiet "Next question" meanwhile.
  */
 function park(id: string, key: string, hold: boolean, said?: string) {
-  const reply = hold ? "I'll leave that for now: it stays on the line as to do, to answer there or here whenever you like." : 'Left for later: it stays on the line as to do.';
+  const reply = hold
+    ? "I'll leave that for now: it stays on the line as to do, to answer there or here whenever you like."
+    : 'Left for later: it stays on the line as to do.';
   updateJob(id, (x) =>
     x.walk
       ? {
@@ -1276,19 +1281,48 @@ function withFacts(s: State, j0: DemoJob, facts: Facts): DemoJob {
 
 /**
  * A starter's wording depends on the facts (the safeguarding level, the country): when they change, its machine translations are
- * dropped, so it is translated again and marked again (section 19, phase 6, E).
+ * dropped, so it is translated again and marked again (section 19, phase 6, E). A published snapshot of those starters is cleared
+ * for the languages affected, so the new facts are not hidden behind the old wording.
  */
 function starterRetranslated(s: State, j: DemoJob, facts: Facts): DemoJob {
   if (facts.safeguarding === j.facts.safeguarding && facts.country === j.facts.country) return j;
   const starters = j.commitments.filter((k) => !s.org.standard.some((c) => c.key === k));
   if (!starters.length) return j;
+  const dropped = new Set<string>();
   const drop = (f?: Record<string, FixedOwn>) => {
     if (!f) return f;
-    const out = Object.fromEntries(Object.entries(f).filter(([k, x]) => !(x.machine && starters.includes(k))));
+    const out = Object.fromEntries(
+      Object.entries(f).filter(([k, x]) => {
+        if (x.machine && starters.includes(k)) {
+          dropped.add(k);
+          return false;
+        }
+        return true;
+      }),
+    );
     return Object.keys(out).length ? out : undefined;
   };
-  const translations = j.translations ? (Object.fromEntries(Object.entries(j.translations).map(([l, t]) => [l, t ? { ...t, fixed: drop(t.fixed) } : t])) as DemoJob['translations']) : undefined;
-  return { ...j, fixed: drop(j.fixed), ...(translations ? { translations } : {}) };
+  const translations = j.translations
+    ? (Object.fromEntries(Object.entries(j.translations).map(([l, t]) => [l, t ? { ...t, fixed: drop(t.fixed) } : t])) as DemoJob['translations'])
+    : undefined;
+  const fixed = drop(j.fixed);
+  if (!dropped.size) return { ...j, fixed, ...(translations ? { translations } : {}) };
+  const fixedPublished = j.fixedPublished
+    ? (Object.fromEntries(
+        Object.entries(j.fixedPublished)
+          .map(([l, store]) => {
+            const next = Object.fromEntries(Object.entries(store).filter(([k]) => !dropped.has(k)));
+            return [l, next] as const;
+          })
+          .filter(([, store]) => Object.keys(store).length > 0),
+      ) as DemoJob['fixedPublished'])
+    : undefined;
+  return {
+    ...j,
+    fixed,
+    ...(translations ? { translations } : {}),
+    fixedPublished: fixedPublished && Object.keys(fixedPublished).length ? fixedPublished : undefined,
+  };
 }
 
 /** The changed lines of approved sections, put in or left out as the user says. */
@@ -1514,7 +1548,14 @@ function changeLine(id: string, key: string, from: (lines: string[]) => string[]
   updateJob(id, (j) => {
     const sections = j.sections.map((x) => (x.key === key ? { ...x, lines: from(x.lines), edited: true } : x));
     if (JSON.stringify(sections) === JSON.stringify(j.sections)) return j;
-    return { ...touched(j), sections, ...liveEdit(j), versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note, sections }], lastChange: { keys: [key], text: note, before: j.sections, beforeTags: j.tags, beforeFacts: j.facts, beforeTone: j.tone } };
+    return {
+      ...touched(j),
+      sections,
+      ...liveEdit(j),
+      versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note, sections }],
+      lastChange: { keys: [key], text: note, before: j.sections, beforeTags: j.tags, beforeFacts: j.facts, beforeTone: j.tone },
+      undoStep: undefined,
+    };
   });
 }
 
@@ -1556,9 +1597,13 @@ function walkTurn(s: State, j: DemoJob, text: string): boolean {
     return false;
   }
   // One way to skip, everywhere: "skip", "later", "not now", "leave it" park the question; "no" and "none" still decline it.
+  // Offers (keep, Reach, the flyer): "not now" / "No, thanks" decline them, as today — they are not parked by those words.
   const pk = parkKey(step);
-  if (pk && SKIP.test(t)) {
-    park(j.id, pk, false, text);
+  const offerDecline =
+    (step.kind === 'keep' || step.kind === 'reach' || step.kind === 'flyer') && (t === NOT_NOW || t === NO_THANKS || /^not now\b/i.test(t));
+  if (pk && SKIP.test(t) && !offerDecline) {
+    // Explicit skip parks at once (no second ask) and holds the next question until the user replies to the flow.
+    park(j.id, pk, true, text);
     return true;
   }
   const format = formatOf(s, j.format);
@@ -1963,9 +2008,14 @@ function chatTurn(id: string, text: string, focus?: string) {
   }
   if (UNDO.test(lower.trim())) {
     updateJob(id, (x) => {
+      // The widened Undo step (icons, outline, version editor) and the chat's lastChange replace each other: try the step first.
+      const steppedBack = fromUndoStep(x);
+      if (steppedBack) return { ...steppedBack, chat: [...x.chat, userMsg, msg('ai', `Undone: ${x.undoStep!.text}.`)] };
       if (x.lastChange) return { ...undone(x), chat: [...x.chat, userMsg, msg('ai', 'Undone: the job description is back as it was.')] };
       const prev = x.versions[x.versions.length - 2];
-      return prev ? { ...atVersion(x, prev.sections, `Back to version ${prev.n}`), chat: [...x.chat, userMsg, msg('ai', `Back to version ${prev.n}.`)] } : { ...x, chat: [...x.chat, userMsg, msg('ai', 'There is no earlier version to go back to.')] };
+      return prev
+        ? { ...atVersion(x, prev.sections, `Back to version ${prev.n}`), chat: [...x.chat, userMsg, msg('ai', `Back to version ${prev.n}.`)] }
+        : { ...x, chat: [...x.chat, userMsg, msg('ai', 'There is no earlier version to go back to.')] };
     });
     return;
   }
@@ -2035,6 +2085,14 @@ export function dismissChange(id: string) {
   updateJob(id, (x) => ({ ...x, lastChange: undefined, undoStep: undefined }));
 }
 
+/** Restores the widened Undo step, or null when there is none or a linked translation is still being written. */
+function fromUndoStep(x: DemoJob): DemoJob | null {
+  const st = x.undoStep;
+  if (!st || st.writing) return null;
+  const back: DemoJob = { ...touched(x), ...st.before, ...liveEdit(x), lastChange: undefined, undoStep: undefined, wordingOffer: undefined };
+  return { ...back, versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note: `Undid: ${st.text}`, sections: back.sections }] };
+}
+
 /**
  * Undo for the last change made with the icons, the outline, or a version's editor (section 19, phase 6, C): the job's content comes
  * back as it was, in every language, with the links; the facts, the review, and the chat stay. Organisation settings changed by "Use
@@ -2042,12 +2100,7 @@ export function dismissChange(id: string) {
  */
 export function undoStep(id: string) {
   if (!ownerOnly()) return;
-  updateJob(id, (x) => {
-    const st = x.undoStep;
-    if (!st || st.writing) return x;
-    const back: DemoJob = { ...touched(x), ...st.before, ...liveEdit(x), undoStep: undefined, wordingOffer: undefined };
-    return { ...back, versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note: `Undid: ${st.text}`, sections: back.sections }] };
-  });
+  updateJob(id, (x) => fromUndoStep(x) ?? x);
 }
 
 export function setFacts(id: string, patch: Partial<Facts>) {
@@ -2098,6 +2151,23 @@ export function reorderSections(id: string, keys: string[]) {
     );
     if (tags.join() === j.tags.join()) return j;
     return touched(regrouped(j, groupingOf(j), tags));
+  });
+}
+
+/** The same reorder within groups, on a language version's own sections (section 19, phase 6, F). */
+export function reorderVersionSections(id: string, lang: JobLang, keys: string[]) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => {
+    const v = viewOf(j, lang);
+    if (!v) return j;
+    const queue = [...keys];
+    const nextKeys = grouped(
+      v.keys.map((t) => (keys.includes(t) ? (queue.shift() ?? t) : t)),
+      v.grouping,
+    );
+    if (nextKeys.join() === v.keys.join()) return j;
+    const next = withView({ ...touched(j), ...liveEdit(j) }, lang, { ...v, keys: nextKeys, sections: inOutlineOrder(v.sections, nextKeys) });
+    return stepped(j, next, 'Reordered sections', lang);
   });
 }
 
@@ -2281,7 +2351,9 @@ export function translateFixed(id: string, key: string, text: string, lang: JobL
   updateJob(id, (j) => {
     if (!fixedList(j, lang).includes(key)) return j;
     const store = { ...fixedStore(j, lang), [key]: { text: text.trim(), machine: true } };
-    return lang === jobLang(j) ? { ...j, fixed: store } : withVersion(j, lang, (t) => ({ ...t, fixed: store }));
+    return lang === jobLang(j)
+      ? { ...touched(j), ...liveEdit(j), fixed: store }
+      : withVersion(j, lang, (t) => ({ ...t, fixed: store }));
   });
 }
 
@@ -2790,21 +2862,6 @@ export function addVersionSection(id: string, lang: JobLang, key: string) {
 export function removeVersionSection(id: string, lang: JobLang, key: string) {
   if (!ownerOnly() || KEPT.includes(key)) return;
   updateJob(id, (j) => withVersion(j, lang, (t) => (t.sections.length > 1 ? { ...t, sections: t.sections.filter((x) => x.key !== key) } : t)));
-}
-
-/** A version's sections in a new order, each within its group in the version's own grouping. */
-export function reorderVersionSections(id: string, lang: JobLang, keys: string[]) {
-  if (!ownerOnly()) return;
-  updateJob(id, (j) =>
-    withVersion(j, lang, (t) => {
-      const queue = [...keys];
-      const order = grouped(
-        t.sections.map((x) => (keys.includes(x.key) ? (queue.shift() ?? x.key) : x.key)),
-        groupingOf(t),
-      );
-      return { ...t, sections: inOutlineOrder(t.sections, order) };
-    }),
-  );
 }
 
 /** A version's section written or rewritten in the chat (by the AI when it is on). */
@@ -3367,6 +3424,12 @@ export function publishNow(id: string): boolean {
   const s = getState();
   const j = s.jobs.find((x) => x.id === id);
   if (!j || s.reviewerAs || j.status !== 'scheduled') return false;
+  // Essentials by every route that makes a job go out (section 19, phase 6, A), including Publish now.
+  const missing = essentials(j);
+  if (missing.length) {
+    update((st) => ({ ...st, notice: { text: `Missing: ${missing.map((k) => ESSENTIAL_WORDS[k]).join(', ')}` } }));
+    return false;
+  }
   if ((j.plan === 'free' && !canGoFree(s, j.id)) || (j.plan === 'amplify' && j.paidVia === 'free' && s.free?.amplify && s.free.amplify !== j.id)) return false;
   const waiting = waitingEmails(j);
   const was = j.scheduledFor ? longDate(j.scheduledFor) : 'its date';

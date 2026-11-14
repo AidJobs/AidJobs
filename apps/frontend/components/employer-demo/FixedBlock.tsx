@@ -102,7 +102,7 @@ function FixedRow({ job, s, lang, k, first, last, drop, onDrag }: { job: DemoJob
               <button
                 type="button"
                 className="ej-sec-icon"
-                aria-label={`Edit ${f.label} for this job`}
+                aria-label={editable ? `Edit ${f.label} for this job` : `Edit ${f.label} for this job, locked: change it for every job`}
                 aria-disabled={!editable || undefined}
                 onClick={() => {
                   if (!editable) return;

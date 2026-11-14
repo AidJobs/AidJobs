@@ -150,7 +150,7 @@ export default function Grip({ label, tip, actions, onKey, onDrag, onDrop, class
             <Fragment key={a.label}>
               {a.off ? (
                 <Tip label={a.off}>
-                  <button type="button" role="menuitem" className="ej-menu-item" aria-disabled="true" data-off="true" onClick={(e) => e.preventDefault()}>
+                  <button type="button" role="menuitem" className="ej-menu-item" aria-label={`${a.label}, ${a.off}`} aria-disabled="true" data-off="true" onClick={(e) => e.preventDefault()}>
                     {a.label}
                   </button>
                 </Tip>
