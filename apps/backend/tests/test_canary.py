@@ -1,6 +1,8 @@
 """Reader canary (ledger W-35, pull request 2): marks, warnings, message notes only."""
 from __future__ import annotations
 
+import pytest
+
 from contracts.canary import (
     append_message,
     evaluate,
