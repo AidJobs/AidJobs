@@ -806,3 +806,139 @@ With 15 to 90 cases, each share carries a 95% margin of roughly ±0.05 to ±0.15
 
 **Next:** a later step changes `adverts.py`'s rules for these patterns, re-scored on a fresh draw. Then Phase 0's guide and wave 1a's deep layer, and the wave-1 families, proposed from the role map.
 
+### 19.17 The broad layer's rule revision and a fresh validation round (14 November 2026)
+
+**Approved by the user on 14 November 2026:** the plan for 19.16's patterns 1 to 7, which covered four things:
+- revise the measures only, each change tested to fail on the old rules;
+- check the change on the first 100 without tuning to them;
+- draw a fresh 100 by a new seed, never the first 100 or the AI test set;
+- code the fresh draw with the same coders on the frozen guide, seal it before scoring, and have it reviewed once.
+
+The restrictions (pattern 8) are not changed here; they go to a separate proposal. No request was made. Advert text, packets, answers and the reconciled set stay in `survey-raw-archive/role-survey-reading/work/validation-2/`. The committed result is `role-survey/broad-validation-2.csv`, counts and shares only.
+
+**The advert set kept fixed.** Which pages count as adverts, and which short lines are site furniture, is decided by patterns frozen as they stood at d62f97e (`tools/survey/advert_set.py`, its hash fixed by a test). So no measure change can move the advert set or the text the coders read. After the rebuild, these are byte-identical to before:
+- the 1,324 adverts and their identity and strata columns;
+- every advert's text;
+- the AI test set;
+- the role map.
+
+`broad-sections.csv` grows from 7,982 to 8,563 rows.
+
+**The rule changes** (`adverts.py`; `test_rules.py`, 34 tests, of which 32 fail on d62f97e's rules: 19 on an assertion, 13 because the behaviour did not exist):
+1. **Headings:**
+   - a short title-case line naming a section type, followed by text;
+   - a label opening a line with a sentence after it, never in a list item;
+   - a main heading about the employer, programme or team;
+   - the labels inside a one-line advert;
+   - a run of two job-fact lines before any heading, which is the header facts.
+
+   Typing a heading by its text rather than its words is not attempted.
+2. **The job-posting data, by the guide's table:** FULL_TIME or PART_TIME gives hours; CONTRACTOR, TEMPORARY, INTERN or VOLUNTEER gives the contract type; a closing time counts unless it is 00:00 or lacks its offset.
+3. **Words in another sense:**
+   - contract type needs a type named, and the French "stage" and a voluntary post replace the bare words;
+   - a reporting line needs the post named;
+   - budget needs a figure outside the employer's own description and the context;
+   - a safeguarding commitment alone is not a check.
+4. **Boilerplate the guide codes vague:** shortlisting alone, "open until filled", "encouraged to apply" and "travel required" no longer count.
+5. **Facts missed:**
+   - a closing time in a city's local time;
+   - languages named without "fluent";
+   - a country in the title;
+   - field missions and visits;
+   - a reference number in the title;
+   - end dates;
+   - renewal subject to funding;
+   - adjustments for applicants;
+   - a title naming the engagement.
+6. **Years:** the largest essential figure, as the guide reads it; a desirable figure only when alone; months as a share of a year; "5 years in X" inside requirements.
+7. **Level:** a labelled grade in the text when the title gives none. Function rules are unchanged, so the role map is unchanged.
+
+`validation.py` gains rounds. Round 2 has:
+- seed 20261114, ids V101 to V200 and five batches;
+- no earlier round's advert, and the same strata;
+- the rules' hashes held from the draw;
+- the frozen guide checked by hash;
+- long lines given in pieces.
+
+It also gains `recheck` (an earlier round re-scored locally, never over its committed file) and a check of every round's file.
+
+**The first 100, re-scored as a check, not a test** (the patterns came from them). Most measures improved:
+- contract type precision 0.56 to 0.86;
+- hours 0.69 to 0.86;
+- closing time recall 0.12 to 0.88;
+- years within one year 74% to 85%.
+
+The plan's stop rule fired: the languages section, validated in round 1, fell to 0.889 (16 of 18 against 16 of 17). One bounded pass, recorded in the commits, followed:
+- a list item is never a label heading, and a label needs a sentence;
+- a title reference needs three digits;
+- how to apply and contract type now read as the guide defines them.
+
+Direct reports scored worse under both revisions, so the user chose to keep d62f97e's rule, and to proceed with the languages section left to round 2.
+
+**Review** (`role-survey/review-10.md`, Grok 4.7, two rounds before the draw): changes needed (2 must-fix, 8 should-fix, 3 minor), then approve with changes (2 should-fix). All points were taken except one must-fix, which the reviewer accepted in the second round: CI requires every round's file, and this pull request carries round 2's.
+
+**The draw** (seed 20261114, made after the rules were frozen at `772b004`):
+- 100 adverts at 77 organisations, 20 French;
+- by source: archive 87, boards 7, step F's feeds 5, documented feeds 1;
+- by system: own sites 60, Greenhouse 17, MyJobMag 5, iCIMS 4, Teamtailor 4, and 2 each from five smaller systems.
+
+**The coders and the guide.**
+- **Coders:** Grok 4.7 (coder A) and Composer 2.5 (coder B), again the only pair; Claude Fable 5.2, Gemini 4 Carbon and GPT-5.6 Luna were refused on the account.
+- **Guide:** version 1.1 as reconciled in round 1 (`guide.md`, sha 6e3151…). `guide-v1.1.md` in round 1's folder is an earlier copy lacking four clarifications.
+- **Grok's runs:** they looped on three of the five batches, so they were rerun in halves and then in groups of five.
+- **Single-coded adverts:** three adverts whose text is one long line (V110, V148, V161) defeated Grok even alone and with a finer reading copy. Composer coded them alone, and the reconciler decided all 189 of their items from the text, as for V057.
+- **Form slips:** the coders corrected their own, form only. Composer's included file line numbers for most of one batch.
+- **A command run twice:** an assembly command ran twice and left three of Composer's files with only their corrections. They were rebuilt from the original answers in the run transcripts before anything was checked.
+
+**Agreement** (the 97 adverts coded twice): language 1.00 and years within one year 1.00. Lowest: family 0.57, travel 0.76, selection steps 0.77, role purpose and pay wording 0.78, header facts 0.79.
+
+**Reconciliation:** 697 items (508 in 95 adverts coded twice, 189 in the three coded once), each settled by reading the advert, with a one-line reason. Sealed on 14 November 2026 at 14:35 IST, before any of the script's answers for the round were read.
+
+**Results** (19.3's targets; round 2 alone decides, since the rules were designed on round 1):
+- **Validated (11, against 8 for the old rules in round 1):**
+  - language: 0.99, English 1.00, French 0.95;
+  - level: 0.976, with officer 0.944 and coordinator or manager 1.000;
+  - the essential-requirements section: 1.000 precision, 0.900 recall;
+  - the languages section: 1.000, 0.882;
+  - **contract type: 0.911, 0.927;**
+  - **languages named: 1.000, 0.873;**
+  - **the equal-opportunity statement: 0.912, 0.897.**
+- **Estimate (34):**
+  - **Near target:**
+    - years within one year in 89.2% of 65 adverts (target 90%);
+    - closing date 0.979 / 0.807;
+    - how to apply 0.982 / 0.836;
+    - duty station 0.895 / 0.861;
+    - reporting line 0.914 / 0.780;
+    - closing time 0.958 / 0.793;
+    - pay 0.862 / 0.781;
+    - safeguarding checks 0.900 / 0.621.
+  - **High precision, low recall:** most section types (precision 0.75 to 1.00, recall 0.21 to 0.71), contract length 0.955 / 0.500, reference number 0.938 / 0.682.
+  - **Weak:** selection steps 0.558 / 0.960, direct reports 0.500 / 0.438, family 0.688 / 0.591 (function 0.713).
+- **Not validated (30):** fewer than 15 cases. Restrictions: 24 of the 100 adverts carry one, and the script found 5 (precision 0.80, recall 0.17); nationality has 15 cases and 0 found.
+
+**Remaining error patterns** (counts from round 2):
+1. **Headings it cannot see**, still the largest source: missed responsibilities 35, about the organisation 26, header facts 22, pay and benefits 22, role purpose 21.
+2. **Selection steps:** 19 false positives, 7 of which the reconciled set codes vague.
+3. **Facts missed:** contract lengths 21, travel 17, vague pay wording 13, and how to apply, safeguarding checks, closing dates and duty stations 11 each.
+4. **Years,** 7 differences: 4 a larger figure than the one asked, 2 no figure, 1 smaller.
+5. **Family,** 41 differences: 20 another function, 16 unplaced, 3 non-job pages given a family, 2 sector.
+6. **Level,** 15 differences, 13 of them unknown where the text gives one.
+7. **Restrictions:** 15 nationality misses, mostly residence or locality limits; 3 national posts, 2 religion, 1 marital, 1 photograph.
+
+**Which broad measures may now be used as validated:**
+- language and level;
+- the presence of the essential-requirements and languages sections;
+- the contract type;
+- whether languages are named;
+- the equal-opportunity statement.
+
+Everything else in `broad-adverts.csv` and `broad-sections.csv` stays an Estimate, labelled so wherever used. Round 1's `broad-validation.csv` stays as the record of the old rules.
+
+**The broad layer, rebuilt** (1,294 evidence adverts; Estimates except where validated):
+- **Facts given:** contract type 48% (validated; 75% under the old rules, which counted a bare FULL_TIME), duty station 68%, equal-opportunity statement 58% (validated), how to apply 53%, languages 45% (validated), reporting line 42%, closing date 40%, selection steps 40%, hours 39%, pay 37%, travel 29%, contract length 24%, start date 23%, closing time 19% (5% before), reference number 12%, budget 1% (13% before).
+- **Years asked** (median, quartiles): officer 4 (3 to 5), coordinator or manager 5 (4 to 7), head or adviser 8 (6 to 10).
+- **Other measures:** sections per advert, median 6 (5 before); partial score median 20, upper quartile 22.9.
+
+**Next:** the restrictions, as their own proposal: first the user's decision on whether residence and locality limits count as nationality, then a targeted sample to reach 15 cases. Then Phase 0's guide and wave 1a's deep layer, and the wave-1 families, proposed from the role map. A later round could take the headings, contract lengths and years (89.2%, just under target), each on a fresh draw.
+

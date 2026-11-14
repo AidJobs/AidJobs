@@ -1,0 +1,76 @@
+measure,positive_cases,script_positives,precision,recall,within_one_year,coder_agreement,kappa,result
+section:about_organisation,55,31,0.935,0.527,,0.814,0.629,Estimate
+section:commitments_safeguarding,10,8,0.500,0.400,,0.887,0.413,not validated
+section:competencies,18,9,0.889,0.444,,0.897,0.674,Estimate
+section:context,27,16,0.750,0.444,,0.835,0.625,Estimate
+section:data_protection,3,0,,0.000,,0.979,0.492,not validated
+section:deliverables,8,5,1.000,0.625,,0.979,0.878,not validated
+section:desirable_requirements,15,12,0.750,0.600,,0.938,0.734,Estimate
+section:equal_opportunity,19,4,1.000,0.211,,0.876,0.536,Estimate
+section:essential_requirements,90,81,1.000,0.900,,0.969,0.840,validated
+section:field_conditions,3,2,0.000,0.000,,0.959,0.314,not validated
+section:fraud_notice,4,1,0.000,0.000,,0.990,0.795,not validated
+section:header_facts,53,32,0.969,0.585,,0.794,0.585,Estimate
+section:how_to_apply,45,37,0.865,0.711,,0.887,0.773,Estimate
+section:languages,17,15,1.000,0.882,,0.918,0.669,validated
+section:pay_benefits,50,29,0.966,0.560,,0.835,0.671,Estimate
+section:responsibilities,87,52,1.000,0.598,,0.918,0.704,Estimate
+section:role_purpose,55,44,0.773,0.618,,0.784,0.548,Estimate
+section:scope,3,9,0.222,0.667,,0.969,0.385,not validated
+section:selection_process,7,3,0.333,0.143,,0.969,0.807,not validated
+section:working_relationships,11,3,0.667,0.182,,0.928,0.593,not validated
+fact:pay,32,29,0.862,0.781,,0.876,0.806,Estimate
+fact:pay_vague,25,14,0.857,0.480,,0.784,0.248,Estimate
+fact:grade,10,6,1.000,0.600,,0.959,0.795,not validated
+fact:contract_type,55,56,0.911,0.927,,0.938,0.878,validated
+fact:contract_length,42,22,0.955,0.500,,0.969,0.940,Estimate
+fact:hours,39,36,0.833,0.769,,0.918,0.838,Estimate
+fact:duty_station,79,76,0.895,0.861,,0.887,0.694,Estimate
+fact:remote,31,29,0.828,0.774,,0.959,0.905,Estimate
+fact:travel,41,28,0.857,0.585,,0.763,0.573,Estimate
+fact:reports_to,41,35,0.914,0.780,,0.804,0.613,Estimate
+fact:direct_reports,16,14,0.500,0.438,,0.856,0.661,Estimate
+fact:budget,1,1,0.000,0.000,,0.804,0.041,not validated
+fact:closing_date,57,47,0.979,0.807,,0.938,0.884,Estimate
+fact:closing_time,29,24,0.958,0.793,,0.918,0.809,Estimate
+fact:start_date,25,25,0.760,0.760,,0.928,0.804,Estimate
+fact:languages,55,48,1.000,0.873,,0.959,0.919,validated
+fact:selection_steps,25,43,0.558,0.960,,0.773,0.564,Estimate
+fact:how_to_apply,67,57,0.982,0.836,,0.887,0.754,Estimate
+fact:no_fee_notice,15,17,0.647,0.733,,0.990,0.962,Estimate
+fact:safeguarding_checks,29,20,0.900,0.621,,0.897,0.736,Estimate
+fact:accompanied,2,1,1.000,0.500,,0.979,0.489,not validated
+fact:hardship_rr,0,3,0.000,,,0.948,0.358,not validated
+fact:housing,11,11,0.818,0.818,,0.959,0.780,not validated
+fact:number_of_posts,9,2,1.000,0.222,,0.969,0.847,not validated
+fact:funding_status,11,4,1.000,0.364,,0.990,0.947,not validated
+fact:equal_opportunity,58,57,0.912,0.897,,0.918,0.835,validated
+fact:adjustments,20,12,0.917,0.550,,0.979,0.932,Estimate
+fact:reference_number,22,16,0.938,0.682,,0.918,0.750,Estimate
+years_min,65,63,,,0.892,1.000,1.000,Estimate
+years_alt,5,0,,,0.000,0.800,0.885,not validated
+degree:named,63,42,1.000,0.667,,0.990,0.978,Estimate
+degree:phd,0,1,0.000,,,1.000,,not validated
+degree:master,35,16,1.000,0.457,,0.959,0.908,Estimate
+degree:bachelor,27,23,0.739,0.630,,0.928,0.818,Estimate
+degree:secondary,1,2,0.000,0.000,,0.959,0.314,not validated
+family,93,80,0.688,0.591,,0.567,0.553,Estimate
+function,93,80,0.713,0.613,,0.845,0.834,Estimate
+level,95,82,0.976,0.842,,0.887,0.850,validated
+level:intern_fellow,11,8,1.000,0.727,,0.990,0.947,not validated
+level:head_adviser,12,11,1.000,0.917,,0.969,0.862,not validated
+level:coordinator_manager,22,20,1.000,0.909,,0.948,0.845,validated
+level:officer,40,36,0.944,0.850,,0.928,0.849,validated
+level:assistant,10,7,1.000,0.700,,0.959,0.755,not validated
+language,100,100,0.990,0.990,,1.000,1.000,validated
+language:en,81,80,1.000,0.988,,1.000,1.000,validated
+language:fr,19,20,0.950,1.000,,1.000,1.000,validated
+restriction:any,24,5,0.800,0.167,,0.918,0.750,not validated
+restriction:sex,0,0,,,,1.000,,not validated
+restriction:age,1,1,1.000,1.000,,1.000,1.000,not validated
+restriction:religion,2,0,,0.000,,1.000,1.000,not validated
+restriction:marital_family,1,0,,0.000,,1.000,1.000,not validated
+restriction:nationality,15,0,,0.000,,0.938,0.695,not validated
+restriction:national_post,6,4,0.750,0.500,,0.938,0.467,not validated
+restriction:disability,0,0,,,,1.000,,not validated
+restriction:photo_appearance,1,0,,0.000,,1.000,1.000,not validated
