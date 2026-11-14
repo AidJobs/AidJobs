@@ -95,7 +95,7 @@ export default function OutlineEditor({ rows, grouping, onOp, recommended = [], 
 
   return (
     <div ref={root} className="ej-ol" aria-label={label} role="group">
-      <div className="sr-only" aria-live="polite">
+      <div className="sr-only" role="status">
         {said}
       </div>
       {order.map((g, gi) => {

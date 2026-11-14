@@ -236,10 +236,12 @@ function LinkLangs({ job, disabled }: { job: DemoJob; disabled: boolean }) {
         >
           <span className="ej-menu-label">Linked languages</span>
           {langs.map((l, i) => (
-            <label key={l} className="ej-menu-item flex items-center gap-2">
-              <input type="checkbox" checked={linked.includes(l)} autoFocus={i === 0} onChange={() => setLinked(job.id, linked.includes(l) ? linked.filter((x) => x !== l) : [...linked, l])} />
-              <span lang={l}>{langOf(l).native}</span>
-              {l === jobLang(job) && <span className="aj-faint">the job&apos;s own</span>}
+            <label key={l} className="ej-menu-item">
+              <span className="flex items-center gap-2">
+                <input type="checkbox" checked={linked.includes(l)} autoFocus={i === 0} onChange={() => setLinked(job.id, linked.includes(l) ? linked.filter((x) => x !== l) : [...linked, l])} />
+                <span lang={l}>{langOf(l).native}</span>
+                {l === jobLang(job) && <span className="aj-faint">the job&apos;s own</span>}
+              </span>
             </label>
           ))}
           <span className="aj-faint block px-2.5 pb-1" style={{ fontSize: 11.5 }}>

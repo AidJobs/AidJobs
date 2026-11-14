@@ -173,6 +173,7 @@ describe('when none of the offered answers fits (section 19, phase 6, A)', () =>
     const id = started();
     sendChat(id, 'hmm');
     sendChat(id, 'erm, well');
+    expect(job(id).walk?.parked).toEqual(['grade']);
     sendChat(id, 'P3');
     expect(job(id).facts.grade).toBe('P3');
     expect(job(id).walk?.parked ?? []).not.toContain('grade');

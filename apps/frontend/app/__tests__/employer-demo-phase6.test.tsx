@@ -179,7 +179,7 @@ describe('the outline, one design wherever it appears (section 19, phase 6, B)',
     expect(job('job-comms').groupOf?.[firstJob]).toBe('employer');
     key(panel.querySelector('[data-grip-key="group:offer"]'), 'ArrowUp');
     expect(job('job-comms').groupOrder?.indexOf('offer')).toBeLessThan(job('job-comms').groupOrder!.indexOf('person'));
-    expect(container.querySelector('.ej-ol [aria-live="polite"]')?.textContent).toMatch(/^Moved the group The offer and conditions/);
+    expect(container.querySelector('.ej-ol > .sr-only[role="status"]')?.textContent).toMatch(/^Moved the group The offer and conditions/);
   });
 
   it('dragging tells a press from a drag; dropped after a row it joins that row’s group, under a title it goes first in that group', () => {
@@ -221,7 +221,7 @@ describe('the four icons on the draft (section 19, phase 6, C and D)', () => {
     const before = job('job-comms').tags.indexOf('responsibilities');
     key(q('[data-grip-key="responsibilities"]'), 'ArrowUp');
     expect(job('job-comms').tags.indexOf('responsibilities')).toBe(before - 1);
-    expect(q('.ej-doc > [aria-live="polite"]')?.textContent).toMatch(/^Moved\. .+: \d+ of \d+ in .+, \d+ of \d+ in the job description$/);
+    expect(q('.ej-doc > .sr-only[role="status"]')?.textContent).toMatch(/^Moved\. .+: \d+ of \d+ in .+, \d+ of \d+ in the job description$/);
     act(() => jest.advanceTimersByTime(20));
     expect(document.activeElement?.getAttribute('data-grip-key')).toBe('responsibilities');
   });

@@ -230,8 +230,7 @@ export function StepNote({ job, onSeeChat }: { job: DemoJob; onSeeChat?: () => v
         {st.writing ? '. Writing the linked languages…' : ''}
         {st.also && (
           <span className="ej-also">
-            {' '}
-            Also in{' '}
+            . Also in{' '}
             {st.also.langs.map((l, i) => (
               <Fragment key={l}>
                 {i > 0 && <span aria-hidden> · </span>}
@@ -760,7 +759,7 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inW
     <>
       <article ref={root} className="ej-doc aj-card flex flex-col gap-1 p-3 lg:p-5" aria-label="Job description" data-drop-top={dropAfter === null || undefined}>
         {icons && (
-          <div className="sr-only" aria-live="polite">
+          <div className="sr-only" role="status">
             {said}
           </div>
         )}
