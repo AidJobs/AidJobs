@@ -910,7 +910,7 @@ Sections with names of the user's own beyond the available ones (not wanted: the
 
 ### Phase 7 plan (managing saved profiles; approved by the user, 15 November 2026; rewritten after the independent plan review the same day)
 
-**Status.** Phase 6 and its review fixes are done. The leftover that already has data and a clear gap is managing saved job profiles: they are saved on publish, offered at the start of a new job, and forgotten from the notice, but there is no page for the list. The user asked for this next on 15 November 2026 and approved the plan the same day, locking the three recommendations: light fact editing on the profile; a side-menu item **Job profiles** beside Organisation settings; and carrying `groupOrder` / `groupOf` into the profile on save. One independent read-only review of this plan the same day ([the report](e6078bdd-e337-4018-896c-fcb84fd207f9): changes needed, 5 must-fix, 7 should-fix, 3 minor); every finding is built into this text with the reviewer's recommended defaults. The three locked decisions are unchanged. No code in this step. The build starts once the user approves it (the project's rule), on `demo/employer` in the order in section G. The merge rule does not apply: `demo/employer` is never merged.
+**Status.** Phase 6 and its review fixes are done. The leftover that already has data and a clear gap is managing saved job profiles: they are saved on publish, offered at the start of a new job, and forgotten from the notice, but there is no page for the list. The user asked for this next on 15 November 2026 and approved the plan the same day, locking the three recommendations: light fact editing on the profile; a side-menu item **Job profiles** beside Organisation settings; and carrying `groupOrder` / `groupOf` into the profile on save. One independent read-only review of this plan the same day ([the report](e6078bdd-e337-4018-896c-fcb84fd207f9): changes needed, 5 must-fix, 7 should-fix, 3 minor); every finding is built into this text with the reviewer's recommended defaults. The three locked decisions are unchanged. No code in this step. The build starts once the user approves it (the project's rule), on `demo/employer` in the order in section G. The user confirmed on 15 November 2026: build Phase 7 as planned; the high-impact and enterprise role-system work stays in section J for later. The merge rule does not apply: `demo/employer` is never merged.
 
 **What already exists (so this page only manages it).** On publish, a profile is saved automatically (`profileOf`): title, place, family, JD format, section keys, facts without dates and positions, style, how to apply, fixed-text keys (commitments), and language. A newer profile with the same title and place replaces the older. Undo on the notice calls `forgetProfile`. A matching profile is offered at the start of a new job ("Same as your last **Juba Finance Officer**?"). Hire again still copies the written text; a profile does not. There is no screen for the list. That is all this step adds.
 
@@ -1013,8 +1013,31 @@ Screens at 1366, 412, 390, and 360 px, light and dark. Keyboard: reuse `Tip` and
 
 #### I. Not in this phase
 
-A projects list in Organisation settings; replacing the role families with the survey's library; Hire again changes; saving profiles from drafts by hand; a profile that holds full JD text; the user's assessment of the whole demo and the real-AI walk (they follow this phase and its review).
+A projects list in Organisation settings; replacing the role families with the survey's library; Hire again changes; saving profiles from drafts by hand; a profile that holds full JD text; the high-impact and enterprise role-system work in section J (recorded 15 November 2026, not built in this phase); the user's assessment of the whole demo and the real-AI walk (they follow this phase and its review).
 
+#### J. Later: high-impact and enterprise-grade role system (recorded 15 November 2026; not Phase 7)
+
+Phase 7 as planned makes reuse trustworthy (list, rename, light fact edit, delete with restore, Use for a new job, grouping on the profile). It is hygiene for returning employers, not a product leap. The user decided on 15 November 2026 to build Phase 7 as planned, and to keep the following for whenever the time is right — each needs its own plan and approval; none of it is in Phase 7's build order.
+
+**What would make profiles high value and high impact** (the organisation's living role system, not leftovers from publish):
+
+1. **Intentional role library** — named roles people start from on purpose ("Finance Officer — country office"), not only when title+place matches. Publishing updates a chosen role, or offers "Update this role?", instead of silently replacing by title+place.
+2. **Start from the library everywhere** — Create a job, Overview, Manage jobs, and the chat offer "Start from [role]" (or blank). The first click for a returning employer is the role, not hoping the chat guesses the last publish.
+3. **Structure and facts together, still not Hire again** — the profile keeps outline, grouping, style, apply, commitments, and the role's facts; section *text* stays out. Hire again remains "copy this advert's wording."
+4. **Multi-office / variants** — one role, many duty-station or contract variants under one parent (Juba / Nairobi / remote; fixed-term / consultancy). Search and Use work at both levels.
+5. **Quality loop** — after several posts of the same role, the profile shows what is usually edited before publish and which check flags recur (needs real usage data).
+
+**Recommended order when the time is right:** (1) and (2) first, then (4), then governance below, then (5).
+
+**What would make it enterprise grade** (beyond high impact; production scope, not this demo phase):
+
+- **Governance:** who may edit a role profile; an audit of changes; optional owner approval before a profile edit affects new jobs.
+- **Shared libraries:** roles shared across country offices or entities of one organisation, with clear ownership.
+- **Versioning:** a history of the role profile, and the ability to start from an earlier version.
+- **Production persistence:** roles on the AidJobs backend (not demo localStorage), with the contract changes in section 2.
+- **Optional later integrations:** HRIS or applicant-tracking sync, and the validated survey role library (W-54) feeding suggestions — each its own decision.
+
+**Deliberately not on this later list** (easy traps): dashboard chrome; duplicating Hire again as full JD storage; bolting on a projects list; more rename/delete polish alone.
 
 ### Phase 3, revised (the user's decisions, 12 November 2026)
 
