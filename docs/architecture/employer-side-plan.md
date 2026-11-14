@@ -520,6 +520,7 @@ Each phase on `demo/employer`, with a preview for the user's look before the nex
   **The look:** the chat is plain (no bubbles; "You" above the user's lines); new AI messages and written sections appear as they are written, at once with reduced motion, and screen readers get the whole text at once; focus rings follow each control's rounded corners; social links per job, offered from the website's page and the organisation's settings; the answer-by date for a review is optional ("No date").
   **Real-AI walk** (locally, with the demo key from the vault into the dev server only; GPT-6.1 Terra): three runs, about 70 calls, 2 to 10 seconds each, no failures. Spent: about US$0.63 by the earlier rounds' per-call costs (an estimate; OpenRouter's page has the exact figure). Confirmed: About us drafted from a real page (UNICEF's), with the AI saying the page is not about the sample organisation and inventing nothing; the four social accounts offered; a pay suggestion for the Finance Officer exactly the organisation's D1 range (US$4,200 to 5,100 a month) with its source; the open question kept and "Good" adding nothing; with Amplify the steps ran full check, languages, review, Reach, flyer, publish (the market step is skipped when it has no open point); with Free, review then publish, with no Reach or flyer. Found and fixed, with tests shown failing on the earlier code: the reader refused any page over 500 KB (MSF's) instead of reading its first 500 KB; it connected to the first address even when that was IPv6, which many networks cannot reach (Oxfam's timed out); one pattern in the text cleaning could take minutes on a hostile page (every pattern there now runs in linear time, tested with eight hostile 500 KB pages). Some sites refuse the reader (IFRC and Save the Children answered 403); the user then pastes the text, as designed. **Left for the review:** while the AI rewrites a new job's first reply, Enter in the box does nothing and no "Thinking…" shows (the text stays in the box; this predates phase 5).
   **Checks:** 1,034 tests pass (964 before); the new rules' tests were shown failing on the earlier code (65 of them, and the hostile-page test hangs the earlier reader). Type check, lint, and a production build pass. Screens checked at 1366, 412, 390, and 360 px, light and dark, by a headless browser driven outside the repository: the plain chat, the suggestion card, the page-draft card, sub-sections, social links, the Amplify order, a free standard job without Reach or the flyer, both allowances in Billing (available and used), and Organisation settings; the text reveal with reduced motion on and off; keyboard focus through the window. The focus check found two colour tokens the demo used but the site never defined (`--sage-6`, so focus rings did not draw, and `--sage-4`, so the current section's bar never showed, since phase 1); both fixed, and a test now checks every token the demo's styles use. A recursion in the AI's context with two unapproved sections in view was found by the tests and fixed.
+- [ ] **Phase 6, the draft as the place to shape the job (the user's decisions of 14 November 2026):** the chat's user bubble; the outline's two levels back (groups and their sections, everything reorderable, always shown grouped); four icons (+, ✎, ⋮⋮, 🔗) to add, edit, move, and remove sections and the fixed texts from the draft; each language independent, linked only when the user links it; the organisation's fixed texts per language. "Phase 6 plan" below, rewritten after one independent review (changes needed, every finding taken); for the user's approval. Not built yet.
 
 ### Phase 4 plan (approved by the user, 12 November 2026)
 
@@ -682,6 +683,125 @@ Tests for each rule, each shown failing on the earlier code, including: About us
 #### H. Not in this phase
 
 Managing saved profiles; a projects list in Organisation settings; replacing the role families with the survey's library; Hindi and other local languages; token allowances; vouching; reading more than one page of a site; a public title suggested for an internal code; the user's assessment of the whole demo, which follows this phase and its review.
+
+### Phase 6 plan (the user's decisions of 14 November 2026, rewritten after the independent review; for the user's approval)
+
+**Status.** After phase 5 and its review, the user raised four issues on 14 November 2026 and settled the design in chat the same day: the chat's look; the outline panel's design, changed in phase 5 without being asked; editing language versions like the job's own text, each independent; and changing the job's structure and its fixed texts from the draft itself. The user's rule for all of it: **maximum flexibility without confusion; minimal, with icons and tooltips rather than text; a small set of icons doing most of the work; no clutter of icons, tabs, or text tabs.** One independent read-only review of the first draft the same day ([the report](8f35b566-f352-42f8-ad17-4f9256432901): changes needed, 10 must-fix, 12 should-fix, 7 minor); the user then made the choices it asked for, and this is the plan rewritten with every finding built in. No code in this step. The build starts in a new chat once the user approves this plan (the project's rule). The merge rule does not apply: `demo/employer` is never merged.
+
+**What phase 5 misread.** The outline before phase 5 had two levels: the five groups as titles (About the employer, The job, The person, The offer and conditions, Applying), and under each the sections that belong to it, with "+ add" chips for the ones not in the job (under About the employer: About us, Team purpose, Background, Organisational setting). The user's "sub-sections" were these sections under their group; phase 5 built a third level (headings inside a section) and flattened the outline around it. The user confirmed the two-level reading on 14 November 2026.
+
+#### A. The chat
+
+The user's own messages get a soft tinted bubble on the right (light, never black; readable in dark mode); the AI's replies keep no background and no outline. The CSS "You" label (`::before`) goes; a visually hidden "You said" is added for screen readers. The answer buttons are unchanged.
+
+#### B. The outline: groups and their sections, in any order, always shown grouped
+
+**The model.** Two levels, as before phase 5: the five groups, and each group's sections. Everything can be reordered (the user, 14 November 2026): sections within a group, a section into another group, and the groups themselves; but it is always presented grouped: each section under its group, in the order chosen, in the outline panel and in the job description alike. The job description reads in that order (groups do not show as headings in the job itself).
+
+**Saved per job, and per language version:** the order of the groups, each section's group when it was moved into another one, and the order within each group. The job's reading order is derived from these, so what the outline shows is always what the job description reads. This replaces phase 5's free order (`ordered`, `crossesGroups`, `movesAcrossGroups`, and `outlineOrder` re-sorting): "across groups" now means a change of a section's group. A template entry gains an optional group, and a template an optional group order, so Create your own and the Templates tab keep a user's arrangement. The version functions that still force the group order (`addVersionSection`, `reorderVersionSections`), the Languages fix, and the import keep the arrangement too.
+
+**Moving.** A section dropped after another joins that section's group (the first group when dropped at the top); "Move to…" lists the groups. A group moves as a whole, from its title in the outline panel.
+
+**Headings inside a section** (phase 5's sub-sections) stay, but only inside the ✎ editor ("Add a heading inside this section", useful for long sections such as Responsibilities), never in the outline; the outline returns to its earlier look.
+
+**The outline panel** (This job's sections, Create your own, the Templates tab's preview, and the reviewers' read-only view): each group's title with its sections under it, and that group's "+ add" chips under them, as at `c704308`; the rows use ✎ (rename in place) and ⋮⋮ (move, remove), as the user chose. It never turns into one flat list. It shows and edits the language in view; a template change applies to the language in view and the languages linked to it.
+
+**Saved data from phase 5** is brought forward without changing what it reads: a section a phase 5 job moved into another group joins the group of the section before it.
+
+#### C. Four icons for the whole draft
+
+One set of icons, the same everywhere: the job description in every language and the outline panel's rows. Each has a tooltip; the text on the page does not grow.
+
+| Icon | Where | What it does |
+|---|---|---|
+| **+** | A hairline between sections for a pointer, shown on hover; one **+** after the last section, always there, for the keyboard and touch | Opens a short list of the available sections not in this language of the job: the group of the place it was opened first (after About us: Background, Team purpose, Organisational setting), then the other groups; then any fixed text left out, to bring it back. It goes where it was opened (from the last +, at the end of its group). |
+| **✎** | Each section, and each fixed text | Edits in place: heading (with the suggested titles), text, headings inside the section. On a fixed text: "Edit for this job". On How to apply: the application settings (replacing today's gear). |
+| **⋮⋮** | Each section and fixed text; each group title in the outline panel | Drag to move. Enter or Space opens its menu: Move up, Move down, Move to…, Add below, Remove (on a fixed text: Leave out of this job, Change for every job ↗; How to apply has no Remove). With the handle focused, the arrow keys move it. A press that does not move opens the menu. |
+| **🔗** | Once, in the language bar (only when the job has versions) | Links languages, so a change in one also applies to the linked ones (section E). |
+
+No separate remove, settings, or language icon. On devices without hover (phones, touch screens), ✎ and ⋮⋮ show faintly. No confirmation dialogs. Every icon is a labelled button; every menu works with the keyboard; each move is announced with the section's new place. Approve, "Your text", and "Save as our About us" stay on section headers as today. Reviewers see none of the four icons. Structure changes on a job in review or live follow today's rules (an approval reopens; a live page says Updated).
+
+**Undo.** One step per job: the existing change note, with Undo, appears in whichever tab is open after any change from the four icons, and covers everything the change touched, in every language it reached (the job's sections, arrangement, fixed texts, and versions). The next change replaces it. A removed section's text can also be brought back from Earlier versions. While a linked translation is still being written, Undo waits until it is done.
+
+#### D. Structure and fixed texts from the draft
+
+**Any section, from the draft.** From within the job description the user adds any available section anywhere, removes any section, and moves sections and groups, without opening the template. The chosen template is unchanged; the job keeps its own arrangement, and the outline panel shows each change at once. Text already written stays with its section. How to apply cannot be removed by any route (the draft, the outline, the AI, a version); its text and method are changed for the job with ✎.
+
+**Fixed texts on the draft.** Each fixed text shows a small shield (replacing today's lock on each line); its tooltip says "From Organisation settings", or "Locked by your organisation".
+- **Locked** keeps its meaning in Settings today: the wording is fixed and the text cannot be left out of a job (the user chose one concept, 14 November 2026; no separate "Required" pin). On a locked text, ✎ and Leave out are disabled, their tooltip "Locked: change it for every job ↗".
+- ✎ **Edit for this job**: a wording for this job only, with "Back to the organisation's text"; the basic check reads it as it reads any text.
+- ⋮⋮ → **Change for every job ↗**: opens Organisation settings at that text. For anyone but the owner, the tooltip says only the owner can change it.
+- ⋮⋮ → **Leave out of this job**: for a text not locked; the change note says what was left out, with Undo. A text left out comes back from **+**.
+- After editing a fixed text for one job, the owner sees one quiet line, "Use this wording for every job?" (Yes · Not now); Yes changes Organisation settings, and jobs already published keep theirs.
+- The progress line's Fixed text part stays, as the same list, showing the same choices.
+
+**Organisation settings** list every fixed text the demo offers, the AidJobs starter texts marked as starters, so every ↗ has a place (the user, 14 November 2026). One language switch on the fixed-texts card (not one per text) holds the organisation's own wording in each language offered. Today's "lock" keeps its place there.
+
+#### E. Languages, each independent
+
+- **The same draft in every language.** A language version shows like the job's own text, with the four icons (replacing today's always-open text boxes). Its ✎ keeps one field per line, each line's original faintly under it, so the line-by-line reference and the count of lines still in the original keep working. Sections, their arrangement, headings inside sections, and fixed texts left out or edited can differ by language; the facts stay shared, as decided on 8 November 2026.
+- **Independent by default.** A change applies only to the language in view, the job's own language included.
+- **After a change in one language,** the change note offers the other languages once, quietly: "Also in French · Arabic" (the user, 14 November 2026). Taken, it applies as a linked change would; not taken, those versions keep their text and are not flagged for that change. The "changed" banner stays only for changes the rules or the facts made.
+- **🔗 Link languages.** One group of linked languages per job, the job's own language included, chosen with tick boxes from one icon in the language bar; linked tabs show a small link mark. Linking does not bring existing differences into line; a language added later does not join until ticked. While languages are linked, every change follows them: structure, fixed texts left out or edited, text, and changes from the outline panel. Structure always follows. Text follows into a version by the AI when it is on, otherwise by the demo's table with untranslated lines marked; into the job's own language only when the AI is on, otherwise that section is marked "to update" and left as it is (the user, 14 November 2026). A changed version becomes a draft to review. A linked language that lacks the section is skipped. The change note names every language it reached; on a live job it says that linked versions leave the page until reviewed again.
+- **Differences visible.** In the outline panel, a section that differs by language carries a small mark, with its text both as a tooltip and for screen readers ("French only", "Not in Arabic").
+- **Fixed texts in every language.** Each language, the job's own included when it is not English, uses the organisation's wording for that language, word for word; until one is given, the original text, marked ("In English: add your French text in Organisation settings ↗"). Never machine-translated. This holds on the job description, the public page, the preview, the download, and the flyer.
+- **Approval and live jobs.** As now: any change to a version reopens an approval; a live job's page says Updated, and a changed version leaves the live page until it is reviewed again.
+
+#### F. The AI
+
+- Its section actions (add, remove, move, rename, write, headings inside a section) act on the language in view and the languages linked to it, checked by the demo as today. It never changes the link.
+- `fixed_text` acts on the language in view and the linked ones, and refuses a locked text. The AI never edits a fixed text's wording.
+- Removing How to apply is refused on every route.
+- Carrying a linked text change into another language is a new kind of request to the AI, checked like any other, with the demo's table (or "to update") when the AI is off or fails.
+- Its instructions name what the four icons do, so its replies can point to them; the context stays within the 80,000-character limit with the new data.
+
+#### Saved data, and older saves
+
+New, all optional: per job and per version, the group order, sections' groups, and the order within groups; per job, the fixed-text wording for this job and the texts left out, per language; per version, its own headings and arrangement (as the job's `renamed` and order today); the linked languages; the Undo step, widened to cover versions and fixed texts. On the organisation, each fixed text's wording per language. A save from phase 5 is brought forward on load: arrangement as in section B, versions keep their sections, no link, no per-job wording. Hire again and job profiles copy the arrangement and the per-job wording, not the link. Changing the job's own language carries the per-language data with it.
+
+#### This changes earlier decisions
+
+- **8 November 2026, "Update the French too?":** after the user's own edit, the offer is now the change note's "Also in …", once; the banner stays for changes by the rules or the facts.
+- **8 November 2026 and step 10, fixed texts "confirmed once per language":** replaced by the organisation's wording per language in Settings; the record of languages confirmed (`fixedLangs`) is brought forward as "wording given" where a wording exists, otherwise dropped.
+- **Step 6 and phase 5 B, fixed texts "word for word", "changed afterwards only in Organisation settings":** still true for locked texts; a text not locked can now be worded for one job.
+- **Phase 5 B, moving sections anywhere in one flat order:** sections still move anywhere, but always shown and read grouped; groups move too.
+- **Phase 5 B, sub-sections in the outline:** now headings inside a section, in the ✎ editor only.
+- **Phase 5 E, "The chat":** the user's messages have a soft background again.
+
+#### G. Build order
+
+Each step on `demo/employer`, with its tests, before the next:
+
+1. The chat (A).
+2. The saved data, its bringing forward, and the widened Undo, settled once (so later steps do not rework them).
+3. The outline: groups and sections in any order, always grouped; the outline panel's earlier design with ✎ and ⋮⋮; headings inside a section moved into ✎ (B).
+4. The four icons on the job's own draft: +, ✎, ⋮⋮, with structure from the draft (C, D first part).
+5. Fixed texts: the shield, edit for this job, change for every job, leave out, locked, bring back, every text in Settings, the offer to use a wording for every job (D).
+6. Languages: the same draft in every version, independence, "Also in …", 🔗 links, differences marked, the organisation's wording per language everywhere it shows (E), and the AI (F).
+7. The round's checks, the push for the preview, this record and the ledger.
+
+#### H. Checks
+
+Tests for each rule, each shown failing on the earlier code, including:
+- a section added from the draft at the place chosen, in the right group, kept through a reload and a template rebuild;
+- groups reordered and a section moved into another group, the outline and the job description reading the same;
+- a phase 5 save brought forward reading as before;
+- a section removed and brought back with Undo, and from Earlier versions;
+- moves by drag, by the arrow keys, and by Move up, down, and to;
+- How to apply never removable, by any route;
+- a fixed text worded for one job and reset; a locked one refused (edit and leave out); one left out and brought back from +; the offer to use the wording for every job;
+- a change in one language not reaching another unless linked or offered, and reaching each linked one (structure copied, text drafted and marked for review); a linked edit into the job's own language with the AI off marked "to update";
+- Undo across languages;
+- the fixed texts in each language on the job description, the public page, the preview, the download, and the flyer;
+- the AI's refusals (How to apply, a locked text, the link);
+- reviewers seeing none of the icons;
+- the context of a full job with versions and per-language data within 80,000 characters.
+
+Tests that change with this plan, each listed when changed: the chat's look test (the "You" label), phase 5's outline and order tests, the version reorder tests that kept the group order, and the fixed-text tick-box tests. Type check, lint, and a production build. Screens at 1366, 412, 390, and 360 px, light and dark: the chat, the outline panel, the four icons and their menus in the job's own language and a version, the link and "Also in …", the fixed texts and Settings. Keyboard and screen reader through every icon and menu. Then the preview on `demo/employer`, one independent review of the phase, and a real-AI walk once the demo's OpenRouter account has credit (it answers 402 since 14 November 2026).
+
+#### I. Not in this phase
+
+Sections with names of the user's own beyond the available ones (not wanted: the user, 14 November 2026); managing saved profiles; a projects list in Organisation settings; the user's assessment of the whole demo, which follows this phase and its review.
 
 ### Phase 3, revised (the user's decisions, 12 November 2026)
 
