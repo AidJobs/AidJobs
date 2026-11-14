@@ -41,6 +41,12 @@ from contracts.persist import persist_candidate
 from contracts.persist import created_ids, observable_jobs, observe_known
 from contracts.refusal import refusal
 from contracts.run_ownership import OwnershipLost, confirm_running, save_failure_outcome
+from contracts.canary import (
+    append_message as canary_append_message,
+    evaluate as canary_evaluate,
+    previous_kept_from_logs,
+    previous_reader_from_logs,
+)
 from crawler_v2.job_pages import SavedJob, choose_pages, link_key, saved_job
 from crawler_v2.readers import LISTING_READER, LISTING_STRATEGY, html_readers, read_listing
 from contracts.reader import Response
@@ -352,7 +358,63 @@ class SimpleCrawler:
     def _get_db_conn(self):
         """Get database connection"""
         return psycopg2.connect(self.db_url, connect_timeout=10)
-    
+
+    def _previous_kept_row(self, source_id: str):
+        """(valid_count, observed) of the latest finished crawl for the source, or None."""
+        if not self.db_url:
+            return None
+        try:
+            # Short timeout: a miss must not slow the crawl or offline tests.
+            conn = psycopg2.connect(self.db_url, connect_timeout=2)
+        except Exception:
+            return None
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT valid_count, observed
+                    FROM crawl_logs
+                    WHERE source_id = %s
+                      AND status IS DISTINCT FROM 'running'
+                    ORDER BY ran_at DESC NULLS LAST, id DESC
+                    LIMIT 1
+                    """,
+                    (source_id,),
+                )
+                return cur.fetchone()
+        except Exception:
+            return None
+        finally:
+            conn.close()
+
+    def _previous_reader_name(self, source_id: str):
+        """The latest extraction_logs reader for the source, or None."""
+        if not self.db_url:
+            return None
+        try:
+            conn = psycopg2.connect(self.db_url, connect_timeout=2)
+        except Exception:
+            return None
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT extracted_fields->>'reader'
+                    FROM extraction_logs
+                    WHERE source_id = %s
+                      AND extracted_fields ? 'reader'
+                    ORDER BY created_at DESC NULLS LAST, id DESC
+                    LIMIT 1
+                    """,
+                    (source_id,),
+                )
+                row = cur.fetchone()
+                return row[0] if row else None
+        except Exception:
+            return None
+        finally:
+            conn.close()
+
     async def _fetch_page(self, url: str) -> Tuple[int, str, str]:
         """(status, html, stop). `stop` is why the source stops here, in fixed words: a refusal
         or challenge, or a fetch-policy stop (robots.txt, budget); '' otherwise. One request: a
@@ -2556,6 +2618,26 @@ class SimpleCrawler:
                     thin=thin,
                 )
                 
+                # Canary (W-35): notes only; status and lifecycle unchanged.
+                reader_name = LISTING_READER.get() or "unknown"
+                readers = html_readers(self)
+                previous_kept = previous_kept_from_logs(
+                    lambda: self._previous_kept_row(source_id)
+                )
+                previous_reader = previous_reader_from_logs(
+                    lambda: self._previous_reader_name(source_id)
+                )
+                canary_warnings = canary_evaluate(
+                    page=html or "",
+                    readers=readers,
+                    reader_name=reader_name,
+                    rows_read=len(jobs),
+                    admitted=len(admitted),
+                    observed=int(counts.get("observed") or 0),
+                    previous_kept=previous_kept,
+                    previous_reader=previous_reader,
+                )
+
                 # Log extraction result (Phase 2)
                 if self.extraction_logger:
                     extraction_status = 'OK'
@@ -2590,9 +2672,11 @@ class SimpleCrawler:
                         extracted_fields['listing_complete'] = listing_report['complete']
                         extracted_fields['listing_stop'] = listing_report['stop']
                     # Which reader read the listing (W-35): a diagnostic, never lifecycle evidence.
-                    extracted_fields['reader'] = LISTING_READER.get()
+                    extracted_fields['reader'] = reader_name
                     if LISTING_STRATEGY.get():
                         extracted_fields['strategy'] = LISTING_STRATEGY.get()
+                    if canary_warnings:
+                        extracted_fields['canary'] = list(canary_warnings)
                     
                     await asyncio.to_thread(
                         self.extraction_logger.log_extraction,
@@ -2613,6 +2697,7 @@ class SimpleCrawler:
                 crawl_status, crawl_message = save_failure_outcome(
                     crawl_status, crawl_message, counts
                 )
+                crawl_message = canary_append_message(crawl_message, canary_warnings)
                 return {
                     'status': crawl_status,
                     'message': crawl_message,

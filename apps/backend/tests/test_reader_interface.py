@@ -438,8 +438,12 @@ def test_a_new_employer_on_a_known_system_is_read_with_no_code(monkeypatch):
 def test_the_general_readers_crawl_records_its_strategy(monkeypatch):
     html, record = _fixture("general_reader", "icrc-listing")
     result, _run, fields = _crawl(monkeypatch, html, record["url"])
-    assert result["message"] == "Found 32 jobs"
+    # Thin listing rows are not admitted without job pages, so the canary notes that
+    # (W-35); status and the found count stay as before.
+    assert result["message"].startswith("Found 32 jobs")
+    assert "canary: rows read but none admitted or observed" in result["message"]
     assert (fields["reader"], fields["strategy"]) == ("general", "selector-links")
+    assert fields.get("canary") == ["rows read but none admitted or observed"]
     assert "listing_complete" not in fields
 
 
