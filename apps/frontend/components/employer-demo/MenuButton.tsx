@@ -15,7 +15,7 @@ export function refocus(wrap: HTMLElement | null, button: HTMLElement | null) {
  * Where the list opens: fixed to the screen beside its button, so no scrolling or clipped box around it cuts it; it opens upwards when
  * there is more room above, is never wider than the screen, and scrolls only up and down.
  */
-function placeFor(el: HTMLElement, align: 'left' | 'right', up: boolean): CSSProperties {
+export function placeFor(el: HTMLElement, align: 'left' | 'right', up: boolean): CSSProperties {
   const r = el.getBoundingClientRect();
   const vw = window.innerWidth;
   const vh = window.innerHeight;

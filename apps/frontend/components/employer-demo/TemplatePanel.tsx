@@ -3,10 +3,10 @@
 import { ChevronDown, GripHorizontal, MessagesSquare, Plus, Sparkles, X } from 'lucide-react';
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import Tip from '@/components/site/Tip';
-import { applyOutline, createFormat, formatOf, headingOf, setFacts as changeFacts, subId } from './actions';
-import DragList, { moveItem } from './DragList';
-import { CONTRACTS, ENGAGEMENTS, FAMILIES_ORDER, GROUPS, headingFor, orderSections, outlineOrder, placeIn, recommendSections, SECTION_BY_KEY, SECTIONS } from './engine';
-import { isWritten } from './flow';
+import { createFormat, formatOf, groupingOf, headingOf, outlineOp, setFacts as changeFacts } from './actions';
+import { CONTRACTS, ENGAGEMENTS, FAMILIES_ORDER, GROUPS, headingFor, orderSections, recommendSections, SECTION_BY_KEY } from './engine';
+import { addToGroup, applyToEntries, formatGrouping, groupedEntries, groupOfKey, groupOrderOf } from './outline';
+import OutlineEditor from './OutlineEditor';
 import MenuButton from './MenuButton';
 import { recommendation, TYPE_REASONS, wordsFor } from './setup';
 import { getState } from './store';
@@ -17,17 +17,29 @@ import { inputStyle } from './ui';
  * What the template panel shows: this job's sections (once written), a template with its sections as adjusted, or one being created.
  * `from`: the template Create your own started from, or blank.
  */
-export type Pick = { tab: 'sections' | 'templates' | 'own'; key: string; name: string; order: Format['order']; from?: string };
+export type Pick = { tab: 'sections' | 'templates' | 'own'; key: string; name: string; order: Format['order']; groupOrder?: Format['groupOrder']; from?: string };
 
-/** A template's headings for this job: its own sections and those the job type calls for. */
+/** A template's headings for this job, in its grouping: its own sections and those the job type calls for, each joining its group. */
 export function orderFor(s: State, job: DemoJob, key: string): Format['order'] {
   const format = formatOf(s, key);
-  return orderSections(recommendSections(format, job.facts), format).map((k) => ({ key: k, heading: headingFor(k, format) }));
+  const g = formatGrouping(format);
+  const entries = orderSections(recommendSections(format, job.facts), format).map((k) => ({ key: k, heading: headingFor(k, format) }));
+  return groupedEntries(entries, g);
+}
+
+/** A template chosen in the panel: its sections for this job and its group order. */
+function pickOf(s: State, job: DemoJob, key: string): { key: string; order: Format['order']; groupOrder?: Format['groupOrder'] } {
+  return { key, order: orderFor(s, job, key), groupOrder: formatOf(s, key).groupOrder };
 }
 
 export function startPick(s: State, job: DemoJob, tab: Pick['tab']): Pick {
   const key = job.setup ? recommendation(s, job.format).key : job.format;
-  return { tab, key, name: '', order: orderFor(s, job, key), from: key };
+  return { tab, name: '', ...pickOf(s, job, key), from: key };
+}
+
+/** The pick's grouping, as the outline and the job read it. */
+export function pickGrouping(pick: Pick) {
+  return formatGrouping({ order: pick.order, groupOrder: pick.groupOrder });
 }
 
 /**
@@ -43,9 +55,10 @@ export function refitPick(s: State, before: DemoJob, after: DemoJob, pick: Pick)
   const kept = pick.order.filter((o) => !gone.includes(o.key));
   const added = now.filter((n) => !was.some((o) => o.key === n.key) && !kept.some((o) => o.key === n.key));
   const all = [...kept, ...added];
-  // The user's own order stays; a section the new type brings goes in at its group.
-  const keys = added.reduce((order, a) => placeIn(order, a.key), kept.map((o) => o.key));
-  return { ...pick, order: keys.map((k) => all.find((o) => o.key === k)!) };
+  // The user's own grouping stays; a section the new type brings goes in at the end of its group.
+  const g = pickGrouping({ ...pick, order: kept });
+  const placed = added.reduce((acc, a) => addToGroup(acc.keys, acc.grouping, a.key), { keys: kept.map((o) => o.key), grouping: g });
+  return { ...pick, order: groupedEntries(placed.keys.map((k) => all.find((o) => o.key === k)!), placed.grouping) };
 }
 
 /** The headings the job description shows while choosing: the template's sections as adjusted, or the ones being created. */
@@ -91,14 +104,14 @@ export function JobTypeSentence({ job, s, onChanged }: { job: DemoJob; s: State;
 }
 
 /** The template's headings, by group, as they will read; what the last change added or removed is marked, with the reason. */
-export function HeadingsPreview({ order, title, note }: { order: Format['order']; title: string; note: string }) {
+export function HeadingsPreview({ order, title, note, groupOrder }: { order: Format['order']; title: string; note: string; groupOrder?: Format['groupOrder'] }) {
   const keys = order.map((o) => o.key);
   const sig = keys.join();
   const [seen, setSeen] = useState({ sig, keys, base: keys });
   if (seen.sig !== sig) setSeen({ sig, keys, base: seen.keys });
   const removed = seen.base.filter((k) => !keys.includes(k));
-  // In the group order the headings show by group; once a section was moved across groups, as one list in the user's order.
-  const grouped = outlineOrder(keys).join() === keys.join();
+  // Always by group, in the order chosen (section 19, phase 6, B).
+  const g = formatGrouping({ order, groupOrder });
   const row = (k: string) => {
     const added = !seen.base.includes(k);
     const entry = order.find((o) => o.key === k);
@@ -109,7 +122,6 @@ export function HeadingsPreview({ order, title, note }: { order: Format['order']
           {added && TYPE_REASONS[k] ? `${TYPE_REASONS[k]}. ` : ''}
           {SECTION_BY_KEY[k]?.hint}
         </span>
-        {entry?.subs?.length ? <span className="aj-faint" style={{ fontSize: 12 }}>Sub-sections: {entry.subs.map((sb) => sb.heading).join(' · ')}</span> : null}
       </div>
     );
   };
@@ -121,24 +133,19 @@ export function HeadingsPreview({ order, title, note }: { order: Format['order']
           {note}
         </span>
       </div>
-      {grouped ? (
-        GROUPS.map((g) => {
-          const inGroup = keys.filter((k) => SECTION_BY_KEY[k]?.group === g.key);
-          if (!inGroup.length) return null;
-          return (
-            <section key={g.key} className="flex flex-col gap-1.5" aria-label={g.label}>
-              <span className="aj-faint" style={{ fontSize: 11, fontWeight: 650, letterSpacing: '0.03em', textTransform: 'uppercase' }}>
-                {g.label}
-              </span>
-              {inGroup.map(row)}
-            </section>
-          );
-        })
-      ) : (
-        <section className="flex flex-col gap-1.5" aria-label="In your order">
-          {keys.map(row)}
-        </section>
-      )}
+      {groupOrderOf(g).map((gk) => {
+        const inGroup = keys.filter((k) => groupOfKey(g, k) === gk);
+        const label = GROUPS.find((x) => x.key === gk)?.label ?? gk;
+        if (!inGroup.length) return null;
+        return (
+          <section key={gk} className="flex flex-col gap-1.5" aria-label={label}>
+            <span className="aj-faint" style={{ fontSize: 11, fontWeight: 650, letterSpacing: '0.03em', textTransform: 'uppercase' }}>
+              {label}
+            </span>
+            {inGroup.map(row)}
+          </section>
+        );
+      })}
       {removed.length > 0 && (
         <span className="aj-faint" style={{ fontSize: 12 }}>
           Not in this one: {removed.map((k) => SECTION_BY_KEY[k]?.label ?? k).join(', ')}.
@@ -148,163 +155,21 @@ export function HeadingsPreview({ order, title, note }: { order: Format['order']
   );
 }
 
-/** A heading changed on the job itself: applied when the field is left or Enter is pressed, so it can be cleared and retyped. */
-function LazyHeading({ value, label, onCommit }: { value: string; label: string; onCommit: (v: string) => void }) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const commit = () => {
-    if (draft !== null && draft.trim() && draft.trim() !== value) onCommit(draft.trim());
-    setDraft(null);
-  };
+/**
+ * A template's sections being adjusted (the template panel, Create your own, a phone's template choice): the outline in the user's
+ * design (section 19, phase 6, B), every change applied to the pick until it is used.
+ */
+function PickOutline({ pick, setPick, recommended, nameOf }: { pick: Pick; setPick: (p: Pick) => void; recommended: string[]; nameOf: (key: string) => string }) {
   return (
-    <input
-      className="ej-heading-input"
-      value={draft ?? value}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') commit();
-        if (e.key === 'Escape' && draft !== null) {
-          e.stopPropagation();
-          setDraft(null);
-        }
-      }}
-      aria-label={label}
+    <OutlineEditor
+      rows={pick.order.map((o) => ({ key: o.key, heading: o.heading }))}
+      grouping={pickGrouping(pick)}
+      recommended={recommended}
+      label="Sections of the template, by group"
+      onOp={(op) => setPick({ ...pick, ...applyToEntries(pick.order, pick.groupOrder, op, nameOf) })}
     />
   );
 }
-
-/** A section's sub-sections in the outline (section 19, phase 5, B): one level, renamed, moved within the section, removed, or added. */
-function SubRows({ entry, onChange, lazy, disabled }: { entry: Format['order'][number]; onChange: (subs: NonNullable<Format['order'][number]['subs']>) => void; lazy: boolean; disabled?: string }) {
-  const subs = entry.subs ?? [];
-  const [adding, setAdding] = useState('');
-  const move = (i: number, by: -1 | 1) => {
-    const next = [...subs];
-    [next[i], next[i + by]] = [next[i + by], next[i]];
-    onChange(next);
-  };
-  return (
-    <div className="ej-subrows flex flex-col gap-1" role="group" aria-label={`Sub-sections of ${entry.heading}`}>
-      {subs.map((sb, i) => (
-        <div key={sb.id} className="ej-outline-row ej-subrow min-w-0">
-          {lazy ? (
-            <LazyHeading value={sb.heading} label={`Sub-heading ${i + 1} of ${entry.heading}`} onCommit={(v) => onChange(subs.map((x) => (x.id === sb.id ? { ...x, heading: v } : x)))} />
-          ) : (
-            <input className="ej-heading-input" value={sb.heading} onChange={(e) => onChange(subs.map((x) => (x.id === sb.id ? { ...x, heading: e.target.value } : x)))} aria-label={`Sub-heading ${i + 1} of ${entry.heading}`} />
-          )}
-          <span className="ej-row-tools">
-            <Tip label="Move up within the section">
-              <button type="button" disabled={i === 0} onClick={() => move(i, -1)} aria-label={`Move ${sb.heading} up`}>
-                <ChevronDown size={12} strokeWidth={2} style={{ transform: 'rotate(180deg)' }} />
-              </button>
-            </Tip>
-            <Tip label="Move down within the section">
-              <button type="button" disabled={i === subs.length - 1} onClick={() => move(i, 1)} aria-label={`Move ${sb.heading} down`}>
-                <ChevronDown size={12} strokeWidth={2} />
-              </button>
-            </Tip>
-            <Tip label="Remove this sub-section">
-              <button type="button" onClick={() => onChange(subs.filter((x) => x.id !== sb.id))} aria-label={`Remove ${sb.heading}`}>
-                <X size={12} strokeWidth={2} />
-              </button>
-            </Tip>
-          </span>
-        </div>
-      ))}
-      {disabled ? (
-        <span className="aj-faint" style={{ fontSize: 11.5 }}>
-          {disabled}
-        </span>
-      ) : (
-        <form
-          className="flex items-center gap-1"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!adding.trim()) return;
-            onChange([...subs, { id: subId(), heading: adding.trim() }]);
-            setAdding('');
-          }}
-        >
-          <input className="ej-heading-input ej-sub-add" value={adding} onChange={(e) => setAdding(e.target.value)} placeholder="+ Sub-section" aria-label={`Add a sub-section to ${entry.heading}`} />
-          {adding.trim() && (
-            <button type="submit" className="aj-text-btn" style={{ height: 26 }}>
-              Add
-            </button>
-          )}
-        </form>
-      )}
-    </div>
-  );
-}
-
-/**
- * A template's sections: added, removed, renamed, and moved anywhere, across groups too (section 19, phase 5, B; the handle takes the
- * arrow keys), each with its sub-sections. A section added goes in at its group. `headingOf` names a section added; `lazy` applies a
- * rename only when its field is left; `subsOff`: why a section cannot have sub-sections yet.
- */
-export function HeadingsEditor({ order, onChange, recommended, headingOf: nameOf = (k) => SECTION_BY_KEY[k]?.label ?? k, lazy = false, subsOff }: { order: Format['order']; onChange: (o: Format['order']) => void; recommended: string[]; headingOf?: (key: string) => string; lazy?: boolean; subsOff?: (key: string) => string | undefined }) {
-  const ids = order.map((o) => o.key);
-  const entry = (k: string) => order.find((o) => o.key === k)!;
-  const rename = (key: string, heading: string) => onChange(order.map((o) => (o.key === key ? { ...o, heading } : o)));
-  const add = (key: string) => {
-    const keys = placeIn(ids, key);
-    onChange(keys.map((k) => (k === key ? { key, heading: nameOf(key) } : entry(k))));
-  };
-  return (
-    <div className="flex flex-col gap-3" aria-label="Sections of your template">
-      <span className="aj-faint" style={{ fontSize: 11.5 }}>
-        Drag a section anywhere, even into another group; once moved, the job keeps your order.
-      </span>
-      {ids.length > 0 && (
-        <DragList ids={ids} label={(k) => entry(k).heading} onMove={(from, to) => onChange(moveItem(ids, from, to).map(entry))}>
-          {(k) => (
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <div className="ej-outline-row min-w-0">
-                {lazy ? (
-                  <LazyHeading value={entry(k).heading} label={`Heading for ${SECTION_BY_KEY[k]?.label ?? k}`} onCommit={(v) => rename(k, v)} />
-                ) : (
-                  <input className="ej-heading-input" value={entry(k).heading} onChange={(e) => rename(k, e.target.value)} aria-label={`Heading for ${SECTION_BY_KEY[k]?.label ?? k}`} />
-                )}
-                <span className="aj-faint shrink-0" style={{ fontSize: 10.5 }} title="Its group">
-                  {GROUPS.find((g) => g.key === SECTION_BY_KEY[k]?.group)?.label}
-                </span>
-                <span className="ej-row-tools">
-                  <Tip label="Remove this section">
-                    <button type="button" onClick={() => onChange(order.filter((o) => o.key !== k))} aria-label={`Remove ${entry(k).heading}`}>
-                      <X size={12} strokeWidth={2} />
-                    </button>
-                  </Tip>
-                </span>
-              </div>
-              <SubRows entry={entry(k)} lazy={lazy} disabled={subsOff?.(k)} onChange={(subs) => onChange(order.map((o) => (o.key === k ? { ...o, subs } : o)))} />
-            </div>
-          )}
-        </DragList>
-      )}
-      {GROUPS.map((g) => {
-        const missing = SECTIONS.filter((d) => d.group === g.key && !ids.includes(d.key)).sort((a, b) => Number(recommended.includes(b.key)) - Number(recommended.includes(a.key)));
-        if (!missing.length) return null;
-        return (
-          <section key={g.key} className="flex flex-col gap-1" aria-label={`Add to ${g.label}`}>
-            <span className="aj-faint" style={{ fontSize: 11, fontWeight: 650, letterSpacing: '0.03em', textTransform: 'uppercase' }}>
-              Add · {g.label}
-            </span>
-            <div className="flex flex-wrap gap-1">
-              {missing.map((d) => (
-                <Tip key={d.key} label={`${d.hint}${recommended.includes(d.key) ? ' · recommended for this job' : ''}`}>
-                  <button type="button" className="ej-add" data-recommended={recommended.includes(d.key)} onClick={() => add(d.key)} aria-label={`Add ${d.label}${recommended.includes(d.key) ? ', recommended for this job' : ''}`}>
-                    {recommended.includes(d.key) ? <Sparkles size={11} strokeWidth={2} /> : <Plus size={11} strokeWidth={2} />}
-                    {d.label}
-                  </button>
-                </Tip>
-              ))}
-            </div>
-          </section>
-        );
-      })}
-    </div>
-  );
-}
-
 /** "Started from": blank, or any template's sections, for Create your own (the earlier "Create your own JD format" pop-up). */
 function StartFrom({ s, job, value, onPick }: { s: State; job: DemoJob; value: string; onPick: (key: string) => void }) {
   const usable = s.formats.filter((f) => !f.key.startsWith('pasted-'));
@@ -341,12 +206,12 @@ function OwnFields({ job, s, pick, setPick }: { job: DemoJob; s: State; pick: Pi
         <span className="ej-panel-label">Name</span>
         <input style={inputStyle} value={pick.name} onChange={(e) => setPick({ ...pick, name: e.target.value })} placeholder="For example: Riverstone field roles" />
       </label>
-      <StartFrom s={s} job={job} value={pick.from ?? ''} onPick={(key) => setPick({ ...pick, from: key, order: key ? orderFor(s, job, key) : [] })} />
+      <StartFrom s={s} job={job} value={pick.from ?? ''} onPick={(key) => setPick({ ...pick, from: key, ...(key ? pickOf(s, job, key) : { order: [], groupOrder: undefined }), key: key || pick.key })} />
       <span className="ej-panel-label">Sections, in order</span>
       <span className="aj-faint" style={{ fontSize: 12, marginTop: -8 }}>
         Add, remove, rename, and drag the sections; the job description shows them as you go. At least 3.
       </span>
-      <HeadingsEditor order={pick.order} onChange={(order) => setPick({ ...pick, order })} recommended={recommended} />
+      <PickOutline pick={pick} setPick={setPick} recommended={recommended} nameOf={(k) => SECTION_BY_KEY[k]?.label ?? k} />
     </div>
   );
 }
@@ -364,7 +229,7 @@ function TemplateFields({ s, job, pick, setPick }: { s: State; job: DemoJob; pic
     <div className="flex flex-col gap-3">
       <label className="flex flex-col gap-1">
         <span className="ej-panel-label">Template</span>
-        <select className="ej-select" value={pick.key} onChange={(e) => setPick({ ...pick, key: e.target.value, order: orderFor(s, job, e.target.value) })} aria-label="Template">
+        <select className="ej-select" value={pick.key} onChange={(e) => setPick({ ...pick, ...pickOf(s, job, e.target.value) })} aria-label="Template">
           {FAMILIES_ORDER.map((fam) => {
             const list = usable.filter((x) => x.family === fam).sort((a, b) => Number(b.key === rec) - Number(a.key === rec));
             return list.length ? (
@@ -387,7 +252,7 @@ function TemplateFields({ s, job, pick, setPick }: { s: State; job: DemoJob; pic
         <span className="ej-panel-label min-w-0 flex-1">Its sections for this job</span>
         {edited && (
           <Tip label={`Back to ${f.label}'s own sections`}>
-            <button type="button" className="aj-text-btn" style={{ height: 24, padding: '0 4px', fontSize: 12 }} onClick={() => setPick({ ...pick, order: orderFor(s, job, pick.key) })}>
+            <button type="button" className="aj-text-btn" style={{ height: 24, padding: '0 4px', fontSize: 12 }} onClick={() => setPick({ ...pick, ...pickOf(s, job, pick.key) })}>
               Reset
             </button>
           </Tip>
@@ -396,36 +261,27 @@ function TemplateFields({ s, job, pick, setPick }: { s: State; job: DemoJob; pic
       <span className="aj-faint" style={{ fontSize: 12, marginTop: -8 }}>
         Rename, remove, add, and drag the sections before you use it; the job description shows them as you go.
       </span>
-      <HeadingsEditor order={pick.order} onChange={(order) => setPick({ ...pick, order })} recommended={recommendSections(f, job.facts)} headingOf={(k) => headingFor(k, f)} />
+      <PickOutline pick={pick} setPick={setPick} recommended={recommendSections(f, job.facts)} nameOf={(k) => headingFor(k, f)} />
     </div>
   );
 }
 
-/** This job's own sections, edited directly once a template is in use: each change applies at once, text written is kept. */
-function JobOutline({ s, job }: { s: State; job: DemoJob }) {
-  const order = job.tags.map((k) => {
-    const written = isWritten(job, k) ? job.sections.find((x) => x.key === k)?.subs?.map((sb) => ({ id: sb.id, heading: sb.title })) : undefined;
-    const subs = written ?? job.subsPlan?.[k];
-    return { key: k, heading: headingOf(s, job, k), ...(subs ? { subs } : {}) };
-  });
+/**
+ * This job's own sections, once a template is in use (section 19, phase 6, B): the same outline, each change applied at once to the
+ * job, text already written kept with its section; read only for reviewers.
+ */
+export function JobOutline({ s, job }: { s: State; job: DemoJob }) {
+  const rows = job.tags.map((k) => ({ key: k, heading: headingOf(s, job, k) }));
   const ro = Boolean(s.reviewerAs);
-  if (ro) return <HeadingsPreview order={order} title={formatOf(s, job.format).label} note="Read only for reviewers" />;
   return (
     <div className="flex flex-col gap-2">
       <span className="aj-faint" style={{ fontSize: 12 }}>
-        Rename, remove, add, and drag this job&apos;s sections; each change applies at once, and text already written is kept where its section stays.
+        {ro ? 'Read only for reviewers.' : 'Drag a section, or press its grip for more; click a heading to rename it. Each change applies at once, and text already written stays with its section.'}
       </span>
-      <HeadingsEditor
-        order={order}
-        onChange={(next) => applyOutline(job.id, next)}
-        recommended={recommendSections(formatOf(s, job.format), job.facts)}
-        headingOf={(k) => headingFor(k, formatOf(s, job.format))}
-        lazy
-      />
+      <OutlineEditor rows={rows} grouping={groupingOf(job)} recommended={recommendSections(formatOf(s, job.format), job.facts)} label="This job's sections, by group" onOp={ro ? undefined : (op) => outlineOp(job.id, op)} />
     </div>
   );
 }
-
 function PanelTabs({ tabs, pick, setPick }: { tabs: Array<[Pick['tab'], string]>; pick: Pick; setPick: (p: Pick) => void }) {
   const keys = (e: ReactKeyboardEvent<HTMLElement>) => {
     const at = tabs.findIndex(([k]) => k === pick.tab);
@@ -639,7 +495,7 @@ function SaveAsOurs({ s, pick }: { s: State; pick: Pick }) {
         className="aj-pill shrink-0"
         disabled={!name.trim() || taken || pick.order.length < 3}
         onClick={() => {
-          createFormat(name.trim(), pick.order, formatOf(s, pick.key).tone);
+          createFormat(name.trim(), pick.order, formatOf(s, pick.key).tone, pick.groupOrder);
           setOpen(false);
           setName('');
         }}
@@ -661,7 +517,7 @@ export function PhoneTemplate({ job, s, pick, setPick, onApply, onChat, onCancel
   const rec = recommendation(s, job.format).key;
   const usable = s.formats.filter((f) => !f.key.startsWith('pasted-'));
   const cards = [...usable.filter((f) => f.key === rec), ...usable.filter((f) => f.key !== rec)];
-  const choose = (key: string | 'own') => (key === 'own' ? setPick({ ...pick, tab: 'own' }) : setPick({ ...pick, tab: 'templates', key, order: orderFor(s, job, key) }));
+  const choose = (key: string | 'own') => (key === 'own' ? setPick({ ...pick, tab: 'own' }) : setPick({ ...pick, tab: 'templates', ...pickOf(s, job, key) }));
   const nearest = () => {
     cancelAnimationFrame(frame.current);
     frame.current = requestAnimationFrame(() => {
@@ -698,7 +554,15 @@ export function PhoneTemplate({ job, s, pick, setPick, onApply, onChat, onCancel
             <OwnFields job={job} s={s} pick={pick} setPick={setPick} />
           </div>
         ) : (
-          <HeadingsPreview order={order} title={formatOf(s, pick.key).label} note={`${order.length} sections · about ${wordsFor(order.length)} words · swipe the cards below to compare`} />
+          <div className="aj-card flex flex-col gap-3 p-4">
+            <div className="flex flex-col gap-0.5">
+              <span className="ej-panel-label">{formatOf(s, pick.key).label}</span>
+              <span className="aj-faint" style={{ fontSize: 12 }}>
+                {`${order.length} sections · about ${wordsFor(order.length)} words · swipe the cards below to compare`}
+              </span>
+            </div>
+            <PickOutline pick={pick} setPick={setPick} recommended={recommendSections(formatOf(s, pick.key), job.facts)} nameOf={(k) => headingFor(k, formatOf(s, pick.key))} />
+          </div>
         )}
       </div>
       <div ref={strip} className="ej-card-strip" onScroll={nearest} role="radiogroup" aria-label="Templates">

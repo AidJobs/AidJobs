@@ -38,8 +38,8 @@ import { GooglePreview, JobPageLangs, ShareCards } from './Publish';
 import { VersionsDialog } from './Review';
 import { inferSdgs, proposedStyle, SDG_NAMES, sdgsOf, toneOf, wordsFor } from './setup';
 import { getState, go, goBack, READING_KEY, useDemo } from './store';
-import Structure, { Commitments } from './Structure';
-import { HeadingsPreview, PhoneTemplate, previewOrder, startPick, TemplatePanel, type Pick } from './TemplatePanel';
+import { Commitments } from './Structure';
+import { HeadingsPreview, JobOutline, PhoneTemplate, pickGrouping, previewOrder, startPick, TemplatePanel, type Pick } from './TemplatePanel';
 import { ALL_LANGS, jobLang, langOf, versionsOf } from './translate';
 import type { DemoJob, JobLang, State } from './types';
 import { Dialog, radioKeys, scrollInside } from './ui';
@@ -1035,15 +1035,16 @@ function JobWindow({ id }: { id: string }) {
   const applyPick = () => {
     if (!pick) return;
     const wasSetup = Boolean(job.setup);
+    const keys = pick.order.map((o) => o.key);
     if (pick.tab === 'own') {
-      const key = createFormat(pick.name.trim(), pick.order, toneOf(job.style ?? proposedStyle(s)));
-      if (wasSetup) applyTemplate(job.id, key, undefined, pick.order.map((o) => o.key));
+      const key = createFormat(pick.name.trim(), pick.order, toneOf(job.style ?? proposedStyle(s)), pick.groupOrder);
+      if (wasSetup) applyTemplate(job.id, key, undefined, keys, pickGrouping(pick));
       else applyFormat(job.id, key);
     } else {
-      // The template as adjusted in the panel: its sections, their order, and any heading renamed for this job.
-      if (wasSetup) applyTemplate(job.id, pick.key, undefined, pick.order.map((o) => o.key));
+      // The template as adjusted in the panel: its sections, their groups and order, and any heading renamed for this job.
+      if (wasSetup) applyTemplate(job.id, pick.key, undefined, keys, pickGrouping(pick));
       else if (pick.key !== job.format) applyFormat(job.id, pick.key);
-      applyOutline(job.id, pick.order);
+      applyOutline(job.id, pick.order, pick.groupOrder);
     }
     setPick(null);
     if (phone) setView(wasSetup ? 'chat' : 'job');
@@ -1202,11 +1203,11 @@ function JobWindow({ id }: { id: string }) {
   const headings = (() => {
     if (pick && pickOrder && pick.tab !== 'sections') {
       const name = pick.tab === 'own' ? pick.name.trim() || 'Your template' : formatOf(s, pick.key).label;
-      return <HeadingsPreview order={pickOrder} title={name} note={`${pickOrder.length} sections · about ${wordsFor(pickOrder.length)} words · ${job.setup ? 'choose Use in the template panel to start writing' : 'choose Change to use it; text you edited is kept where its section stays'}`} />;
+      return <HeadingsPreview order={pickOrder} groupOrder={pick.groupOrder} title={name} note={`${pickOrder.length} sections · about ${wordsFor(pickOrder.length)} words · ${job.setup ? 'choose Use in the template panel to start writing' : 'choose Change to use it; text you edited is kept where its section stays'}`} />;
     }
     if (job.setup === 'style' || job.setup === 'pace') {
       const format = formatOf(s, job.format);
-      return <HeadingsPreview order={job.tags.map((k) => ({ key: k, heading: job.sections.find((x) => x.key === k)?.title ?? headingFor(k, format) }))} title={format.label} note={job.setup === 'style' ? 'Choose in the chat how it should sound; then it is written in these sections.' : 'Choose in the chat whether to write one section at a time or all of it first.'} />;
+      return <HeadingsPreview order={job.tags.map((k) => ({ key: k, heading: job.sections.find((x) => x.key === k)?.title ?? headingFor(k, format), ...(job.groupOf?.[k] ? { group: job.groupOf[k] } : {}) }))} groupOrder={job.groupOrder} title={format.label} note={job.setup === 'style' ? 'Choose in the chat how it should sound; then it is written in these sections.' : 'Choose in the chat whether to write one section at a time or all of it first.'} />;
     }
     return (
       <div className="aj-card flex flex-col items-center gap-3 p-8 text-center aj-muted">
@@ -1237,7 +1238,7 @@ function JobWindow({ id }: { id: string }) {
         </div>
       )}
       {job.sections.length ? (
-        <DocumentView job={job} s={s} current={focus} noteEdits onSeeChat={phone ? () => setView('chat') : undefined} />
+        <DocumentView job={job} s={s} current={focus} noteEdits draft onSeeChat={phone ? () => setView('chat') : undefined} />
       ) : (
         <div className="aj-card flex flex-col gap-2 p-5">
           <TitleEditor job={job} disabled={reviewing} />
@@ -1425,7 +1426,7 @@ function JobWindow({ id }: { id: string }) {
               >
                 Change the template
               </button>
-              <Structure job={job} s={s} bare hideCommitments />
+              <JobOutline job={job} s={s} />
             </div>
           </Dialog>
         )}

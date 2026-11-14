@@ -41,7 +41,8 @@ import {
   usd,
   type PackageKey,
 } from './plans';
-import { addDays, arrangementLabel, article, commitmentText, COMMITMENTS, daysUntil, inOutlineOrder, isoDay, longDate, salaryText, slug } from './engine';
+import { addDays, arrangementLabel, article, COMMITMENTS, daysUntil, inOutlineOrder, isoDay, longDate, salaryText, slug } from './engine';
+import { fixedList, fixedShown, ORG_LANG } from './fixed';
 import { jobUrl } from './links';
 import { PUBLIC_SAMPLES } from './sample';
 import BeforePublish, { checkSummary, checksToLook, type RowKey } from './Checks';
@@ -278,14 +279,17 @@ export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: Stat
           ))}
         </nav>
       )}
-      {job.commitments.length > 0 && (
+      {fixedList(job, shownLang).length > 0 && (
         <section>
           <h3>{say('Our commitments', 'commitments')}</h3>
-          {job.commitments.map((k) => (
-            <p key={k} className="ej-commitment">
-              <strong>{commitmentLabel(k, COMMITMENTS.find((c) => c.key === k)?.label ?? k, l)}.</strong> <span lang="en">{commitmentText(k, s.org, job.facts).text}</span>
-            </p>
-          ))}
+          {fixedList(job, shownLang).map((k) => {
+            const f = fixedShown(job, s, k, shownLang);
+            return (
+              <p key={k} className="ej-commitment">
+                <strong>{commitmentLabel(k, COMMITMENTS.find((c) => c.key === k)?.label ?? k, l)}.</strong> <span lang={f.toTranslate ? ORG_LANG : shownLang}>{f.text}</span>
+              </p>
+            );
+          })}
         </section>
       )}
       <div className="aj-faint flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-2 aj-hair" style={{ fontSize: 11.5 }}>

@@ -1229,6 +1229,13 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
       sel.value = value;
       sel.dispatchEvent(new Event('change', { bubbles: true }));
     });
+  // Changed by phase 6 (section 19, B): a heading in the outline reads as text; clicked, it becomes a field, and Enter saves it.
+  const rename = (root: HTMLElement, index: number, value: string) => {
+    act(() => (root.querySelectorAll('.ej-ol-head')[index] as HTMLElement).click());
+    const input = root.querySelector('.ej-ol-input') as HTMLInputElement;
+    typeInto(input, value);
+    act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  };
   const typeInto = (input: HTMLInputElement, value: string) =>
     act(() => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, value);
@@ -1256,16 +1263,16 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     click('Browse templates');
     const un = getState().formats.find((f) => f.label.startsWith('UN Secretariat'))!;
     choose(panel().querySelector('select[aria-label="Template"]') as HTMLSelectElement, un.key);
-    const inputs = () => Array.from(panel().querySelectorAll('.ej-heading-input')) as HTMLInputElement[];
+    const heads = () => Array.from(panel().querySelectorAll('.ej-ol-head')) as HTMLElement[];
     const first = un.order[0].key;
-    typeInto(inputs()[0], 'Our mandate');
+    rename(panel(), 0, 'Our mandate');
     const dropped = un.order[un.order.length - 1];
     act(() => (panel().querySelector(`[aria-label="Remove ${dropped.heading}"]`) as HTMLElement).click());
     expect(panel().textContent).toContain('Reset');
     act(() => byLabel('Engagement: job. Change it').click());
     click('Consultancy');
-    expect(inputs()[0].value).toBe('Our mandate');
-    expect(panel().querySelector('[aria-label="Heading for Deliverables"]')).not.toBeNull();
+    expect(heads()[0].textContent).toBe('Our mandate');
+    expect(panel().querySelector('[aria-label="Deliverables. Rename"]')).not.toBeNull();
     expect(panel().querySelector(`[aria-label="Remove ${dropped.heading}"]`)).toBeNull();
     const before = panel().style.width;
     act(() => byLabel('Resize the template panel: drag, or use the arrow keys').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })));
@@ -1358,11 +1365,7 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(name, 'Riverstone consultancies');
       name.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    const firstHeading = panel().querySelector('.ej-heading-input') as HTMLInputElement;
-    act(() => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(firstHeading, 'Who we are');
-      firstHeading.dispatchEvent(new Event('input', { bubbles: true }));
-    });
+    rename(panel(), 0, 'Who we are');
     shows('Who we are');
     act(() => (panel().querySelector('[aria-label^="Add "]') as HTMLElement).click());
     click('Use Riverstone consultancies');
@@ -1447,12 +1450,13 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     expect(job(id).chat.at(-1)?.ask).toBeUndefined();
     part('Fixed text');
     const before = job(id).commitments.length;
-    act(() => (container.querySelector('#ej-part-card input[type="checkbox"]') as HTMLElement).click());
+    // Changed by phase 6 (section 19, D): a locked text stays on the job, so the first one not locked is the one changed.
+    act(() => (Array.from(container.querySelectorAll('#ej-part-card input[type="checkbox"]')).find((x) => !x.hasAttribute('aria-disabled')) as HTMLElement).click());
     expect(job(id).commitments.length).not.toBe(before);
     part(formatOf(getState(), job(id).format).label);
     const tags = job(id).tags;
-    const list = Array.from(container.querySelectorAll('section.ej-float ul')).find((u) => u.querySelectorAll('.ej-drag-handle').length > 1);
-    act(() => (list?.querySelector('.ej-drag-handle') as HTMLElement).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
+    // Changed by phase 6 (section 19, B): the outline's grip takes the arrow keys, within and across groups.
+    act(() => (container.querySelector(`section.ej-float [data-grip-key="${tags[1]}"]`) as HTMLElement).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
     expect(job(id).tags).not.toEqual(tags);
     expect(job(id).sections.map((x) => x.key)).toEqual(job(id).tags);
     part(job(id).sections.find((x) => x.key === 'apply')!.title);
@@ -1701,10 +1705,13 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     expect(container.querySelector('button[aria-label="Open the chat"]')?.textContent).toContain("Let's build it");
     const cards = () => Array.from(container.querySelectorAll('[aria-label="Templates"] [role="radio"]'));
     expect(cards().at(-1)?.getAttribute('aria-checked')).toBe('true');
-    expect(container.querySelector('.ej-heading-input')).not.toBeNull();
+    // Changed by phase 6 (section 19, B): the same outline as everywhere, editable on the phone too.
+    expect(container.querySelector('.ej-ol .ej-ol-head')).not.toBeNull();
     const un = getState().formats.find((f) => f.label.startsWith('UN Secretariat'))!;
     act(() => (cards().find((c) => c.textContent?.startsWith(un.label)) as HTMLElement).click());
-    expect(container.querySelector(`article[aria-label="${un.label}: its sections"]`)).not.toBeNull();
+    expect(container.querySelector('.ej-ol[aria-label="Sections of the template, by group"]')).not.toBeNull();
+    rename(container, 0, 'Our setting');
+    expect(container.querySelector('.ej-ol-head')?.textContent).toBe('Our setting');
     click(`Use ${un.label}`);
     expect(job(id).format).toBe(un.key);
     expect(job(id).setup).toBe('style');

@@ -145,9 +145,9 @@ export function Commitments({ job, s }: { job: DemoJob; s: State }) {
         const on = job.commitments.includes(c.key);
         return (
           <li key={c.key}>
-            <Tip label={t.text} className="w-full">
-            <label className="ej-outline-row w-full" style={{ cursor: ro ? 'default' : 'pointer' }}>
-              <input type="checkbox" checked={on} disabled={ro} onChange={() => toggleCommitment(job.id, c.key)} />
+            <Tip label={on && t.locked ? `${t.text} (Locked by your organisation: it stays on every job)` : t.text} className="w-full">
+            <label className="ej-outline-row w-full" style={{ cursor: ro || (on && t.locked) ? 'default' : 'pointer' }}>
+              <input type="checkbox" checked={on} disabled={ro} aria-disabled={(on && t.locked) || undefined} onChange={() => toggleCommitment(job.id, c.key)} />
               <span className="min-w-0 flex-1 truncate" style={{ fontWeight: on ? 600 : 500, color: on ? 'var(--text)' : 'var(--text-2)' }}>
                 {c.label}
               </span>

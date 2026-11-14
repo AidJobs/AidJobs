@@ -1,17 +1,18 @@
 'use client';
 
 import { BadgeCheck, Check, Globe, Lock, LockOpen, Mail, Plus, Sparkles, Star, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Tip from '@/components/site/Tip';
 import { forgetBase, invite, removeMember, setKeptApply, setKeptFixed, setRole, stopKeeping } from './actions';
-import { COMMITMENTS, FAMILIES_ORDER, SECTIONS } from './engine';
-import { nextId, update, useDemo } from './store';
-import { langOf } from './translate';
+import { COMMITMENTS, emptyFacts, FAMILIES_ORDER, SECTIONS, starterCommitment } from './engine';
+import { fixedLabel, offeredFixed, ORG_LANG } from './fixed';
+import { nextId, update, useDemo, useRoute } from './store';
+import { ALL_LANGS, langOf } from './translate';
 import type { ApplySettings, ApprovalSetting, Format, JobLang, Org, OrgType, Person, Tone } from './types';
 import BasePrompt from './BasePrompt';
 import { SocialLinks } from './ContextCards';
 import CreateFormatDialog from './FormatBuilder';
-import { DemoMark, Field, inputStyle, isEmail, Section } from './ui';
+import { DemoMark, Field, inputStyle, isEmail, radioKeys, Section } from './ui';
 
 const SECTORS = ['Water, sanitation and hygiene', 'Health', 'Nutrition', 'Education', 'Child protection', 'Gender', 'Livelihoods and food security', 'Climate and environment', 'Shelter', 'Peacebuilding', 'Humanitarian response', 'ESG and environmental and social safeguards'];
 const VOICES = ['Warm', 'Formal', 'Plain English', 'Speaks as "we"', 'Uses "you"', 'Rights-based', 'Short sentences', 'Inclusive'];
@@ -164,29 +165,71 @@ function Sectors({ org }: { org: Org }) {
   );
 }
 
+/**
+ * The fixed texts (section 19, phase 6, D and E): every one the demo offers, the AidJobs starter texts marked as starters, so every
+ * "Change for every job ↗" has a place; editing a starter makes it the organisation's own. One language switch holds the
+ * organisation's own wording in each language offered, used word for word; a text locked is locked in each wording too.
+ */
 function StandardTexts({ org }: { org: Org }) {
+  const s = useDemo();
+  const route = useRoute();
+  const [lang, setLang] = useState<JobLang>(ORG_LANG);
+  const owner = s.me.role === 'owner' && !s.reviewerAs;
+  const target = route.screen === 'org' && route.id?.startsWith('fixed-') ? route.id.slice(6) : null;
+  useEffect(() => {
+    if (!target) return;
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`ej-fixed-${target}`);
+      el?.scrollIntoView?.({ block: 'center' });
+      el?.querySelector<HTMLElement>('textarea')?.focus({ preventScroll: true });
+    });
+  }, [target]);
+  const own = (k: string) => org.standard.find((c) => c.key === k);
+  const setText = (k: string, text: string) => {
+    if (lang !== ORG_LANG) return setOrg({ fixedWording: { ...org.fixedWording, [lang]: { ...org.fixedWording?.[lang], [k]: text } } });
+    setOrg({ standard: own(k) ? org.standard.map((x) => (x.key === k ? { ...x, text } : x)) : [...org.standard, { key: k, label: fixedLabel(k), text, locked: false }] });
+  };
+  const toggleLock = (k: string) => {
+    const c = own(k);
+    setOrg({ standard: c ? org.standard.map((x) => (x.key === k ? { ...x, locked: !x.locked } : x)) : [...org.standard, { key: k, label: fixedLabel(k), text: starterCommitment(k, org, emptyFacts()), locked: true }] });
+  };
   return (
     <div className="flex flex-col gap-3">
-      {org.standard.map((t) => (
-        <div key={t.key} className="aj-card flex flex-col gap-2 p-3">
-          <div className="flex items-center gap-2">
-            <span style={{ fontWeight: 650 }}>{t.label}</span>
-            <Tip label={t.locked ? 'Locked: recruiters cannot change or remove it in a job' : 'Editable: recruiters can edit it in a job'} className="ml-auto">
-              <button
-                type="button"
-                className="aj-pill"
-                style={{ height: 28 }}
-                onClick={() => setOrg({ standard: org.standard.map((x) => (x.key === t.key ? { ...x, locked: !x.locked } : x)) })}
-                aria-pressed={t.locked}
-              >
-                {t.locked ? <Lock size={12} strokeWidth={2} /> : <LockOpen size={12} strokeWidth={2} />}
-                {t.locked ? 'Locked' : 'Editable'}
-              </button>
-            </Tip>
+      <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Language of the wording" onKeyDown={radioKeys}>
+        {ALL_LANGS.map((l) => (
+          <button key={l.key} type="button" role="radio" aria-checked={lang === l.key} className="aj-pill" data-active={lang === l.key} style={{ height: 30 }} onClick={() => setLang(l.key)} lang={l.key}>
+            {l.native}
+          </button>
+        ))}
+      </div>
+      <span className="aj-faint" style={{ fontSize: 12 }}>
+        {lang === ORG_LANG ? 'Your fixed texts, put word for word into every job.' : `Your own ${langOf(lang).label} wording, used word for word in ${langOf(lang).label}. Where there is none, a job shows the ${langOf(ORG_LANG).label} text marked to translate, or the AI's translation marked for you to approve.`}
+      </span>
+      {offeredFixed(org).map((k) => {
+        const c = own(k);
+        const text = lang === ORG_LANG ? (c?.text ?? starterCommitment(k, org, emptyFacts())) : (org.fixedWording?.[lang]?.[k] ?? '');
+        return (
+          <div key={k} id={`ej-fixed-${k}`} className="aj-card flex flex-col gap-2 p-3" data-target={target === k || undefined} style={{ scrollMarginTop: 16 }}>
+            <div className="flex items-center gap-2">
+              <span style={{ fontWeight: 650 }}>{fixedLabel(k)}</span>
+              {!c && (
+                <Tip label="AidJobs wording: edit it to make it your organisation's own">
+                  <span className="aj-chip" tabIndex={0}>
+                    Starter
+                  </span>
+                </Tip>
+              )}
+              <Tip label={c?.locked ? 'Locked: recruiters cannot change or remove it in a job, in any language' : 'Editable: recruiters can word it for a job, or leave it out'} className="ml-auto">
+                <button type="button" className="aj-pill" style={{ height: 28 }} disabled={!owner} onClick={() => toggleLock(k)} aria-pressed={Boolean(c?.locked)}>
+                  {c?.locked ? <Lock size={12} strokeWidth={2} /> : <LockOpen size={12} strokeWidth={2} />}
+                  {c?.locked ? 'Locked' : 'Editable'}
+                </button>
+              </Tip>
+            </div>
+            <textarea style={{ ...inputStyle, minHeight: 64 }} value={text} disabled={!owner} onChange={(e) => setText(k, e.target.value)} aria-label={`${fixedLabel(k)}, ${langOf(lang).label}`} lang={lang} dir={langOf(lang).dir} placeholder={lang === ORG_LANG ? undefined : `No ${langOf(lang).label} wording yet`} />
           </div>
-          <textarea style={{ ...inputStyle, minHeight: 64 }} value={t.text} onChange={(e) => setOrg({ standard: org.standard.map((x) => (x.key === t.key ? { ...x, text: e.target.value } : x)) })} aria-label={t.label} />
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -241,7 +284,6 @@ function KeptForEveryJob({ org }: { org: Org }) {
           </div>
         </Field>
       )}
-      {(org.fixedLangs ?? []).length > 0 && <span className="aj-faint">Fixed text confirmed in: {(org.fixedLangs ?? []).map((k) => langOf(k as JobLang).label).join(', ')}.</span>}
       <span className="aj-faint">Jobs already published keep their own text.</span>
     </div>
   );

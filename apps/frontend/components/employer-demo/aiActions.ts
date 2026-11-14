@@ -19,7 +19,6 @@ import {
   setPace,
   setStyle,
   settleQuestion,
-  toggleCommitment,
   toggleSection,
   undoLastChange,
   writeSections,
@@ -46,13 +45,21 @@ import {
   changeSub,
   headingOf,
   isApprovalReply,
+  groupingOf,
+  outlineOp,
+  bringBackFixed,
+  editFixed,
+  leaveOutFixed,
+  translateFixed,
 } from './actions';
+import { GROUP_KEYS, groupOfKey, KEPT } from './outline';
+import { canWord, fixedLabel, isLocked, ORG_LANG, orgWording } from './fixed';
 import { approvalRequired } from './approval';
 import { checkSuggestion, offerSuggestion, showPageDraft } from './context';
 import { pageFor } from './pageMemory';
 import { canAmplifyFree } from './plans';
 import { profileFor } from './profiles';
-import { COMMITMENTS, CONTRACTS, crossesGroups, daysUntil, extractFacts, headingFor, LANGUAGES, SECTION_BY_KEY, emptyFacts } from './engine';
+import { COMMITMENTS, CONTRACTS, daysUntil, extractFacts, headingFor, LANGUAGES, SECTION_BY_KEY, emptyFacts } from './engine';
 import { amplifying, ASKS, asksOf, checkPoints, DECLINABLE, FIXED_SECTIONS, fullPoints, isSettled, isWritten, keepToOffer, LATER, LEFT, marketPoints, nextStep, reachOpen, stepKey } from './flow';
 import { planFor } from './invites';
 import { isPublished, STATE_LABEL, stateActionsOf, type StateAction } from './lifecycle';
@@ -132,6 +139,8 @@ const ORDER = [
   'add_section',
   'remove_section',
   'reorder_sections',
+  'move_section',
+  'move_group',
   'rename_section',
   'write_section',
   'sub',
@@ -167,19 +176,6 @@ export const MOVE_ASKED = /\b(?:move|moving|put|place|swap|switch|reorder|re-ord
 
 /** The user approved every section at once: "approve the rest", "all of them are good", not "all good" about one section. */
 export const ALL_ASKED = /\bapprove (?:them )?all\b|\bapprove (?:the rest|everything|every section|both|all (?:of them|the sections|sections))\b|\b(?:all (?:of them|the sections|sections)|the rest|everything|every section|both) (?:is |are |looks? )?(?:good|fine|ok|okay|approved)\b/i;
-
-/** The order of `after` puts some section on the other side of a section of another group than in `before`: a move across groups. */
-export function movesAcrossGroups(before: string[], after: string[]): boolean {
-  const group = (k: string) => SECTION_BY_KEY[k]?.group ?? k;
-  const at = new Map(after.map((k, i) => [k, i]));
-  for (let i = 0; i < before.length; i++)
-    for (let n = i + 1; n < before.length; n++) {
-      const a = before[i];
-      const b = before[n];
-      if (group(a) !== group(b) && (at.get(a) ?? 0) > (at.get(b) ?? 0)) return true;
-    }
-  return false;
-}
 
 /** Words that name a later question, so the user's own answer to it ahead of time can settle it. */
 const SETTLE_WORDS: Record<string, RegExp> = {
@@ -542,18 +538,34 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         else if (!j.tags.includes(section)) toggleSection(id, section);
         break;
       case 'remove_section':
-        if (inVersion) removeVersionSection(id, inVersion, section);
+        // How to apply is part of every job, by every route (section 19, phase 6, D).
+        if (KEPT.includes(section)) refused.push(`removing ${name}: every job has it; change its text or method with the pencil`);
+        else if (inVersion) removeVersionSection(id, inVersion, section);
         else if (!j.tags.includes(section) || j.tags.length < 2) refused.push(`removing ${name || 'a section'}`);
         else toggleSection(id, section);
         break;
       case 'reorder_sections': {
+        // Within their groups only; a section goes into another group with move_section (section 19, phase 6, B).
         const order = Array.isArray(a.order) ? a.order.filter((k): k is string => typeof k === 'string') : [];
-        const queue = [...order];
-        const after = j.tags.map((t) => (order.includes(t) ? (queue.shift() ?? t) : t));
         if (order.length < 2 || new Set(order).size !== order.length || !order.every((k) => j.tags.includes(k))) refused.push('the new order');
-        // Across groups only when the user asked to move something (section 19, phase 5, B); within its group as before.
-        else if (movesAcrossGroups(j.tags, after) && !MOVE_ASKED.test(said ?? '')) refused.push('moving a section into another group: only when you ask for it');
         else reorderSections(id, order);
+        break;
+      }
+      case 'move_section': {
+        const group = oneOf(a.group, GROUP_KEYS);
+        const after = a.after === null || a.after === undefined ? null : typeof a.after === 'string' && j.tags.includes(a.after) ? a.after : undefined;
+        if (!j.tags.includes(section) || !group || after === undefined || (after && groupOfKey(groupingOf(j), after) !== group)) refused.push(`moving ${name || 'a section'}`);
+        else if (!MOVE_ASKED.test(said ?? '')) refused.push('moving a section into another group: only when you ask for it');
+        else if (after) outlineOp(id, { op: 'drop', key: section, after, group });
+        else outlineOp(id, { op: 'toGroup', key: section, group });
+        break;
+      }
+      case 'move_group': {
+        const group = oneOf(a.group, GROUP_KEYS);
+        const before = a.before === null || a.before === undefined ? null : oneOf(a.before, GROUP_KEYS);
+        if (!group || before === undefined || (a.before !== null && a.before !== undefined && !before)) refused.push('moving a group');
+        else if (!MOVE_ASKED.test(said ?? '')) refused.push('moving a group: only when you ask for it');
+        else outlineOp(id, { op: 'groupBefore', group, before });
         break;
       }
       case 'sub': {
@@ -798,12 +810,31 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
       case 'fixed_text': {
         const keys = (v: unknown) => (Array.isArray(v) ? v.filter((k): k is string => typeof k === 'string') : []);
         const valid = (k: string) => COMMITMENTS.some((c) => c.key === k) && (k !== 'mds' || s.org.mdsMember);
+        const lang = a.language === undefined ? (inVersion ?? jobLang(j)) : oneOf(a.language, LANG_KEYS);
         const remove = keys(a.remove);
         const add = keys(a.add);
-        if ([...remove, ...add].some((k) => !valid(k))) refused.push('a fixed text the organisation does not have');
-        else {
-          for (const k of remove) if (j.commitments.includes(k)) toggleCommitment(id, k);
-          for (const k of add) if (!job()?.commitments.includes(k)) toggleCommitment(id, k);
+        const texts = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.entries(v as Raw).filter((e): e is [string, string] => typeof e[1] === 'string' && Boolean(e[1].trim()) && e[1].length <= 2000) : []);
+        const word = texts(a.word);
+        const translate = texts(a.translate);
+        if (!lang || [...remove, ...add, ...word.map((w) => w[0]), ...translate.map((w) => w[0])].some((k) => !valid(k))) {
+          refused.push('a fixed text the organisation does not have');
+          break;
+        }
+        // A locked text stays on the job (section 19, phase 6, D); its wording is changed only in Organisation settings.
+        const locked = remove.filter((k) => isLocked(s.org, k));
+        if (locked.length) refused.push(`leaving out ${locked.map(fixedLabel).join(' and ')}: it is locked by your organisation`);
+        for (const k of remove.filter((x) => !locked.includes(x))) leaveOutFixed(id, k, lang);
+        for (const k of add) bringBackFixed(id, k, lang);
+        // A wording for this job only with the words the user typed; the AI never rewrites a fixed text in the job's own language.
+        for (const [k, text] of word) {
+          if (!canWord(s.org, k, lang)) refused.push(`${fixedLabel(k)}: it is locked; change it for every job in Organisation settings`);
+          else if (!(said ?? '').toLowerCase().includes(text.trim().toLowerCase().slice(0, 200))) refused.push(`${fixedLabel(k)}: a wording for this job needs your own words`);
+          else editFixed(id, k, text, lang);
+        }
+        // Translated only where the organisation has no wording for that language, marked until approved.
+        for (const [k, text] of translate) {
+          if (lang === ORG_LANG || orgWording(s.org, k, lang)) refused.push(`${fixedLabel(k)}: your organisation has its wording in ${langOf(lang).label}`);
+          else translateFixed(id, k, text, lang);
         }
         break;
       }

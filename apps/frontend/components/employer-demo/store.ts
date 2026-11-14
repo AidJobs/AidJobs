@@ -7,6 +7,7 @@ import { purgeDeleted } from './lifecycle';
 import { daysUntil, inOutlineOrder, startOfDay } from './engine';
 import { broughtForward } from './flow';
 import { formatForward, jobGrouped } from './outline';
+import { fixedWordingNow } from './fixed';
 import { profilesFromJobs } from './profiles';
 import { initialState } from './sample';
 import type { DemoJob, Recipient, State } from './types';
@@ -48,7 +49,7 @@ export function normalise(s0: State): State {
     // Amplified before versions were counted (12 November 2026): the versions it already has stay public, as paid for.
     const n = Object.keys(j3.translations ?? {}).length;
     const j4 = j3.plan === 'amplify' && !j3.paidVia ? { ...j3, paidVia: 'single' as const, langsPaid: Math.max(j3.langsPaid ?? 0, n - LANGS_INCLUDED.single) } : j3;
-    const j = broughtForward(j4, s);
+    const j = wordingKept(broughtForward(j4, s), s);
     if (j !== j0) changed = true;
     if (j.status === 'live' && j.facts.deadline && daysUntil(s.today, j.facts.deadline) < 0) {
       changed = true;
@@ -62,10 +63,15 @@ export function normalise(s0: State): State {
   return changed ? { ...s, jobs } : s;
 }
 
+/** A job published before its fixed texts' wording was kept (section 19, phase 6, D) takes it from the settings as they are now. */
+function wordingKept(j: DemoJob, s: State): DemoJob {
+  return ['scheduled', 'live', 'closed'].includes(j.status) && !j.fixedPublished ? { ...j, fixedPublished: fixedWordingNow(j, s) } : j;
+}
+
 /** The sample data as the window takes it on: its jobs brought forward and its published jobs' profiles kept. */
 function sample(today: number): State {
   const s = initialState(today);
-  return { ...s, jobs: s.jobs.map((j) => broughtForward(j, s)), profiles: profilesFromJobs(s.jobs) };
+  return { ...s, jobs: s.jobs.map((j) => wordingKept(broughtForward(j, s), s)), profiles: profilesFromJobs(s.jobs) };
 }
 
 function load(): State {

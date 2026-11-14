@@ -1,18 +1,23 @@
 'use client';
 
-import { AlertCircle, Check, CheckCircle2, Info, Lock, MessageSquare, Pencil, Settings2, ShieldCheck, Sparkles, X } from 'lucide-react';
+import { AlertCircle, Check, CheckCircle2, ChevronUp, Info, Lock, MessageSquare, Pencil, Plus, Settings2, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import Tip from '@/components/site/Tip';
-import { addRemark, answerFact, approveSection, changedSinceLastRound, dismissChange, editSection, formatOf, markGenuine, sendChat, setApply, setFacts, setMethod, settleRemark, undoLastChange } from './actions';
+import { addRemark, answerFact, approveSection, bringBackFixed, changedSinceLastRound, dismissChange, editSection, formatOf, groupingOf, markGenuine, outlineOp, sendChat, setApply, setFacts, setMethod, settleRemark, subId, undoLastChange, undoStep } from './actions';
+import Grip, { dropAt, type GripAction } from './Grip';
+import FixedBlock from './FixedBlock';
+import { fixedLabel, offeredFixed } from './fixed';
+import { placeFor } from './MenuButton';
+import { groupOfKey, groupOrderOf, KEPT } from './outline';
 import { contractPicks, deadlinePicks, eligibilityPicks, gradePicks, languagePicks, methodPicks, placePatch, placePicks, salaryPicks, safeguardingPicks, type Pick } from './answers';
 import { DOCUMENTS } from './apply';
 import { saveAboutForOrg } from './context';
 import Composer, { type ComposerHandle } from './Composer';
-import { addDays, commitmentText, COMMITMENTS, completeText, findInclusive, headingFor, inOutlineOrder, longDate, looseLocation, PLACES, quality, suggestTitle, titleSuggestions, type QualityItem } from './engine';
-import type { ApplySettings, ChatMsg, DemoJob, Facts, Section as Sec, State } from './types';
+import { addDays, commitmentText, COMMITMENTS, completeText, findInclusive, GROUPS, headingFor, inOutlineOrder, longDate, looseLocation, PLACES, quality, recommendSections, SECTIONS, suggestTitle, titleSuggestions, type QualityItem } from './engine';
+import type { ApplySettings, ChatMsg, DemoJob, Facts, GroupKey, Section as Sec, State } from './types';
 import { RevealBlock } from './Reveal';
 import { getState } from './store';
-import { Dialog, Field, inputStyle } from './ui';
+import { Dialog, Field, inputStyle, scrollInside } from './ui';
 
 export function rich(text: string): ReactNode {
   return text.split(/(\*\*[^*]+\*\*)/g).map((p, i) => (p.startsWith('**') ? <strong key={i}>{p.slice(2, -2)}</strong> : <Fragment key={i}>{p}</Fragment>));
@@ -202,7 +207,40 @@ export function ApplyFields({ job }: { job: DemoJob }) {
   );
 }
 
-type SectionProps = { job: DemoJob; sec: Sec; s: State; notes: QualityItem[]; onFlag: (f: Flag) => void; onSeeChat?: () => void; current?: boolean; noteEdits?: boolean; since?: number };
+type SectionProps = { job: DemoJob; sec: Sec; s: State; notes: QualityItem[]; onFlag: (f: Flag) => void; onSeeChat?: () => void; current?: boolean; noteEdits?: boolean; since?: number; draft?: DraftTools };
+
+/** What the window's draft gives each section (section 19, phase 6, C): its grip's moves and the + panel opened from it. */
+type DraftTools = { grip: (sec: Sec) => GripAction[]; onKey: (key: string, by: -1 | 1) => void; onDrag: (key: string, y: number | null, done: boolean) => void; dropAfter: string | null | undefined };
+
+/** The change note for the last change made with the icons, with its Undo; while a linked translation is written, Undo waits. */
+function StepNote({ job, onSeeChat }: { job: DemoJob; onSeeChat?: () => void }) {
+  const st = job.undoStep;
+  if (!st) return null;
+  return (
+    <div className="ej-change-note" role="status">
+      <Check size={12} strokeWidth={2.4} />
+      <span className="min-w-0 flex-1">
+        {st.text}
+        {st.settings ? '. Organisation settings changed too; Undo leaves them' : ''}
+      </span>
+      <Tip label={st.writing ? 'Waits until the linked translation is written' : 'Put it back as it was, in every language'}>
+        <button type="button" className="aj-text-btn" style={{ height: 24 }} onClick={() => undoStep(job.id)} aria-disabled={st.writing || undefined}>
+          Undo
+        </button>
+      </Tip>
+      {onSeeChat && (
+        <button type="button" className="aj-text-btn" style={{ height: 24 }} onClick={onSeeChat}>
+          See in chat
+        </button>
+      )}
+      <Tip label="Hide this note">
+        <button type="button" className="aj-icon-btn" style={{ width: 24, height: 24, border: 'none' }} onClick={() => dismissChange(job.id)} aria-label="Hide this note">
+          <X size={12} strokeWidth={2} />
+        </button>
+      </Tip>
+    </div>
+  );
+}
 
 /**
  * A section's text revealed as it is written (section 19, phase 5, E): when the AI or the rules stored new text for it after the window
@@ -222,7 +260,7 @@ function SectionText({ job, sec, since, children }: { job: DemoJob; sec: Sec; si
 
 const asText = (lines: string[]) => lines.map((l) => (l.startsWith('- ') ? `• ${l.slice(2)}` : l)).join('\n');
 
-function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits, since }: SectionProps) {
+function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits, since, draft }: SectionProps) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState('');
   const [title, setTitle] = useState('');
@@ -240,10 +278,13 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
   const [applyOpen, setApplyOpen] = useState(false);
   const reviewing = Boolean(s.reviewerAs);
   const remarks = job.review.remarks.filter((r) => r.section === sec.key && r.state === 'open');
-  const changed = Boolean(job.lastChange?.keys.includes(sec.key));
+  const changed = Boolean(job.lastChange?.keys.includes(sec.key)) || Boolean(job.undoStep?.tab === 'doc' && job.undoStep.keys?.[0] === sec.key);
   const sinceLastRound = reviewing && changedSinceLastRound(job).includes(sec.key);
+  // The window's quiet header (section 19, phase 6, C): the heading, Approve while the walk asks for it, the pencil, and the grip.
+  const icons = Boolean(draft) && !reviewing;
+  const editTip = `Edit ${sec.title}${sec.key === 'apply' ? ': its text and how people apply' : ''}${sec.edited ? ' · Edited by you' : ''}`;
   return (
-    <section id={`ej-sec-${sec.key}`} className="rounded-2xl px-3 py-2" data-changed={changed} data-review-changed={sinceLastRound} data-current={current || undefined} aria-label={sec.title} style={{ scrollMarginTop: 12 }}>
+    <section id={`ej-sec-${sec.key}`} className="ej-dsec rounded-2xl px-3 py-2" data-changed={changed} data-review-changed={sinceLastRound} data-current={current || undefined} data-drop-key={draft ? sec.key : undefined} data-drop-group={draft ? groupOfKey(groupingOf(job), sec.key) : undefined} data-drop={draft && draft.dropAfter === sec.key ? 'after' : undefined} aria-label={sec.title} style={{ scrollMarginTop: 12 }}>
       <div className="flex items-center gap-2">
         <h3 style={{ flex: 1 }}>{sec.title}</h3>
         {sinceLastRound && (
@@ -251,20 +292,20 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
             Changed since round {job.review.round - 1}
           </span>
         )}
-        {sec.edited && <span className="aj-chip">Your text</span>}
+        {!draft && sec.edited && <span className="aj-chip">Your text</span>}
         {job.walk && !job.setup && !reviewing && sec.lines.length > 0 && !job.walk.approved.includes(sec.key) && (
           <button type="button" className="aj-pill" style={{ height: 28 }} onClick={() => approveSection(job.id, sec.key)} aria-label={`Approve ${sec.title}`}>
             <Check size={12} strokeWidth={2} aria-hidden /> Approve
           </button>
         )}
-        {!reviewing && sec.key === 'about' && s.me.role === 'owner' && sec.lines.length > 0 && sec.lines.join('\n').trim() !== s.org.about.trim() && (
+        {!draft && !reviewing && sec.key === 'about' && s.me.role === 'owner' && sec.lines.length > 0 && sec.lines.join('\n').trim() !== s.org.about.trim() && (
           <Tip label="Each new job's About us starts from it; jobs already written keep theirs">
             <button type="button" className="aj-text-btn" style={{ height: 28 }} onClick={() => saveAboutForOrg(job.id)}>
               Save as our About us
             </button>
           </Tip>
         )}
-        {!reviewing && sec.key === 'apply' && (
+        {!draft && !reviewing && sec.key === 'apply' && (
           <Tip label="Set up how to apply">
             <button type="button" className="aj-icon-btn" style={{ width: 28, height: 28 }} onClick={() => setApplyOpen(true)} aria-label="Set up how to apply">
               <Settings2 size={13} strokeWidth={1.8} />
@@ -272,11 +313,25 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
           </Tip>
         )}
         {!reviewing && !editing && (
-          <Tip label={`Edit ${sec.title}`}>
-            <button type="button" className="aj-icon-btn" style={{ width: 28, height: 28 }} onClick={startEdit} aria-label={`Edit ${sec.title}`}>
-              <Pencil size={13} strokeWidth={1.8} />
-            </button>
-          </Tip>
+          <span className={icons ? 'ej-sec-tools' : 'contents'}>
+            <Tip label={icons ? editTip : `Edit ${sec.title}`}>
+              <button type="button" className={icons ? 'ej-sec-icon' : 'aj-icon-btn'} style={icons ? undefined : { width: 28, height: 28 }} onClick={startEdit} aria-label={`Edit ${sec.title}`}>
+                <Pencil size={13} strokeWidth={1.8} />
+              </button>
+            </Tip>
+            {icons && draft && (
+              <Grip
+                gripKey={sec.key}
+                className="ej-grip ej-sec-icon"
+                label={`Move ${sec.title}, or press for its menu`}
+                tip="Drag to move, or press for more"
+                actions={draft.grip(sec)}
+                onKey={(by) => draft.onKey(sec.key, by)}
+                onDrag={(y) => draft.onDrag(sec.key, y, false)}
+                onDrop={(y) => draft.onDrag(sec.key, y, true)}
+              />
+            )}
+          </span>
         )}
         {reviewing && (
           <>
@@ -308,6 +363,7 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
           </Tip>
         </div>
       )}
+      {changed && !job.lastChange && job.undoStep && !reviewing && <StepNote job={job} onSeeChat={onSeeChat} />}
       {notes.map((n) => (
         <div key={n.key} className="ej-check mb-1" style={{ color: 'var(--amber)' }}>
           <AlertCircle size={12} strokeWidth={2} /> <span style={{ color: 'var(--text-2)' }}>{n.text.replace(`${sec.title}: `, '')}</span>
@@ -315,6 +371,12 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
       ))}
       {editing ? (
         <div className="flex flex-col gap-2">
+          {draft && sec.key === 'apply' && (
+            <div className="flex flex-col gap-2 rounded-xl border p-3 aj-hair">
+              <span className="ej-panel-label">How people apply</span>
+              <ApplyFields job={job} />
+            </div>
+          )}
           <label className="flex flex-col gap-1">
             <span className="aj-faint" style={{ fontSize: 11.5 }}>
               Heading
@@ -334,18 +396,33 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
             </div>
           )}
           <textarea style={{ ...inputStyle, minHeight: 140, lineHeight: 1.6 }} value={text} onChange={(e) => setText(e.target.value)} aria-label={`${sec.title} text`} autoFocus />
-          {subs.map((sb) => (
-            <label key={sb.id} className="flex flex-col gap-1">
-              <span style={{ fontWeight: 650, fontSize: 13 }}>{sb.title}</span>
-              <textarea style={{ ...inputStyle, minHeight: 80, lineHeight: 1.6 }} value={sb.text} onChange={(e) => setSubs(subs.map((x) => (x.id === sb.id ? { ...x, text: e.target.value } : x)))} aria-label={`${sb.title} text`} />
-            </label>
+          {subs.map((sb, i) => (
+            <div key={sb.id} className="flex flex-col gap-1 rounded-xl border p-2 aj-hair">
+              <div className="flex items-center gap-1">
+                <input style={{ ...inputStyle, fontWeight: 650, flex: 1 }} value={sb.title} onChange={(e) => setSubs(subs.map((x) => (x.id === sb.id ? { ...x, title: e.target.value } : x)))} aria-label={`Heading ${i + 1} inside ${sec.title}`} placeholder="Heading" />
+                <Tip label="Move this heading up">
+                  <button type="button" className="aj-icon-btn" style={{ width: 28, height: 28 }} disabled={i === 0} onClick={() => setSubs(swap(subs, i, i - 1))} aria-label={`Move ${sb.title || 'this heading'} up`}>
+                    <ChevronUp size={13} strokeWidth={2} />
+                  </button>
+                </Tip>
+                <Tip label="Remove this heading and its text">
+                  <button type="button" className="aj-icon-btn" style={{ width: 28, height: 28 }} onClick={() => setSubs(subs.filter((x) => x.id !== sb.id))} aria-label={`Remove ${sb.title || 'this heading'}`}>
+                    <X size={13} strokeWidth={2} />
+                  </button>
+                </Tip>
+              </div>
+              <textarea style={{ ...inputStyle, minHeight: 80, lineHeight: 1.6 }} value={sb.text} onChange={(e) => setSubs(subs.map((x) => (x.id === sb.id ? { ...x, text: e.target.value } : x)))} aria-label={`${sb.title || 'Heading'} text`} />
+            </div>
           ))}
+          <button type="button" className="aj-text-btn self-start" style={{ height: 28, paddingInline: 0 }} onClick={() => setSubs([...subs, { id: subId(), title: '', text: '' }])}>
+            <Plus size={12} strokeWidth={2} aria-hidden /> Add a heading inside this section
+          </button>
           <div className="flex gap-1.5">
             <button
               type="button"
               className="aj-ink-btn"
               onClick={() => {
-                editSection(job.id, sec.key, text, noteEdits, { title, subs: subs.map((x) => ({ id: x.id, text: x.text })) });
+                editSection(job.id, sec.key, text, noteEdits, { title, subs: subs.map((x) => ({ id: x.id, title: x.title, text: x.text })) });
                 setEditing(false);
               }}
             >
@@ -355,9 +432,6 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
               Cancel
             </button>
           </div>
-          <span className="aj-faint" style={{ fontSize: 11.5 }}>
-            Sub-sections are added, renamed, moved, or removed from the template&apos;s name on the line, under This job&apos;s sections.
-          </span>
         </div>
       ) : (
         <SectionText job={job} sec={sec} since={since}>
@@ -425,6 +499,11 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
   );
 }
 
+function swap<T>(list: T[], a: number, b: number): T[] {
+  const next = [...list];
+  [next[a], next[b]] = [next[b], next[a]];
+  return next;
+}
 function FlagDialog({ job, flag, onClose }: { job: DemoJob; flag: Flag; onClose: () => void }) {
   const [reason, setReason] = useState('');
   return (
@@ -497,15 +576,156 @@ export function TitleEditor({ job, disabled }: { job: DemoJob; disabled?: boolea
     </>
   );
 }
-/** `current`: the section in view in the window, marked; `noteEdits`: the window's chat notices hand edits. */
-export function DocumentView({ job, s, onSeeChat, current, noteEdits }: { job: DemoJob; s: State; onSeeChat?: () => void; current?: string | null; noteEdits?: boolean }) {
+/**
+ * The + panel (section 19, phase 6, C): the outline's own chips, the group of the place it was opened first, then the other groups,
+ * then any fixed text left out, to bring it back. A section goes where the + was opened (from the last +, at the end of its group).
+ */
+function AddPanel({ job, s, at, onClose }: { job: DemoJob; s: State; at: { after: string | null; anchor: HTMLElement; end: boolean }; onClose: () => void }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [place] = useState(() => placeFor(at.anchor, 'left', at.end));
+  const g = groupingOf(job);
+  const here = at.after ? groupOfKey(g, at.after) : groupOrderOf(g)[0];
+  const groups = [here, ...groupOrderOf(g).filter((x) => x !== here)];
+  const rec = recommendSections(formatOf(s, job.format), job.facts);
+  const left = offeredFixed(s.org).filter((k) => !job.commitments.includes(k));
+  useEffect(() => {
+    requestAnimationFrame(() => box.current?.querySelector<HTMLElement>('button')?.focus({ preventScroll: true }));
+    const down = (e: PointerEvent) => {
+      if (!box.current?.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener('pointerdown', down);
+    return () => document.removeEventListener('pointerdown', down);
+  }, [onClose]);
+  const add = (key: string) => {
+    outlineOp(job.id, at.end ? { op: 'add', key } : { op: 'add', key, after: at.after });
+    onClose();
+    requestAnimationFrame(() => {
+      scrollInside(document.getElementById(`ej-sec-${key}`));
+      document.querySelector<HTMLElement>(`[data-grip-key="${key}"]`)?.focus({ preventScroll: true });
+    });
+  };
+  return (
+    <div
+      ref={box}
+      className="ej-menu ej-addpanel"
+      data-fixed
+      style={place}
+      role="dialog"
+      aria-label="Add a section here"
+      onKeyDown={(e) => {
+        if (e.key !== 'Escape') return;
+        e.stopPropagation();
+        onClose();
+        at.anchor.isConnected && at.anchor.focus();
+      }}
+    >
+      {groups.map((gk) => {
+        const missing = SECTIONS.filter((d) => d.group === gk && !job.tags.includes(d.key));
+        if (!missing.length) return null;
+        return (
+          <div key={gk} className="flex flex-col gap-1" role="group" aria-label={GROUPS.find((x) => x.key === gk)?.label}>
+            <span className="ej-menu-label">{GROUPS.find((x) => x.key === gk)?.label}</span>
+            <div className="flex flex-wrap gap-1 px-1.5">
+              {missing.map((d) => (
+                <Tip key={d.key} label={`${d.hint}${rec.includes(d.key) ? ' · recommended for this job' : ''}`}>
+                  <button type="button" className="ej-add" data-recommended={rec.includes(d.key)} onClick={() => add(d.key)} aria-label={`Add ${d.label}${rec.includes(d.key) ? ', recommended for this job' : ''}`}>
+                    <Plus size={11} strokeWidth={2} aria-hidden />
+                    {d.label}
+                    {rec.includes(d.key) && <Sparkles size={10} strokeWidth={2} aria-hidden className="ej-ol-rec" />}
+                  </button>
+                </Tip>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+      {left.length > 0 && (
+        <div className="flex flex-col gap-1" role="group" aria-label="Fixed texts left out">
+          <span className="ej-menu-label">Our commitments</span>
+          <div className="flex flex-wrap gap-1 px-1.5">
+            {left.map((k) => (
+              <Tip key={k} label={`Bring back ${fixedLabel(k)} at the end of Our commitments`}>
+                <button
+                  type="button"
+                  className="ej-add"
+                  onClick={() => {
+                    bringBackFixed(job.id, k);
+                    onClose();
+                  }}
+                >
+                  <ShieldCheck size={11} strokeWidth={2} aria-hidden />
+                  {fixedLabel(k)}
+                </button>
+              </Tip>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A section removed with the grip or the outline leaves a one-line note where it was, with its Undo. */
+function RemovedNote({ job }: { job: DemoJob }) {
+  const r = job.undoStep?.removed;
+  if (!r) return null;
+  return (
+    <div className="ej-change-note ej-removed-note" role="status">
+      <X size={12} strokeWidth={2.4} />
+      <span className="min-w-0 flex-1">Removed {r.title}</span>
+      <button type="button" className="aj-text-btn" style={{ height: 24 }} onClick={() => undoStep(job.id)}>
+        Undo
+      </button>
+    </div>
+  );
+}
+
+/** `current`: the section in view in the window, marked; `noteEdits`: the window's chat notices hand edits; `draft`: the window's icons. */
+export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inWindow }: { job: DemoJob; s: State; onSeeChat?: () => void; current?: string | null; noteEdits?: boolean; draft?: boolean }) {
   const [flag, setFlag] = useState<Flag | null>(null);
   const [since] = useState(() => Date.now());
+  const [adding, setAdding] = useState<{ after: string | null; anchor: HTMLElement; end: boolean } | null>(null);
+  const [dropAfter, setDropAfter] = useState<string | null | undefined>(undefined);
+  const root = useRef<HTMLElement>(null);
   const live = s.jobs.filter((j) => j.id !== job.id && (j.status === 'live' || j.status === 'scheduled')).map((j) => j.facts.title);
   const checks = quality(job.sections, job.facts, s.today, live);
+  const icons = Boolean(inWindow) && !s.reviewerAs;
+  const g = groupingOf(job);
+  const keys = job.walk ? job.tags : inOutlineOrder(job.sections, job.tags).map((x) => x.key);
+  const focusGrip = (key: string) => requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-grip-key="${key}"]`)?.focus({ preventScroll: true }));
+  const openAdd = (after: string | null, anchor: HTMLElement | null, end: boolean) => anchor && setAdding({ after, anchor, end });
+  const tools: DraftTools | undefined = icons
+    ? {
+        grip: (sec) => [
+          { label: 'Move up', run: () => (outlineOp(job.id, { op: 'by', key: sec.key, by: -1, reading: true }), focusGrip(sec.key)) },
+          { label: 'Move down', run: () => (outlineOp(job.id, { op: 'by', key: sec.key, by: 1, reading: true }), focusGrip(sec.key)) },
+          { label: 'Move to group…', items: groupOrderOf(g).filter((x) => x !== groupOfKey(g, sec.key)).map((x) => ({ label: GROUPS.find((y) => y.key === x)?.label ?? x, run: () => (outlineOp(job.id, { op: 'toGroup', key: sec.key, group: x }), focusGrip(sec.key)) })) },
+          { label: 'Add a section below', run: () => openAdd(sec.key, document.querySelector<HTMLElement>(`[data-grip-key="${sec.key}"]`), false) },
+          ...(KEPT.includes(sec.key) ? [] : [{ label: 'Remove', danger: true, run: () => outlineOp(job.id, { op: 'remove', key: sec.key }) }]),
+          ...(sec.key === 'about' && s.me.role === 'owner' && sec.lines.length > 0 && sec.lines.join('\n').trim() !== s.org.about.trim() ? [{ label: 'Save as our About us', run: () => saveAboutForOrg(job.id) }] : []),
+        ],
+        onKey: (key, by) => {
+          outlineOp(job.id, { op: 'by', key, by, reading: true });
+          focusGrip(key);
+        },
+        onDrag: (key, y, finished) => {
+          if (y === null) return setDropAfter(undefined);
+          const at = dropAt(root.current, y, key);
+          if (!finished) return setDropAfter(at.after);
+          setDropAfter(undefined);
+          outlineOp(job.id, { op: 'drop', key, after: at.after, group: (at.group ?? groupOrderOf(g)[0]) as GroupKey });
+          focusGrip(key);
+        },
+        dropAfter,
+      }
+    : undefined;
+  const removed = icons && job.undoStep?.tab === 'doc' ? job.undoStep.removed : undefined;
+  const removedAt = removed ? (removed.after && keys.includes(removed.after) ? removed.after : null) : undefined;
+  const note = icons && job.undoStep?.tab === 'doc' && !job.lastChange && !job.undoStep.removed && !job.undoStep.keys?.some((k) => keys.includes(k));
+  const heading = (k: string) => job.renamed?.[k] ?? headingFor(k, formatOf(s, job.format));
   return (
     <>
-      <article className="ej-doc aj-card flex flex-col gap-1 p-3 lg:p-5" aria-label="Job description">
+      <article ref={root} className="ej-doc aj-card flex flex-col gap-1 p-3 lg:p-5" aria-label="Job description" data-drop-top={dropAfter === null || undefined}>
         <div className="px-3 pb-2">
           <div className="aj-faint" style={{ fontSize: 11 }}>
             {s.org.name}
@@ -515,23 +735,45 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits }: { job: D
           </div>
           <TitleEditor job={job} disabled={Boolean(s.reviewerAs)} />
         </div>
-        {job.walk
-          ? job.tags.map((k) => {
-              const sec = job.sections.find((x) => x.key === k);
-              if (sec) return <SectionView key={k} job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === k)} onFlag={setFlag} onSeeChat={onSeeChat} current={current === k} noteEdits={noteEdits} since={since} />;
-              return (
-                <section key={k} id={`ej-sec-${k}`} className="rounded-2xl px-3 py-2" aria-label={`${job.renamed?.[k] ?? headingFor(k, formatOf(s, job.format))}, not written yet`} style={{ scrollMarginTop: 12 }}>
-                  <h3 className="aj-faint">{job.renamed?.[k] ?? headingFor(k, formatOf(s, job.format))}</h3>
+        {note && <StepNote job={job} onSeeChat={onSeeChat} />}
+        {removedAt === null && <RemovedNote job={job} />}
+        {keys.map((k, i) => {
+          const sec = job.sections.find((x) => x.key === k);
+          return (
+            <Fragment key={k}>
+              {icons && i > 0 && (
+                <div className="ej-addline" aria-hidden>
+                  <button type="button" tabIndex={-1} className="ej-addline-btn" onClick={(e) => openAdd(keys[i - 1], e.currentTarget, false)} title="Add a section here">
+                    <Plus size={12} strokeWidth={2.2} />
+                  </button>
+                </div>
+              )}
+              {sec ? (
+                <SectionView job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === k)} onFlag={setFlag} onSeeChat={onSeeChat} current={current === k} noteEdits={noteEdits} since={since} draft={tools} />
+              ) : (
+                <section key={k} id={`ej-sec-${k}`} className="rounded-2xl px-3 py-2" data-drop-key={icons ? k : undefined} data-drop-group={icons ? groupOfKey(g, k) : undefined} data-drop={dropAfter === k ? 'after' : undefined} aria-label={`${heading(k)}, not written yet`} style={{ scrollMarginTop: 12 }}>
+                  <h3 className="aj-faint">{heading(k)}</h3>
                   <p className="aj-faint m-0" style={{ fontSize: 12.5 }}>
                     Written when we get here.
                   </p>
                 </section>
-              );
-            })
-          : inOutlineOrder(job.sections, job.tags).map((sec) => (
-              <SectionView key={sec.key} job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === sec.key)} onFlag={setFlag} onSeeChat={onSeeChat} current={current === sec.key} noteEdits={noteEdits} since={since} />
-            ))}
-        {job.commitments.length > 0 && (
+              )}
+              {removedAt === k && <RemovedNote job={job} />}
+            </Fragment>
+          );
+        })}
+        {icons && (
+          <div className="ej-addend">
+            <Tip label="Add a section, or bring back a fixed text">
+              <button type="button" className="ej-addend-btn" onClick={(e) => openAdd(keys[keys.length - 1] ?? null, e.currentTarget, true)} aria-label="Add a section" aria-haspopup="dialog">
+                <Plus size={14} strokeWidth={2.2} />
+              </button>
+            </Tip>
+          </div>
+        )}
+        {inWindow ? (
+          <FixedBlock job={job} s={s} />
+        ) : job.commitments.length > 0 ? (
           <section className="rounded-2xl px-3 py-2" aria-label="Commitments">
             <h3 className="flex items-center gap-1.5">
               <ShieldCheck size={13} strokeWidth={2} /> Our commitments
@@ -551,13 +793,13 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits }: { job: D
               );
             })}
           </section>
-        )}
+        ) : null}
       </article>
+      {adding && <AddPanel job={job} s={s} at={adding} onClose={() => setAdding(null)} />}
       {flag && <FlagDialog job={job} flag={flag} onClose={() => setFlag(null)} />}
     </>
   );
 }
-
 const PICKS: Partial<Record<NonNullable<ChatMsg['ask']>, (s: State, job: DemoJob) => Pick[]>> = {
   place: placePicks,
   deadline: deadlinePicks,

@@ -9,6 +9,7 @@ import {
   buildSection,
   buildSections,
   COMMITMENTS,
+  commitmentText,
   roleByKey,
   SECTION_BY_KEY,
   daysUntil,
@@ -17,6 +18,7 @@ import {
   ENGAGEMENTS,
   extractFacts,
   FORMAT_FOR_TYPE,
+  GROUPS,
   headingFor,
   isoDay,
   longDate,
@@ -44,9 +46,10 @@ import { contentOf, describeStyle, proposedStyle, recommendation, styleFromReply
 import { profileFor, profileName, profileOf } from './profiles';
 import { aiWrites, ASKS, asksOf, checkPoints, contentPrint, essentials, ESSENTIAL_WORDS, FIXED_SECTIONS, isSettled, isWritten, nextStep, parkedIn, parkKey, stepKey, type Step } from './flow';
 import { AGAIN_DATE, AGAIN_PLACE, AGAIN_POSITIONS, INVITE, KEEP_ALL, KEEP_AS_IS, MARK_REVIEWED, NO_MORE_LANGS, NO_REVIEW, NOT_NOW, NOTHING_ELSE, REMIND, SEND_REVIEW, SHOW_FLYER, stateMessage, THIS_JOB } from './walkChat';
-import { ALL_GOOD, ASK_TEXT as WALK_ASK, CHANGE_NO, CHANGE_YES, CHOOSE_SDGS, fixedNamed, NO_SDGS, orgGoalsAnswer, GENUINE, GOOD, KEEP_FIXED, LEAVE_IT, NO_THANKS, NONE_OF_THESE, OTHER_WORDING, overview, paceIn, PACE_QUICK, promptFor, readAnswer, readDetails, STYLE_QUICK, styleQuestion } from './walkChat';
-import { addToGroup, formatGrouping, grouped, groupingFrom, groupOfKey, isGrouped } from './outline';
-import type { ApplySettings, AskKind, ChatMsg, Content, DeletedJob, Delivery, DemoJob, Facts, Format, Grouping, JobLang, Pace, PayRequest, Person, Plan, ReachPlan, Recipient, Review, Section, State, Tone, Translation, UndoStep } from './types';
+import { ALL_GOOD, APPROVE_FIXED, ASK_TEXT as WALK_ASK, CHANGE_NO, DISMISS_MARK, CHANGE_YES, CHOOSE_SDGS, fixedNamed, NO_SDGS, orgGoalsAnswer, GENUINE, GOOD, KEEP_FIXED, LEAVE_IT, NO_THANKS, NONE_OF_THESE, OTHER_WORDING, overview, paceIn, PACE_QUICK, promptFor, readAnswer, readDetails, STYLE_QUICK, styleQuestion } from './walkChat';
+import { addToGroup, applyOp, formatGrouping, grouped, groupingFrom, groupOfKey, isGrouped, KEPT, type OutlineOp } from './outline';
+import { canWord, fixedLabel, fixedList, fixedMarked, fixedShown, fixedStore, fixedWordingNow, isLocked, offeredFixed, ORG_LANG, orgWording } from './fixed';
+import type { ApplySettings, AskKind, ChatMsg, Content, DeletedJob, Delivery, DemoJob, Facts, FixedOwn, Format, Grouping, JobLang, Pace, PayRequest, Person, Plan, ReachPlan, Recipient, Review, Section, State, Tone, Translation, UndoStep } from './types';
 
 /** A job's or a version's grouping (section 19, phase 6, B). */
 export function groupingOf(x: Grouping): Grouping {
@@ -1374,9 +1377,7 @@ function walkTurn(s: State, j: DemoJob, text: string): boolean {
       return true;
     case 'fixed': {
       if (t === KEEP_FIXED || /^(?:yes|ok|okay|keep|fine|good|sure)\b/i.test(t)) {
-        const lang = jobLang(j);
-        if (lang !== 'en' && !s.org.fixedLangs?.includes(lang)) update((st) => ({ ...st, org: { ...st.org, fixedLangs: [...(st.org.fixedLangs ?? []), lang] } }));
-        settle(j.id, 'fixed', text, lang !== 'en' && !s.org.fixedLangs?.includes(lang) ? `Kept, word for word, and confirmed for every ${langOf(lang).label} job.` : 'Kept, word for word.');
+        settle(j.id, 'fixed', text, 'Kept. Each one can be worded for this job with its pencil in the job description.');
         return true;
       }
       if (t === 'Add them') {
@@ -1388,10 +1389,15 @@ function walkTurn(s: State, j: DemoJob, text: string): boolean {
         settle(j.id, 'fixed', text, 'Fine: no fixed text on this job.');
         return true;
       }
-      const out = /\b(?:remove|without|leave out|drop|take out|no)\b/i.test(t) ? fixedNamed(t, j.commitments) : [];
-      if (!out.length) return false;
+      const asked = /\b(?:remove|without|leave out|drop|take out|no)\b/i.test(t) ? fixedNamed(t, j.commitments) : [];
+      const out = asked.filter((k) => !isLocked(s.org, k));
+      if (!asked.length) return false;
+      if (!out.length) {
+        say(`${asked.map(fixedLabel).join(' and ')} ${asked.length === 1 ? 'is' : 'are'} locked by your organisation, so ${asked.length === 1 ? 'it stays' : 'they stay'} on every job. The owner changes that in Organisation settings.`);
+        return true;
+      }
       updateJob(j.id, (x) => ({ ...touched(x), commitments: x.commitments.filter((c) => !out.includes(c)) }));
-      settle(j.id, 'fixed', text, `Left out for this job: ${out.map((k) => COMMITMENTS.find((c) => c.key === k)?.label ?? k).join(', ')}.`);
+      settle(j.id, 'fixed', text, `Left out for this job: ${out.map((k) => COMMITMENTS.find((c) => c.key === k)?.label ?? k).join(', ')}.${out.length < asked.length ? ` ${asked.filter((k) => !out.includes(k)).map(fixedLabel).join(' and ')} stays: it is locked.` : ''}`);
       return true;
     }
     case 'keep':
@@ -1416,6 +1422,16 @@ function walkTurn(s: State, j: DemoJob, text: string): boolean {
       const p = step.point;
       if (t === LEAVE_IT || /^(?:leave it as it is|ignore)\b|^(?:keep it|it'?s fine)\b/i.test(t)) {
         leavePoint(j.id, p.key, text);
+        return true;
+      }
+      if (p.key === 'fixed-machine' && (t === APPROVE_FIXED || /^approve\b/i.test(t))) {
+        for (const k of fixedMarked(j, s).machine) approveFixed(j.id, k);
+        updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), msg('ai', 'Approved: the translations stand as they are.')] }));
+        return true;
+      }
+      if (p.key.startsWith('to-update-') && (t === DISMISS_MARK || /^dismiss\b/i.test(t))) {
+        dismissToUpdate(j.id, p.key.slice(10));
+        updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, msg('user', text), msg('ai', 'Dismissed: the section stays as it is.')] }));
         return true;
       }
       if (p.hit && (t === GENUINE || /\bgenuine\b/i.test(t))) {
@@ -1814,6 +1830,7 @@ export function toggleSection(id: string, key: string) {
     jobs: s.jobs.map((j) => {
       if (j.id !== id) return j;
       const has = j.tags.includes(key);
+      if (has && KEPT.includes(key)) return j;
       const added = has ? null : addToGroup(j.tags, groupingOf(j), key);
       const tags = added ? added.keys : j.tags.filter((t) => t !== key);
       const next = touched({ ...j, tags, ...(added ? groupingOf(added.grouping) : {}) });
@@ -1842,6 +1859,70 @@ export function reorderSections(id: string, keys: string[]) {
   });
 }
 
+const groupName = (g: string) => GROUPS.find((x) => x.key === g)?.label ?? g;
+
+/** The note an outline change leaves, with its Undo. */
+function opNote(j: DemoJob, s: State, op: OutlineOp, before: DemoJob): string {
+  const name = 'key' in op ? headingOf(s, before, op.key) : '';
+  switch (op.op) {
+    case 'add':
+      return `Added ${headingOf(s, j, op.key)}`;
+    case 'remove':
+      return `Removed ${name}`;
+    case 'rename':
+      return `Renamed ${name} to ${op.heading}`;
+    case 'groupBy':
+    case 'groupBefore':
+      return `Moved the group ${groupName(op.group)}`;
+    default: {
+      const was = groupOfKey(groupingOf(before), op.key);
+      const now = groupOfKey(groupingOf(j), op.key);
+      return was === now ? `Moved ${name}` : `Moved ${name} to ${groupName(now)}`;
+    }
+  }
+}
+
+/**
+ * One change from the outline or the draft's icons (section 19, phase 6, B and C), on the job's own language: a section added (written
+ * in place when the job has text), removed (never How to apply), renamed, or moved within or into a group, or a group moved. It is
+ * one Undo step, and the outline and the job description show it at once; an approval reopens and a live page says Updated, as today.
+ */
+export function outlineOp(id: string, op: OutlineOp) {
+  if (!ownerOnly()) return;
+  update((s) => ({
+    ...s,
+    jobs: s.jobs.map((j) => {
+      if (j.id !== id) return j;
+      if (op.op === 'rename') {
+        const heading = op.heading.trim();
+        if (!heading || !j.tags.includes(op.key) || heading === headingOf(s, j, op.key)) return j;
+        const next = { ...touched(j), ...liveEdit(j), renamed: { ...j.renamed, [op.key]: heading }, sections: j.sections.map((x) => (x.key === op.key ? { ...x, title: heading } : x)) };
+        return stepped(j, next, opNote(next, s, op, j), 'doc', { keys: [op.key] });
+      }
+      if (op.op === 'remove' && (KEPT.includes(op.key) || !j.tags.includes(op.key) || j.tags.length < 2)) return j;
+      if (op.op === 'add' && (j.tags.includes(op.key) || !SECTION_BY_KEY[op.key])) return j;
+      const placed = applyOp(j.tags, groupingOf(j), op);
+      const moved = regrouped({ ...touched(j), ...liveEdit(j) }, placed.grouping, placed.keys);
+      if (op.op === 'add') {
+        const sec = j.sections.length ? withTemplateSubs(s, j, built(op.key, ctxFor(s, moved), j)) : null;
+        const withSec = sec ? { ...moved, sections: inOutlineOrder([...moved.sections, j.renamed?.[op.key] ? { ...sec, title: j.renamed[op.key] } : sec], moved.tags) } : moved;
+        const next = sec ? { ...withSec, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Added ${sec.title}`, sections: withSec.sections }] } : withSec;
+        return stepped(j, next, opNote(next, s, op, j), 'doc', { keys: [op.key] });
+      }
+      if (op.op === 'remove') {
+        const read = j.tags;
+        const at = read.indexOf(op.key);
+        const title = headingOf(s, j, op.key);
+        const sections = moved.sections.filter((x) => x.key !== op.key);
+        const next = { ...moved, sections, versions: j.sections.some((x) => x.key === op.key) ? [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Removed ${title}`, sections }] : j.versions };
+        return stepped(j, next, opNote(next, s, op, j), 'doc', { removed: { key: op.key, title, after: at > 0 ? read[at - 1] : null } });
+      }
+      if (moved.tags.join() === j.tags.join() && JSON.stringify(groupingOf(moved)) === JSON.stringify(groupingOf(j))) return j;
+      return stepped(j, moved, opNote(moved, s, op, j), 'doc', { keys: 'key' in op ? [op.key] : [] });
+    }),
+  }));
+}
+
 export function applyFormat(id: string, formatKey: string) {
   if (!ownerOnly()) return;
   update((s) => ({
@@ -1849,7 +1930,10 @@ export function applyFormat(id: string, formatKey: string) {
     jobs: s.jobs.map((j) => {
       if (j.id !== id) return j;
       const format = formatOf(s, formatKey);
-      const extras = j.tags.filter((t) => !format.order.some((o) => o.key === t) && (['deliverables', 'learning', 'deployment', 'funding', 'conditions', 'languages'].includes(t) || j.sections.some((x) => x.key === t && (x.edited || x.ai))));
+      const was = formatOf(s, j.format);
+      // Kept through a template change: what the job type brings, text written by hand or by the AI, sections the user added
+      // beyond the old template, and How to apply, which every job has (section 19, phase 6, D).
+      const extras = j.tags.filter((t) => !format.order.some((o) => o.key === t) && (['deliverables', 'learning', 'deployment', 'funding', 'conditions', 'languages', ...KEPT].includes(t) || !was.order.some((o) => o.key === t) || j.sections.some((x) => x.key === t && (x.edited || x.ai))));
       const wanted = orderSections([...format.order.map((o) => o.key), ...extras], format);
       // A job the user has grouped in their own way keeps it: its sections stay where they are, and the new template's join their groups.
       const own = Boolean(j.groupOrder || j.groupOf);
@@ -1864,7 +1948,146 @@ export function applyFormat(id: string, formatKey: string) {
 
 export function toggleCommitment(id: string, key: string) {
   if (!ownerOnly()) return;
-  updateJob(id, (j) => ({ ...touched(j), commitments: j.commitments.includes(key) ? j.commitments.filter((c) => c !== key) : [...j.commitments, key] }));
+  // A locked text cannot be left out of a job, by any route (section 19, phase 6, D).
+  updateJob(id, (j) => (j.commitments.includes(key) && isLocked(getState().org, key) ? j : { ...touched(j), commitments: j.commitments.includes(key) ? j.commitments.filter((c) => c !== key) : [...j.commitments, key] }));
+}
+
+/**
+ * A change to the fixed texts of the job in one language (section 19, phase 6, D and E): their list and order, and their wording for
+ * this job. A version changed this way needs a new review, like any edit to it; each change is one Undo step in that language's tab.
+ */
+function fixedChange(id: string, lang: JobLang | undefined, text: (j: DemoJob) => string, fn: (list: string[], store: Record<string, FixedOwn>, j: DemoJob) => { list: string[]; store: Record<string, FixedOwn> } | null, after?: (j: DemoJob) => DemoJob) {
+  if (!ownerOnly()) return;
+  update((s) => ({
+    ...s,
+    jobs: s.jobs.map((j) => {
+      if (j.id !== id) return j;
+      const l = lang ?? jobLang(j);
+      const own = l === jobLang(j);
+      if (!own && !j.translations?.[l]) return j;
+      const out = fn(fixedList(j, l), fixedStore(j, l), j);
+      if (!out) return j;
+      const store = Object.keys(out.store).length ? out.store : undefined;
+      const next: DemoJob = own ? { ...touched(j), ...liveEdit(j), commitments: out.list, fixed: store } : withVersion(j, l, (t) => ({ ...t, commitments: out.list, fixed: store }));
+      if (next === j) return j;
+      const done = stepped(j, next, text(j), own ? 'doc' : l);
+      return after ? after(done) : done;
+    }),
+  }));
+}
+
+/** "Edit for this job": a wording for this job only; the owner is then offered, quietly, to use it for every job. */
+export function editFixed(id: string, key: string, wording: string, lang?: JobLang) {
+  const s = getState();
+  const text = wording.trim();
+  fixedChange(
+    id,
+    lang,
+    () => `Worded ${fixedLabel(key)} for this job`,
+    (list, store, j) => {
+      const l = lang ?? jobLang(j);
+      if (!list.includes(key) || !text || !canWord(s.org, key, l)) return null;
+      const org = l === ORG_LANG ? commitmentText(key, s.org, j.facts).text : orgWording(s.org, key, l);
+      if (text === org) return { list, store: Object.fromEntries(Object.entries(store).filter(([k]) => k !== key)) };
+      return { list, store: { ...store, [key]: { text } } };
+    },
+    (j) => (s.me.role === 'owner' && !s.reviewerAs && fixedStore(j, lang ?? jobLang(j))[key]?.text ? { ...j, wordingOffer: { key, lang: lang ?? jobLang(j), left: 2 } } : j),
+  );
+}
+
+/** "Back to the organisation's text". */
+export function resetFixed(id: string, key: string, lang?: JobLang) {
+  fixedChange(id, lang, () => `${fixedLabel(key)}: back to your organisation's text`, (list, store) => (store[key] ? { list, store: Object.fromEntries(Object.entries(store).filter(([k]) => k !== key)) } : null));
+}
+
+/** "Leave out of this job": never a locked text. */
+export function leaveOutFixed(id: string, key: string, lang?: JobLang) {
+  const org = getState().org;
+  fixedChange(id, lang, () => `Left out ${fixedLabel(key)}`, (list, store) => (list.includes(key) && !isLocked(org, key) ? { list: list.filter((k) => k !== key), store } : null));
+}
+
+/** A fixed text left out, brought back from + at the end of the block. */
+export function bringBackFixed(id: string, key: string, lang?: JobLang) {
+  const org = getState().org;
+  fixedChange(id, lang, () => `Brought back ${fixedLabel(key)}`, (list, store) => (!list.includes(key) && offeredFixed(org).includes(key) ? { list: [...list, key], store } : null));
+}
+
+/** Move up or down within the block, never among the sections. */
+export function moveFixed(id: string, key: string, by: -1 | 1, lang?: JobLang) {
+  fixedChange(id, lang, () => `Moved ${fixedLabel(key)}`, (list, store) => {
+    const at = list.indexOf(key);
+    const to = at + by;
+    if (at < 0 || to < 0 || to >= list.length) return null;
+    const next = [...list];
+    [next[at], next[to]] = [next[to], next[at]];
+    return { list: next, store };
+  });
+}
+
+/**
+ * A fixed text translated by the AI into a language the organisation has no wording for (section 19, phase 6, E): marked
+ * "machine-translated" until approved; edited with the pencil like any other text. A version changed this way needs a new review.
+ */
+export function translateFixed(id: string, key: string, text: string, lang: JobLang) {
+  if (!ownerOnly() || lang === ORG_LANG || orgWording(getState().org, key, lang)) return;
+  updateJob(id, (j) => {
+    if (!fixedList(j, lang).includes(key)) return j;
+    const store = { ...fixedStore(j, lang), [key]: { text: text.trim(), machine: true } };
+    return lang === jobLang(j) ? { ...j, fixed: store } : withVersion(j, lang, (t) => ({ ...t, fixed: store }));
+  });
+}
+
+/** Dragged within the block: after another fixed text, or first. */
+export function placeFixed(id: string, key: string, after: string | null, lang?: JobLang) {
+  fixedChange(id, lang, () => `Moved ${fixedLabel(key)}`, (list, store) => {
+    if (!list.includes(key) || after === key) return null;
+    const rest = list.filter((k) => k !== key);
+    const at = after && rest.includes(after) ? rest.indexOf(after) + 1 : 0;
+    const next = [...rest.slice(0, at), key, ...rest.slice(at)];
+    return next.join() === list.join() ? null : { list: next, store };
+  });
+}
+
+/** A machine-translated fixed text approved on its mark (or by approving its version). */
+export function approveFixed(id: string, key: string, lang?: JobLang) {
+  fixedChange(id, lang, () => `Approved ${fixedLabel(key)}`, (list, store) => (store[key]?.machine && !store[key]?.approved ? { list, store: { ...store, [key]: { ...store[key], approved: true } } } : null));
+}
+
+/** A "to update" mark dismissed: the section is right as it is in that language. */
+export function dismissToUpdate(id: string, key: string, lang?: JobLang) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => {
+    const l = lang ?? jobLang(j);
+    if (l === jobLang(j)) {
+      if (!j.toUpdate?.[key]) return j;
+      const rest = { ...j.toUpdate };
+      delete rest[key];
+      return { ...j, toUpdate: Object.keys(rest).length ? rest : undefined };
+    }
+    const t = j.translations?.[l];
+    if (!t?.toUpdate?.[key]) return j;
+    const rest = { ...t.toUpdate };
+    delete rest[key];
+    return { ...j, translations: { ...j.translations, [l]: { ...t, toUpdate: Object.keys(rest).length ? rest : undefined } } };
+  });
+}
+
+/**
+ * "Use this wording for every job?" Yes: Organisation settings take it (in the organisation's language its text, otherwise its
+ * wording for that language), so new jobs and drafts use it; Undo does not undo Settings, and the note says so.
+ */
+export function keepWordingForAll(id: string, yes: boolean) {
+  const s0 = getState();
+  const j0 = s0.jobs.find((j) => j.id === id);
+  const offer = j0?.wordingOffer;
+  if (!j0 || !offer || s0.me.role !== 'owner' || s0.reviewerAs) return;
+  const text = fixedStore(j0, offer.lang)[offer.key]?.text;
+  update((s) => {
+    const jobs = s.jobs.map((j) => (j.id === id ? { ...j, wordingOffer: undefined, ...(yes && j.undoStep ? { undoStep: { ...j.undoStep, settings: true } } : {}) } : j));
+    if (!yes || !text) return { ...s, jobs };
+    const org = offer.lang === ORG_LANG ? { ...s.org, standard: s.org.standard.some((c) => c.key === offer.key) ? s.org.standard.map((c) => (c.key === offer.key ? { ...c, text } : c)) : [...s.org.standard, { key: offer.key, label: fixedLabel(offer.key), text, locked: false }] } : { ...s.org, fixedWording: { ...s.org.fixedWording, [offer.lang]: { ...s.org.fixedWording?.[offer.lang], [offer.key]: text } } };
+    return { ...s, org, jobs, notice: { text: `${fixedLabel(offer.key)}: every new job uses this wording. Change it in Organisation settings.` } };
+  });
 }
 
 export function markGenuine(id: string, hitKey: string, reason: string) {
@@ -1877,24 +2100,28 @@ const linesOf = (text: string) => text.split('\n').map((l) => l.replace(/^[•*]
 
 /**
  * A section edited by hand: its text, and from the section's editor (section 19, phase 5, B) its heading (typed, or one of the suggested
- * titles, applied only when saved) and its sub-sections' text.
+ * titles, applied only when saved) and the headings inside it (phase 6, B: added, renamed, and removed only here). `subs`, when given,
+ * is the whole list: each heading's text, and its title when it is new or renamed.
  */
-export function editSection(id: string, key: string, text: string, note = false, extra: { title?: string; subs?: Array<{ id: string; text: string }> } = {}) {
+export function editSection(id: string, key: string, text: string, note = false, extra: { title?: string; subs?: Array<{ id: string; title?: string; text: string }> } = {}) {
   if (!ownerOnly()) return;
   const heading = extra.title?.trim();
-  const was = getState().jobs.find((j) => j.id === id)?.sections.find((x) => x.key === key);
+  const start = getState().jobs.find((j) => j.id === id);
+  const was = start?.sections.find((x) => x.key === key);
   if (heading && was && heading !== was.title) renameSection(id, key, heading);
   updateJob(id, (j) => {
     const lines = linesOf(text);
     const old = j.sections.find((x) => x.key === key);
-    const subs = old?.subs?.map((sb) => {
-      const typed = extra.subs?.find((x) => x.id === sb.id);
-      return typed ? { ...sb, lines: linesOf(typed.text) } : sb;
-    });
-    if (JSON.stringify(lines) === JSON.stringify(old?.lines) && JSON.stringify(subs) === JSON.stringify(old?.subs)) return j;
-    const sections = j.sections.map((x) => (x.key === key ? { ...x, lines, edited: true, ...(subs ? { subs } : {}) } : x));
+    const subs = extra.subs
+      ? extra.subs
+          .map((x) => ({ id: x.id, title: (x.title ?? old?.subs?.find((y) => y.id === x.id)?.title ?? '').trim(), lines: linesOf(x.text) }))
+          .filter((x) => x.title || x.lines.length)
+          .map((x) => ({ ...x, title: x.title || 'More' }))
+      : old?.subs;
+    if (JSON.stringify(lines) === JSON.stringify(old?.lines) && JSON.stringify(subs ?? []) === JSON.stringify(old?.subs ?? [])) return start && j !== start ? stepped(start, j, `Renamed ${was?.title ?? key}`, 'doc', { keys: [key] }) : j;
+    const sections = j.sections.map((x) => (x.key === key ? { ...x, lines, edited: true, subs: subs?.length ? subs : undefined } : x));
     const title = j.sections.find((x) => x.key === key)?.title ?? key;
-    const next: DemoJob = { ...touched(j), sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${title}`, sections }], ...liveEdit(j) };
+    const next: DemoJob = stepped(start ?? j, { ...touched(j), sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${title}`, sections }], ...liveEdit(j) }, `Edited ${title}`, 'doc', { keys: [key] });
     return note ? { ...next, part: `s:${key}`, chat: [...j.chat, msg('ai', `You changed **${title}** by hand. I'll keep your wording; ask me if another section should change to match.`)] } : next;
   });
   if (note) ensureAsk(id);
@@ -2029,12 +2256,12 @@ export function importJobDescription(text: string, opts: { host?: string; saveAs
   return id;
 }
 
-/** Saves a format the organisation built itself, for reuse. Returns its key. */
-export function createFormat(label: string, order: Format['order'], tone: Tone): string {
+/** Saves a format the organisation built itself, for reuse, with its grouping. Returns its key. */
+export function createFormat(label: string, order: Format['order'], tone: Tone, groupOrder?: Format['groupOrder']): string {
   const key = nextId('format');
   update((s) => ({
     ...s,
-    formats: [...s.formats, { key, label, family: 'Your organisation', usedBy: `Created by ${s.me.name}`, tone, order, commitments: formatOf(s, 'house').commitments }],
+    formats: [...s.formats, { key, label, family: 'Your organisation', usedBy: `Created by ${s.me.name}`, tone, order, commitments: formatOf(s, 'house').commitments, ...(groupOrder ? { groupOrder } : {}) }],
     notice: { text: `Saved ${label}. It is under Your organisation in the template panel and on the JD formats page.` },
   }));
   return key;
@@ -2310,7 +2537,7 @@ export function addVersionSection(id: string, lang: JobLang, key: string) {
 }
 
 export function removeVersionSection(id: string, lang: JobLang, key: string) {
-  if (!ownerOnly()) return;
+  if (!ownerOnly() || KEPT.includes(key)) return;
   updateJob(id, (j) => withVersion(j, lang, (t) => (t.sections.length > 1 ? { ...t, sections: t.sections.filter((x) => x.key !== key) } : t)));
 }
 
@@ -2633,6 +2860,8 @@ export function publish(id: string, o: PublishOptions): boolean {
         scheduledFor: o.schedule ?? undefined,
         publishedAt: o.schedule ? undefined : Date.now(),
         published: o.schedule ? undefined : { facts: x.facts, sections: x.sections, at: Date.now() },
+        // The fixed texts keep the wording they were published with; a later change in Settings reaches new jobs and drafts only.
+        fixedPublished: fixedWordingNow(x, s),
         ...(o.plan === 'amplify' ? { paidVia: viaOf(o.paid, x), langsPaid: (x.langsPaid ?? 0) + (o.langs ?? 0) } : {}),
         paidFor: undefined,
         payRequest: undefined,
@@ -2937,6 +3166,7 @@ function asDraft(x: DemoJob, who: string, what: string): DemoJob {
     paidVia: paid ? x.paidVia : undefined,
     ...(x.plan === 'amplify' ? { choice: 'amplify' as const } : {}),
     scheduledFor: undefined,
+    fixedPublished: undefined,
     reach: kept && (kept.candidates.length || kept.team.length || kept.rounds.length) ? kept : null,
     reachPlan: r && (candidates.length || team.length) ? { candidates, team, candidateMsg: r.candidateMsg, teamMsg: r.teamMsg } : x.reachPlan,
     payRequest: undefined,
@@ -3226,7 +3456,15 @@ export function downloadCopy(j: DemoJob, orgName: string, say = false): boolean 
     if (say) notify(`${no}.`);
     return false;
   }
-  const text = [j.facts.title, `${orgName} · ${j.facts.location}`, j.facts.deadline ? `Closing date: ${longDate(j.facts.deadline)}` : '', '', ...j.sections.flatMap((s) => [s.title.toUpperCase(), ...allLines(s).map((l) => (l.startsWith('- ') ? `• ${l.slice(2)}` : l)), ''])].join('\n');
+  const fixed = fixedList(j).map((k) => fixedShown(j, getState(), k));
+  const text = [
+    j.facts.title,
+    `${orgName} · ${j.facts.location}`,
+    j.facts.deadline ? `Closing date: ${longDate(j.facts.deadline)}` : '',
+    '',
+    ...j.sections.flatMap((s) => [s.title.toUpperCase(), ...allLines(s).map((l) => (l.startsWith('- ') ? `• ${l.slice(2)}` : l)), '']),
+    ...(fixed.length ? ['OUR COMMITMENTS', ...fixed.map((f) => `${f.label}. ${f.text}`), ''] : []),
+  ].join('\n');
   const href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
   const a = document.createElement('a');
   a.href = href;

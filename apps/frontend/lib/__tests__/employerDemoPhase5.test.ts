@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { addTranslation, applyTemplate, approveSection, changeSub, chooseStyle, createFormat, editSection, goOn, reorderSections, sendChat, setFacts, setPace, startJob, toggleSection, writeSections } from '../../components/employer-demo/actions';
+import { addTranslation, applyTemplate, approveSection, changeSub, chooseStyle, createFormat, editSection, goOn, outlineOp, sendChat, setFacts, setPace, startJob, toggleSection, writeSections } from '../../components/employer-demo/actions';
 import { applyAiTurn, checkLines, type OpenTarget } from '../../components/employer-demo/aiActions';
 import { contextFor, resetAi } from '../../components/employer-demo/ai';
 import { acceptPageDraft, acceptSuggestion, checkSuggestion, extractDraft, payBasis, rejectPageDraft, rejectSuggestion, saveAboutForOrg, surveyCard, yearsBasis } from '../../components/employer-demo/context';
 import { holdPage, pageFor } from '../../components/employer-demo/pageMemory';
 import { draftFromPage } from '../../components/employer-demo/pages';
 import { basicAdvertCheck } from '../../components/employer-demo/market';
-import { outlineOrder, placeIn, titleSuggestions } from '../../components/employer-demo/engine';
+import { outlineOrder, SECTION_BY_KEY, titleSuggestions } from '../../components/employer-demo/engine';
 import { FIXED_SECTIONS, nextStep } from '../../components/employer-demo/flow';
 import { getState, normalise, resetDemo, STORAGE_KEY, update } from '../../components/employer-demo/store';
 import { draftProblems } from '../employerDemoAi/quality';
@@ -95,11 +95,12 @@ describe('the outline: About us, headings, sub-sections, and moving sections (se
     ]);
   });
 
-  it('a section moved across groups keeps its place through a reload; one added without a place goes in at its group', () => {
+  // Changed by phase 6 (section 19, B): a section moves into a group rather than out of the group order, and keeps it through a reload.
+  it('a section moved into another group keeps its place through a reload; one added without a place goes in at its group', () => {
     const tags = job('job-comms').tags;
+    outlineOp('job-comms', { op: 'drop', key: 'apply', after: tags[0], group: 'employer' });
     const moved = [tags[0], 'apply', ...tags.slice(1).filter((k) => k !== 'apply')];
-    reorderSections('job-comms', moved);
-    expect(job('job-comms')).toMatchObject({ tags: moved, ordered: true });
+    expect(job('job-comms')).toMatchObject({ tags: moved, groupOf: { apply: 'employer' } });
     expect(job('job-comms').sections.map((x) => x.key)).toEqual(moved);
     const reloaded = normalise({ ...getState() }).jobs.find((j) => j.id === 'job-comms')!;
     expect(reloaded.tags).toEqual(moved);
@@ -107,8 +108,8 @@ describe('the outline: About us, headings, sub-sections, and moving sections (se
     const extra = ['languages', 'competencies'].find((k) => !moved.includes(k))!;
     toggleSection('job-comms', extra);
     const after = job('job-comms').tags;
-    expect(after).toEqual(placeIn(moved, extra));
     expect(after[1]).toBe('apply');
+    expect(after.indexOf(extra)).toBe(after.filter((k) => ['person'].includes(SECTION_BY_KEY[k]?.group ?? '') && k !== extra).map((k) => after.indexOf(k)).reduce((a, b) => Math.max(a, b), -1) + 1);
     expect(outlineOrder(after)).not.toEqual(after);
   });
 
@@ -118,13 +119,16 @@ describe('the outline: About us, headings, sub-sections, and moving sections (se
     expect(normalise({ ...getState() }).jobs.find((j) => j.id === 'job-comms')?.tags).toEqual(outlineOrder(before));
   });
 
+  // Changed by phase 6 (section 19, B and F): reordering keeps each section in its group; moving into a group is its own action.
   it('the AI moves a section into another group only when the user asked; within its group it may reorder', () => {
     const tags = job('job-comms').tags;
     const moved = [tags[0], 'apply', ...tags.slice(1).filter((k) => k !== 'apply')];
     applyAiTurn('job-comms', 'tidy it up', { reply: 'Done.', actions: [{ type: 'reorder_sections', order: moved }] }, open);
     expect(job('job-comms').tags).toEqual(tags);
+    applyAiTurn('job-comms', 'tidy it up', { reply: 'Done.', actions: [{ type: 'move_section', section: 'apply', group: 'employer', after: tags[0] }] }, open);
+    expect(job('job-comms').tags).toEqual(tags);
     expect(job('job-comms').chat.filter((m) => m.ai).at(-1)?.text).toContain('Not done: moving a section into another group: only when you ask for it');
-    applyAiTurn('job-comms', 'move How to apply up, right after About us', { reply: 'Moved.', actions: [{ type: 'reorder_sections', order: moved }] }, open);
+    applyAiTurn('job-comms', 'move How to apply up, right after About us', { reply: 'Moved.', actions: [{ type: 'move_section', section: 'apply', group: 'employer', after: tags[0] }] }, open);
     expect(job('job-comms').tags).toEqual(moved);
   });
 

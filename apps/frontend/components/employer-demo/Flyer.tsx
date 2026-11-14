@@ -5,7 +5,8 @@ import qrcode from 'qrcode-generator';
 import { useMemo, useState } from 'react';
 import { inOutlineOrder } from './engine';
 import { amplifying, flyerStale, reachOpen } from './flow';
-import { countryName, jobLang, langOf, localDate, stale, tableLang, term, ui, versionsOf } from './translate';
+import { fixedLabel, fixedList } from './fixed';
+import { commitmentLabel, countryName, jobLang, langOf, localDate, stale, tableLang, term, ui, versionsOf } from './translate';
 import type { DemoJob, JobLang, State } from './types';
 import { Dialog, OrgMark, radioKeys } from './ui';
 
@@ -73,6 +74,16 @@ function Notice({ job, s, url, lang }: { job: DemoJob; s: State; url: string; la
           </a>
         </div>
       </div>
+      {fixedList(job, shown).length > 0 && (
+        <p className="ej-flyer-text" style={{ fontSize: 12 }}>
+          <strong>{say('Our commitments', 'commitments')}:</strong> {fixedList(job, shown).map((k) => commitmentLabel(k, fixedLabel(k), shown)).join(' · ')}
+        </p>
+      )}
+      {fixedList(job, shown).length > 0 && (
+        <p className="ej-flyer-text" style={{ fontSize: 12 }}>
+          <strong>{say('Our commitments', 'commitments')}:</strong> {fixedList(job, shown).map((k) => commitmentLabel(k, fixedLabel(k), shown)).join(' · ')}
+        </p>
+      )}
       <div className="ej-flyer-foot">
         <strong>{say(`Applying is free. ${s.org.short} never asks for money at any stage.`, 'free', { org: s.org.short })}</strong>
         <span>

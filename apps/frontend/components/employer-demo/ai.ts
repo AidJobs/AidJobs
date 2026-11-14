@@ -14,6 +14,8 @@ import { afterApproval, FIXED_SECTIONS, nextStep, reviewDone, setAiWrites, type 
 import { contentOf, proposedStyle, recommendation, STYLES, TYPE_REASONS, usualTemplate, wordsFor } from './setup';
 import { surveyCard } from './context';
 import { getState } from './store';
+import { groupOfKey, groupOrderOf } from './outline';
+import { fixedList, fixedShown, isLocked } from './fixed';
 import type { DemoJob, Facts, Format, JobLang, State } from './types';
 
 /**
@@ -238,8 +240,19 @@ export function contextFor(s: State, j: DemoJob, focus: string | undefined, firs
       styleKept: Boolean(s.org.styleKept),
       website: s.org.website || null,
       websiteAsked: Boolean(s.org.websiteAsked),
-      fixedTexts: COMMITMENTS.filter((c) => c.key !== 'mds' || s.org.mdsMember).map((c) => ({ key: c.key, label: c.label })),
+      fixedTexts: COMMITMENTS.filter((c) => c.key !== 'mds' || s.org.mdsMember).map((c) => ({ key: c.key, label: c.label, locked: isLocked(s.org, c.key) })),
     },
+    // The fixed texts on the job in the language in view (section 19, phase 6, D and E); a text to translate carries its wording.
+    fixed: (() => {
+      const lang = version && j.translations?.[version] ? version : jobLang(j);
+      return {
+        language: lang,
+        texts: fixedList(j, lang).map((k) => {
+          const f = fixedShown(j, s, k, lang);
+          return { key: k, label: f.label, locked: f.locked, wordedForJob: f.own, machineTranslated: f.machine, toTranslate: f.toTranslate, ...(f.toTranslate ? { text: f.text } : {}) };
+        }),
+      };
+    })(),
     job: {
       status: j.status,
       stateActions: stateActionsOf(s, j).map((a) => ({ key: AI_ACTION[a], label: STATE_LABEL[a] })),
@@ -251,12 +264,13 @@ export function contextFor(s: State, j: DemoJob, focus: string | undefined, firs
       inView: focus ?? null,
       versionInView: version && j.translations?.[version] ? { key: version, label: langOf(version).label } : null,
       canUndo: Boolean(j.lastChange),
+      groupOrder: groupOrderOf(j),
       sections: j.tags.map((k) => {
         const sec = j.sections.find((x) => x.key === k);
         return {
           key: k,
           heading: sec?.title ?? j.renamed?.[k] ?? headingFor(k, format),
-          group: SECTION_BY_KEY[k]?.group,
+          group: groupOfKey(j, k),
           fixed: FIXED_SECTIONS.includes(k),
           by: sec ? (sec.edited ? 'user' : sec.ai ? 'ai' : 'rules') : null,
           approved: j.walk ? j.walk.approved.includes(k) : null,

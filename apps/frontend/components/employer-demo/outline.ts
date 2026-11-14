@@ -197,6 +197,62 @@ export function groupedEntries(order: OutlineEntry[], g: Grouping): OutlineEntry
   });
 }
 
+/** One change made in the outline or with the draft's icons (section 19, phase 6, B and C). */
+export type OutlineOp =
+  | { op: 'drop'; key: string; after: string | null; group: GroupKey }
+  | { op: 'by'; key: string; by: -1 | 1; reading?: boolean }
+  | { op: 'toGroup'; key: string; group: GroupKey }
+  | { op: 'remove'; key: string }
+  | { op: 'add'; key: string; group?: GroupKey; after?: string | null }
+  | { op: 'rename'; key: string; heading: string }
+  | { op: 'groupBy'; group: GroupKey; by: -1 | 1 }
+  | { op: 'groupBefore'; group: GroupKey; before: GroupKey | null };
+
+/** How to apply is part of every job: no route removes it. */
+export const KEPT = ['apply'];
+
+/** An operation on a list of keys and its grouping; how a removal or a rename reaches the text is the caller's. */
+export function applyOp(keys: string[], g: Grouping, op: OutlineOp): Moved {
+  switch (op.op) {
+    case 'drop':
+      return moveAfter(keys, g, op.key, op.after, op.group);
+    case 'by':
+      return op.reading ? moveInReading(keys, g, op.key, op.by) : moveBy(keys, g, op.key, op.by);
+    case 'toGroup':
+      return moveToGroup(keys, g, op.key, op.group);
+    case 'remove':
+      return KEPT.includes(op.key) ? { keys, grouping: g } : done(keys.filter((k) => k !== op.key), g);
+    case 'add':
+      return op.after !== undefined ? addAfter(keys, g, op.key, op.after, op.group) : addToGroup(keys, g, op.key, op.group);
+    case 'groupBy':
+      return done(keys, moveGroupBy(g, op.group, op.by));
+    case 'groupBefore':
+      return done(keys, moveGroupBefore(g, op.group, op.before));
+    default:
+      return { keys, grouping: g };
+  }
+}
+
+/** A template being adjusted (the template panel, Create your own): the operation applied to its entries. */
+export function applyToEntries(order: OutlineEntry[], groupOrder: GroupKey[] | undefined, op: OutlineOp, nameOf: (key: string) => string): { order: OutlineEntry[]; groupOrder?: GroupKey[] } {
+  if (op.op === 'rename') return { order: order.map((o) => (o.key === op.key ? { ...o, heading: op.heading } : o)), groupOrder };
+  const g = formatGrouping({ order, groupOrder });
+  const next = applyOp(
+    order.map((o) => o.key),
+    g,
+    op,
+  );
+  const entries = next.keys.map((k) => order.find((o) => o.key === k) ?? { key: k, heading: nameOf(k) });
+  return { order: groupedEntries(entries, next.grouping), groupOrder: next.grouping.groupOrder };
+}
+
+/** What a move did, said for screen readers: "Responsibilities: 2 of 3 in The job". */
+export function placeSaid(keys: string[], g: Grouping, key: string, heading: string): string {
+  const group = groupOfKey(g, key);
+  const list = inGroup(keys, g, group);
+  return `${heading}: ${list.indexOf(key) + 1} of ${list.length} in ${GROUPS.find((x) => x.key === group)?.label ?? group}`;
+}
+
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 /** A version brought forward: its own sections read group by group, in the grouping its order shows. */

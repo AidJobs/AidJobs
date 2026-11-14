@@ -3,7 +3,8 @@ import { addSuggestions, SECTION_BY_KEY } from './engine';
 import { isPublished } from './lifecycle';
 import { basicAdvertCheck, fullAdvertCheck, marketCheck, type Point } from './market';
 import { inferSdgs } from './setup';
-import { versionsOf } from './translate';
+import { langOf, versionsOf } from './translate';
+import { fixedLabel, fixedMarked } from './fixed';
 import type { AskKind, DemoJob, Format, GroupKey, JobLang, State, Walk } from './types';
 
 /**
@@ -269,9 +270,20 @@ export function isWritten(job: DemoJob, key: string): boolean {
   return job.sections.some((x) => x.key === key && x.lines.length > 0);
 }
 
-/** The basic check's open points, without those the user chose to leave; Google's needs are asked for as facts. */
+/**
+ * The basic check's open points, without those the user chose to leave; Google's needs are asked for as facts. In the job's own
+ * language, fixed texts machine-translated and not approved yet are a point too (section 19, phase 6, E), as are sections a linked
+ * change marked "to update".
+ */
 export function checkPoints(job: DemoJob, s: State): Point[] {
-  return basicAdvertCheck(job, s).filter((p) => !p.ok && p.key !== 'google' && !job.walk?.skipped?.includes(p.key));
+  const machine = fixedMarked(job, s).machine;
+  const extra: Point[] = [
+    ...(machine.length ? [{ key: 'fixed-machine', ok: false, title: `Fixed text machine-translated: please check and approve ${machine.map(fixedLabel).join(', ')}` }] : []),
+    ...Object.entries(job.toUpdate ?? {})
+      .filter(([k]) => job.tags.includes(k))
+      .map(([k, from]) => ({ key: `to-update-${k}`, ok: false, section: k, title: `${job.sections.find((x) => x.key === k)?.title ?? k}: to update, after a change in ${langOf(from).label}` })),
+  ];
+  return [...basicAdvertCheck(job, s), ...extra].filter((p) => !p.ok && p.key !== 'google' && !job.walk?.skipped?.includes(p.key));
 }
 
 /** Up to three sections that would make this job description stronger, not in it yet. */

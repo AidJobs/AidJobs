@@ -21,6 +21,7 @@ import {
 } from '../../components/employer-demo/actions';
 import { ASKS, checkPoints, flyerStale, keepToOffer, LEFT, nextStep, reachOpen } from '../../components/employer-demo/flow';
 import { partsOf } from '../../components/employer-demo/parts';
+import { fixedShown } from '../../components/employer-demo/fixed';
 import { publicLangs } from '../../components/employer-demo/translate';
 import { getState, resetDemo, update } from '../../components/employer-demo/store';
 
@@ -400,7 +401,8 @@ describe('step 10: kept for next time (section 19)', () => {
     expect(job(after).commitments).not.toEqual(['psea']);
   });
 
-  it('the fixed text is confirmed once for each language, and kept for reuse', () => {
+  // Changed by phase 6 (section 19, E): no confirming per language; the organisation's wording per language in Settings, or a mark.
+  it('in a job in another language, a fixed text shows the organisation’s wording for that language, else its own text marked to translate', () => {
     const id = startJob('Nous recherchons un chargé de logistique à Goma, CDD de 12 mois', undefined, [], true);
     applyTemplate(id, job(id).format);
     chooseStyle(id, ['Warm']);
@@ -408,8 +410,12 @@ describe('step 10: kept for next time (section 19)', () => {
     update((s) => ({ ...s, org: { ...s.org, keepOffered: ['fixed', 'apply'] }, jobs: s.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, approved: [...j.tags], settled: [...ASKS, 'details', 'sdgs'] } } : j)) }));
     goOn(id);
     expect(step(id)).toEqual({ kind: 'fixed' });
-    expect(last(id)?.text).toContain('This is the first French job: confirming them here keeps them for every French job');
+    expect(last(id)?.text).toContain('Where your settings have no French wording, a text shows in English marked "to translate"');
     sendChat(id, 'Keep them');
-    expect(getState().org.fixedLangs).toEqual(['fr']);
+    expect(getState().org.fixedLangs).toBeUndefined();
+    const k = job(id).commitments[0];
+    expect(fixedShown(job(id), getState(), k)).toMatchObject({ toTranslate: true, machine: false });
+    update((s) => ({ ...s, org: { ...s.org, fixedWording: { fr: { [k]: 'Notre propre formulation.' } } } }));
+    expect(fixedShown(job(id), getState(), k)).toMatchObject({ text: 'Notre propre formulation.', toTranslate: false, machine: false });
   });
 });

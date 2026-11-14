@@ -223,14 +223,15 @@ describe('the window, revised: the template comes first, then the style, then th
     expect(job(next).chat.some((m) => m.quick?.includes('Keep it for all jobs'))).toBe(false);
   });
 
-  it('a template the user built is applied with exactly its sections, in the user’s own order across groups (phase 5, B)', () => {
+  // Changed by phase 6 (section 19, B): the user's order is kept as the grouping it reads as, always grouped.
+  it('a template the user built is applied with exactly its sections, in the user’s own order, now as groups in that order (phase 5 and 6, B)', () => {
     const id = startJob('We are hiring a Nutrition Officer', undefined, [], true);
     applyTemplate(id, job(id).format, undefined, ['apply', 'about', 'responsibilities']);
     expect(job(id).tags).toEqual(['apply', 'about', 'responsibilities']);
-    expect(job(id).ordered).toBe(true);
+    expect(job(id).groupOrder?.slice(0, 3)).toEqual(['apply', 'employer', 'job']);
     const grouped = startJob('We are hiring a Health Officer', undefined, [], true);
     applyTemplate(grouped, job(grouped).format, undefined, ['about', 'responsibilities', 'apply']);
-    expect(job(grouped).ordered).toBeUndefined();
+    expect(job(grouped).groupOrder).toBeUndefined();
   });
 
   it('reads the style in words, and turns it into the writer’s tone', () => {
@@ -300,9 +301,14 @@ describe('a new employer, in order (round 7, phase 2): the rules walk steps 3 to
     sendChat(id, '2 positions, starting in January');
     expect(job(id).facts).toMatchObject({ positions: '2', startDate: 'January' });
     expect(step(id)).toEqual({ kind: 'fixed' });
-    expect(job(id).chat.at(-1)?.text).toMatch(/^Then your organisation's fixed text, added word for word from your settings: Safeguarding, PSEA/);
+    expect(job(id).chat.at(-1)?.text).toMatch(/^Then your organisation's fixed text, added word for word from your settings, as one block after the sections: Safeguarding, PSEA/);
+    // Changed by phase 6 (section 19, D): a locked text stays on every job; one not locked is left out.
     sendChat(id, 'leave out the misconduct disclosure scheme');
-    expect(job(id).commitments).not.toContain('mds');
+    expect(job(id).commitments).toContain('mds');
+    expect(job(id).chat.at(-2)?.text).toMatch(/locked by your organisation/);
+    expect(step(id)).toEqual({ kind: 'fixed' });
+    sendChat(id, 'leave out equal opportunity');
+    expect(job(id).commitments).not.toContain('equal');
     expect(step(id)).toEqual({ kind: 'keep', what: 'fixed' });
     expect(job(id).chat.at(-1)?.quick).toEqual(['Keep for every job', 'Only this job']);
     sendChat(id, 'Keep for every job');

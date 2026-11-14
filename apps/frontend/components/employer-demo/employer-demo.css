@@ -2366,3 +2366,361 @@ button.ej-step:hover {
   border-bottom: 1px solid var(--hair);
   color: var(--text);
 }
+
+/*
+ * The outline (section 19, phase 6, B): the five groups as small-capital titles, each with its sections and the "+" chips for the
+ * others. Minimal at rest: faint grips, headings as plain text, a quiet × on hover or focus (always shown, faint, without hover).
+ */
+.ej-ol {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ej-ol-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-radius: 10px;
+}
+
+.ej-ol-group[data-drop-before='true'] {
+  box-shadow: 0 -2px 0 0 var(--sage-5);
+}
+
+.ej-ol-group[data-drop-end='true'] {
+  box-shadow: 0 2px 0 0 var(--sage-5);
+}
+
+.ej-ol-gtitle {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 24px;
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.ej-ol-gtitle[data-drop='first'],
+.ej-ol-row[data-drop='after'] {
+  box-shadow: 0 2px 0 0 var(--sage-5);
+}
+
+.ej-ol-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ej-ol-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 30px;
+  border-radius: 8px;
+}
+
+.ej-ol-row:hover {
+  background: var(--surface-2);
+}
+
+.aj-root .ej-grip {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 22px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-3);
+  opacity: 0.55;
+  cursor: grab;
+  touch-action: none;
+}
+
+.aj-root .ej-grip:hover,
+.aj-root .ej-grip:focus-visible,
+.aj-root .ej-grip[aria-expanded='true'] {
+  opacity: 1;
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+/* A group's grip shows on hover or keyboard focus; without hover, faintly. */
+.aj-root .ej-ol-ggrip {
+  opacity: 0;
+}
+
+.ej-ol-gtitle:hover .ej-ol-ggrip,
+.aj-root .ej-ol-ggrip:focus-visible,
+.aj-root .ej-ol-ggrip[aria-expanded='true'] {
+  opacity: 1;
+}
+
+.aj-root .ej-ol-head {
+  display: block;
+  min-width: 0;
+  flex: 1;
+  padding: 3px 4px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: text;
+}
+
+.aj-root .ej-ol-input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--sage-5);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.aj-root .ej-ol-x {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-3);
+  opacity: 0;
+  cursor: pointer;
+}
+
+.ej-ol-row:hover .ej-ol-x,
+.aj-root .ej-ol-x:focus-visible {
+  opacity: 1;
+}
+
+.ej-ol-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  color: var(--amber);
+}
+
+.ej-ol-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px 0 0 24px;
+}
+
+.ej-ol-rec {
+  color: var(--sage-7);
+}
+
+.aj-root .ej-menu-item[data-off='true'] {
+  color: var(--text-3);
+  cursor: not-allowed;
+}
+
+@media (hover: none) {
+  .aj-root .ej-ol-ggrip,
+  .aj-root .ej-ol-x {
+    opacity: 0.5;
+  }
+}
+
+/*
+ * The draft's icons (section 19, phase 6, C): the pencil and the grip in each section's header, faint at rest and clearer on hover or
+ * focus; a hairline + between sections for a pointer, on hover; one + after the last section, always there.
+ */
+.ej-sec-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0.45;
+  transition: opacity 120ms ease;
+}
+
+.ej-dsec:hover .ej-sec-tools,
+.ej-sec-tools:focus-within {
+  opacity: 1;
+}
+
+.aj-root .ej-sec-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.aj-root .ej-sec-icon:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.aj-root .ej-grip.ej-sec-icon {
+  opacity: 1;
+  cursor: grab;
+}
+
+.ej-dsec[data-drop='after'],
+.ej-doc section[data-drop='after'] {
+  box-shadow: 0 2px 0 0 var(--sage-5);
+}
+
+.ej-doc[data-drop-top='true'] > div:first-child {
+  box-shadow: 0 2px 0 0 var(--sage-5);
+}
+
+.ej-addline {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  height: 8px;
+  margin: -4px 0;
+}
+
+.ej-addline::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  left: 12px;
+  border-top: 1px solid var(--sage-5);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.aj-root .ej-addline-btn {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-top: -7px;
+  padding: 0;
+  border: 1px solid var(--sage-5);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--sage-8);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 120ms ease;
+}
+
+.ej-addline:hover::before,
+.ej-addline:hover .ej-addline-btn {
+  opacity: 1;
+}
+
+.ej-addend {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0;
+}
+
+.aj-root .ej-addend-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px dashed var(--sage-5);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sage-8);
+  cursor: pointer;
+}
+
+.aj-root .ej-addend-btn:hover {
+  background: var(--sage-1);
+}
+
+.ej-addpanel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(360px, calc(100vw - 16px));
+  padding-bottom: 10px;
+}
+
+.ej-removed-note {
+  margin: 2px 12px;
+}
+
+@media (hover: none) {
+  .ej-sec-tools {
+    opacity: 0.55;
+  }
+
+  .ej-addline {
+    display: none;
+  }
+}
+
+/* The fixed texts on the draft (section 19, phase 6, D): one block after the sections, a small shield on each text. */
+.ej-fixed-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0;
+  border-radius: 8px;
+}
+
+.ej-fixed-row:hover .ej-sec-tools,
+.ej-fixed-row .ej-sec-tools:focus-within {
+  opacity: 1;
+}
+
+.ej-fixed-row[data-drop='after'],
+.ej-fixed[data-drop-top='true'] > h3 {
+  box-shadow: 0 2px 0 0 var(--sage-5);
+}
+
+.ej-shield {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  color: var(--sage-7);
+}
+
+.aj-root .ej-sec-icon[aria-disabled='true'] {
+  color: var(--text-3);
+  cursor: not-allowed;
+}
+
+.ej-quiet-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-2);
+  font-size: 12.5px;
+}

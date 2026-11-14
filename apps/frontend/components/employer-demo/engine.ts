@@ -831,11 +831,6 @@ export function inOutlineOrder<T extends { key: string }>(sections: T[], keys: s
   return [...listed, ...sections.filter((x) => !keys.includes(x.key))];
 }
 
-/** Whether an order moves a section out of the five groups' order. */
-export function crossesGroups(keys: string[]): boolean {
-  return outlineOrder(keys).join() !== keys.join();
-}
-
 /**
  * A section added without a place: after the last section of its group, or of an earlier group, in the order as it stands; first when
  * none comes before it. In a job that follows the group order this is the group order.
@@ -1237,6 +1232,8 @@ export function applyEdit(text: string, keys: string[], sections: Section[], ctx
   const remove = t.match(/\b(?:remove|drop|delete)\s+(?:the\s+)?(.+)/);
   if (remove) {
     const k = keys.find((x) => remove[1].includes(headingFor(x, ctx.format).toLowerCase()) || remove[1].includes((SECTION_BY_KEY[x]?.label ?? x).toLowerCase()));
+    // How to apply is part of every job (section 19, phase 6, D): its text and method change instead.
+    if (k === 'apply') return { sections, tags: keys, tone, facts, reply: `${headingFor(k, ctx.format)} stays on every job: change its text or how people apply with its pencil.` };
     if (k) return { sections: sections.filter((s) => s.key !== k), tags: keys.filter((x) => x !== k), tone, facts, reply: `Removed ${headingFor(k, ctx.format)}.` };
   }
   const { facts: f2 } = extractFacts(text, today, facts);

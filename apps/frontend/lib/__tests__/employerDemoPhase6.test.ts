@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { addTranslation, applyTemplate, approveSection, chooseStyle, goOn, hireAgain, keepForAll, leavePoint, NEXT_QUESTION, publishBlock, sendChat, setJobLang, setPace, settleQuestion, startJob, unparkPart } from '../../components/employer-demo/actions';
+import { addTranslation, applyFormat, applyTemplate, approveSection, bringBackFixed, chooseStyle, editFixed, editSection, goOn, hireAgain, keepForAll, keepWordingForAll, leaveOutFixed, leavePoint, moveFixed, NEXT_QUESTION, outlineOp, publish, publishBlock, removeVersionSection, resetFixed, restoreVersion, sendChat, setFacts, setJobLang, setPace, settleQuestion, startJob, toggleCommitment, toggleSection, undoStep, unparkPart } from '../../components/employer-demo/actions';
+import { fixedShown } from '../../components/employer-demo/fixed';
 import { applyAiTurn, type OpenTarget } from '../../components/employer-demo/aiActions';
 import { contextFor, resetAi } from '../../components/employer-demo/ai';
-import { inOutlineOrder, outlineOrder } from '../../components/employer-demo/engine';
+import { inOutlineOrder, outlineOrder, SECTION_BY_KEY } from '../../components/employer-demo/engine';
 import { nextStep, type Step } from '../../components/employer-demo/flow';
-import { grouped, groupingFrom, moveAfter, moveBy, moveGroupBy, moveInReading } from '../../components/employer-demo/outline';
+import { grouped, groupingFrom, groupOrderOf, moveAfter, moveBy, moveGroupBy, moveInReading } from '../../components/employer-demo/outline';
 import { partsOf } from '../../components/employer-demo/parts';
 import { getState, normalise, resetDemo, update } from '../../components/employer-demo/store';
 import { readAnswer } from '../../components/employer-demo/walkChat';
@@ -251,6 +252,203 @@ describe('when none of the offered answers fits (section 19, phase 6, A)', () =>
     expect(ctx.walk.parked).toEqual(['grade', `approve:${at.section}`]);
     applyAiTurn(id, `${job(id).sections.find((x) => x.key === at.section)?.title} is good now`, { reply: 'Approved.', actions: [{ type: 'approve_section', section: at.section }] }, open);
     expect(job(id).walk?.approved).toContain(at.section);
+  });
+});
+
+describe('the outline and the draft: structure from anywhere, one Undo step (section 19, phase 6, B, C, and D)', () => {
+  it('a section added from the draft goes where it was opened, in that group, and stays through a reload and a template rebuild', () => {
+    outlineOp('job-comms', { op: 'add', key: 'team', after: 'purpose' });
+    const j = job('job-comms');
+    expect(j.tags.indexOf('team')).toBe(j.tags.indexOf('purpose') + 1);
+    expect(j.groupOf).toEqual({ team: 'job' });
+    expect(j.sections.find((x) => x.key === 'team')?.lines.length).toBeGreaterThan(0);
+    const back = normalise({ ...getState() }).jobs.find((x) => x.id === 'job-comms')!;
+    expect(back.tags).toEqual(j.tags);
+    setFacts('job-comms', { location: 'Gulu, Uganda' });
+    expect(job('job-comms').tags).toEqual(j.tags);
+    const other = getState().formats.find((f) => f.key !== j.format && !f.key.startsWith('pasted-'))!;
+    applyFormat('job-comms', other.key);
+    expect(job('job-comms').tags).toContain('team');
+    expect(job('job-comms').groupOf?.team).toBe('job');
+  });
+
+  it('from the last +, a section goes at the end of its own group', () => {
+    outlineOp('job-comms', { op: 'add', key: 'competencies' });
+    const t = job('job-comms').tags;
+    expect(t.indexOf('competencies')).toBe(Math.max(...t.filter((k) => ['requirements', 'competencies'].includes(k)).map((k) => t.indexOf(k))));
+  });
+
+  it('groups reordered and a section moved into another group: the outline and the job description read the same', () => {
+    outlineOp('job-comms', { op: 'groupBefore', group: 'offer', before: 'job' });
+    outlineOp('job-comms', { op: 'toGroup', key: 'requirements', group: 'employer' });
+    const j = job('job-comms');
+    expect(groupOrderOf(j).slice(0, 2)).toEqual(['employer', 'offer']);
+    expect(j.sections.map((x) => x.key)).toEqual(j.tags);
+    expect(grouped(j.tags, j)).toEqual(j.tags);
+    expect(j.tags.indexOf('requirements')).toBeLessThan(j.tags.indexOf('offer'));
+  });
+
+  it('a moved section keeps its own facts, and the walk follows the reading order', () => {
+    const id = started();
+    outlineOp(id, { op: 'groupBefore', group: 'person', before: 'employer' });
+    expect(job(id).tags[0]).toBe(job(id).tags.find((k) => SECTION_BY_KEY[k]?.group === 'person'));
+    // The person group now comes first, so its facts are asked first; the job's grade is asked before the first job section, wherever it is.
+    expect(step(id)).toMatchObject({ kind: 'ask', fact: 'eligibility', section: job(id).tags[0] });
+    outlineOp(id, { op: 'toGroup', key: 'purpose', group: 'person' });
+    settleQuestion(id, 'eligibility');
+    settleQuestion(id, 'languages');
+    settleQuestion(id, 'safeguarding');
+    goOn(id);
+    const st = advance(id, (x) => x.kind === 'ask' && x.fact === 'grade');
+    expect(st).toMatchObject({ kind: 'ask', fact: 'grade' });
+  });
+
+  it('a section removed is noted where it was and brought back with Undo, in every language; also from Earlier versions', () => {
+    addTranslation('job-comms', 'fr');
+    const before = job('job-comms');
+    outlineOp('job-comms', { op: 'remove', key: 'offer' });
+    expect(job('job-comms').tags).not.toContain('offer');
+    expect(job('job-comms').undoStep).toMatchObject({ tab: 'doc', removed: { key: 'offer', after: before.tags[before.tags.indexOf('offer') - 1] } });
+    undoStep('job-comms');
+    expect(job('job-comms').tags).toEqual(before.tags);
+    expect(job('job-comms').sections).toEqual(before.sections);
+    expect(job('job-comms').translations).toEqual(before.translations);
+    outlineOp('job-comms', { op: 'remove', key: 'offer' });
+    const earlier = job('job-comms').versions.filter((v) => v.sections.some((x) => x.key === 'offer')).at(-1)!;
+    restoreVersion('job-comms', earlier.n);
+    expect(job('job-comms').tags).toContain('offer');
+  });
+
+  it('moves by the grip’s menu and the arrow keys: Move up and down in the outline cross group boundaries; in the draft a move is always seen', () => {
+    const t = job('job-comms').tags;
+    const firstJob = t.find((k) => SECTION_BY_KEY[k]?.group === 'job')!;
+    outlineOp('job-comms', { op: 'by', key: firstJob, by: -1 });
+    expect(job('job-comms').groupOf?.[firstJob]).toBe('employer');
+    expect(job('job-comms').tags).toEqual(t);
+    outlineOp('job-comms', { op: 'by', key: firstJob, by: -1, reading: true });
+    expect(job('job-comms').tags.indexOf(firstJob)).toBe(t.indexOf(firstJob) - 1);
+  });
+
+  it('How to apply is never removed: not from the outline, the draft, the chat, the AI, or a version', () => {
+    outlineOp('job-comms', { op: 'remove', key: 'apply' });
+    toggleSection('job-comms', 'apply');
+    sendChat('job-comms', 'remove How to apply');
+    applyAiTurn('job-comms', 'remove how to apply', { reply: 'Removed.', actions: [{ type: 'remove_section', section: 'apply' }] }, open);
+    expect(job('job-comms').tags).toContain('apply');
+    expect(job('job-comms').chat.filter((m) => m.ai).at(-1)?.text).toContain('Not done: removing How to apply');
+    addTranslation('job-comms', 'fr');
+    removeVersionSection('job-comms', 'fr', 'apply');
+    expect(job('job-comms').translations?.fr?.sections.some((x) => x.key === 'apply')).toBe(true);
+  });
+
+  it('a heading renamed in place is one Undo step; Undo puts the job’s content back, not its facts', () => {
+    const was = job('job-comms').sections.find((x) => x.key === 'purpose')!.title;
+    outlineOp('job-comms', { op: 'rename', key: 'purpose', heading: 'Your role' });
+    setFacts('job-comms', { positions: '3' });
+    expect(job('job-comms').sections.find((x) => x.key === 'purpose')?.title).toBe('Your role');
+    undoStep('job-comms');
+    expect(job('job-comms').sections.find((x) => x.key === 'purpose')?.title).toBe(was);
+    expect(job('job-comms').facts.positions).toBe('3');
+  });
+
+  it('headings inside a section are added, renamed, and removed in the pencil’s editor; never in the outline', () => {
+    const r = job('job-comms').sections.find((x) => x.key === 'responsibilities')!;
+    editSection('job-comms', 'responsibilities', r.lines.join('\n'), false, { subs: [{ id: 'sub-x', title: 'In the field', text: '- Visit partner sites' }] });
+    expect(job('job-comms').sections.find((x) => x.key === 'responsibilities')?.subs).toEqual([{ id: 'sub-x', title: 'In the field', lines: ['- Visit partner sites'] }]);
+    editSection('job-comms', 'responsibilities', r.lines.join('\n'), false, { subs: [{ id: 'sub-x', title: 'Field work', text: '- Visit partner sites' }] });
+    expect(job('job-comms').sections.find((x) => x.key === 'responsibilities')?.subs?.[0].title).toBe('Field work');
+    editSection('job-comms', 'responsibilities', r.lines.join('\n'), false, { subs: [] });
+    expect(job('job-comms').sections.find((x) => x.key === 'responsibilities')?.subs).toBeUndefined();
+  });
+
+  it('the AI moves a group or a section into a group only when asked to move something', () => {
+    applyAiTurn('job-comms', 'tidy it', { reply: 'Done.', actions: [{ type: 'move_group', group: 'offer', before: 'job' }] }, open);
+    expect(job('job-comms').groupOrder).toBeUndefined();
+    applyAiTurn('job-comms', 'put the offer before the job', { reply: 'Done.', actions: [{ type: 'move_group', group: 'offer', before: 'job' }] }, open);
+    expect(groupOrderOf(job('job-comms')).slice(0, 2)).toEqual(['employer', 'offer']);
+  });
+});
+
+describe('fixed texts from the draft (section 19, phase 6, D)', () => {
+  const unlocked = () => job('job-comms').commitments.find((k) => !getState().org.standard.find((c) => c.key === k)?.locked)!;
+  const locked = () => job('job-comms').commitments.find((k) => getState().org.standard.find((c) => c.key === k)?.locked)!;
+
+  it('a text not locked is worded for this job and set back; the owner is offered, quietly, to use it for every job', () => {
+    const k = unlocked();
+    editFixed('job-comms', k, 'Our own words for this job.');
+    expect(fixedShown(job('job-comms'), getState(), k)).toMatchObject({ text: 'Our own words for this job.', own: true });
+    expect(job('job-comms').wordingOffer).toEqual({ key: k, lang: 'en', left: 2 });
+    expect(getState().org.standard.find((c) => c.key === k)?.text).not.toBe('Our own words for this job.');
+    resetFixed('job-comms', k);
+    expect(fixedShown(job('job-comms'), getState(), k).own).toBe(false);
+  });
+
+  it('“Yes” to the wording for every job changes Organisation settings, which Undo leaves; “Not now” changes nothing; passed by twice, it goes', () => {
+    const k = unlocked();
+    editFixed('job-comms', k, 'Our wording, for every job.');
+    keepWordingForAll('job-comms', true);
+    expect(getState().org.standard.find((c) => c.key === k)?.text).toBe('Our wording, for every job.');
+    expect(job('job-comms').undoStep?.settings).toBe(true);
+    undoStep('job-comms');
+    expect(getState().org.standard.find((c) => c.key === k)?.text).toBe('Our wording, for every job.');
+    editFixed('job-comms', k, 'Another wording.');
+    keepWordingForAll('job-comms', false);
+    expect(getState().org.standard.find((c) => c.key === k)?.text).toBe('Our wording, for every job.');
+    editFixed('job-comms', k, 'A third wording.');
+    outlineOp('job-comms', { op: 'rename', key: 'purpose', heading: 'Role' });
+    expect(job('job-comms').wordingOffer?.left).toBe(1);
+    outlineOp('job-comms', { op: 'rename', key: 'purpose', heading: 'The role' });
+    expect(job('job-comms').wordingOffer).toBeUndefined();
+  });
+
+  it('a locked text cannot be worded for the job or left out, by the draft, the line, the chat, or the AI', () => {
+    const k = locked();
+    editFixed('job-comms', k, 'Changed.');
+    leaveOutFixed('job-comms', k);
+    toggleCommitment('job-comms', k);
+    applyAiTurn('job-comms', 'drop it', { reply: 'Done.', actions: [{ type: 'fixed_text', remove: [k] }] }, open);
+    applyAiTurn('job-comms', 'say "Changed."', { reply: 'Done.', actions: [{ type: 'fixed_text', word: { [k]: 'Changed.' } }] }, open);
+    expect(job('job-comms').commitments).toContain(k);
+    expect(fixedShown(job('job-comms'), getState(), k).text).not.toBe('Changed.');
+    expect(job('job-comms').chat.filter((m) => m.ai).at(-1)?.text).toMatch(/locked/);
+  });
+
+  it('a text left out comes back from + at the end of the block; texts move within the block only', () => {
+    const k = unlocked();
+    leaveOutFixed('job-comms', k);
+    expect(job('job-comms').commitments).not.toContain(k);
+    expect(job('job-comms').undoStep?.text).toMatch(/^Left out /);
+    bringBackFixed('job-comms', k);
+    expect(job('job-comms').commitments.at(-1)).toBe(k);
+    moveFixed('job-comms', k, -1);
+    expect(job('job-comms').commitments.at(-2)).toBe(k);
+  });
+
+  it('the AI words a text for the job only with the words the user typed', () => {
+    const k = unlocked();
+    applyAiTurn('job-comms', 'make it warmer', { reply: 'Done.', actions: [{ type: 'fixed_text', word: { [k]: 'A warmer wording the AI made up.' } }] }, open);
+    expect(fixedShown(job('job-comms'), getState(), k).own).toBe(false);
+    applyAiTurn('job-comms', 'Use this: We welcome everyone.', { reply: 'Done.', actions: [{ type: 'fixed_text', word: { [k]: 'We welcome everyone.' } }] }, open);
+    expect(fixedShown(job('job-comms'), getState(), k).text).toBe('We welcome everyone.');
+  });
+
+  it('a published job keeps its fixed texts’ wording when Settings change; drafts take the new wording', () => {
+    const k = job('job-cps').commitments[0];
+    const was = fixedShown(job('job-cps'), getState(), k).text;
+    update((s) => ({ ...s, org: { ...s.org, standard: s.org.standard.map((c) => (c.key === k ? { ...c, text: 'New wording in Settings.' } : c)) } }));
+    expect(job('job-cps').status).toBe('live');
+    expect(fixedShown(job('job-cps'), getState(), k).text).toBe(was);
+    const draft = getState().jobs.find((j) => j.status === 'draft' && j.commitments.includes(k));
+    if (draft) expect(fixedShown(draft, getState(), k).text).toBe('New wording in Settings.');
+    setFacts('job-comms', { deadline: '2026-12-30' });
+    expect(publish('job-comms', { plan: 'free', schedule: null })).toBe(true);
+    expect(job('job-comms').fixedPublished?.en).toBeDefined();
+  });
+
+  it('a phase 5 published job takes its fixed texts’ wording from the settings on load', () => {
+    update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === 'job-cps' ? { ...j, fixedPublished: undefined } : j)) }));
+    const back = normalise({ ...getState() }).jobs.find((j) => j.id === 'job-cps')!;
+    expect(Object.keys(back.fixedPublished?.en ?? {})).toEqual(back.commitments);
   });
 });
 

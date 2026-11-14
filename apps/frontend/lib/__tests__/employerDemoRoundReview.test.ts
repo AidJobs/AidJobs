@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { addTranslation, applyFormat, applyTemplate, chooseStyle, editSection, editTranslation, goOn, greetState, hireAgain, markFlyerMade, publishNow, removeTranslation, reorderSections, sendForReview, setFacts, setPace, startJob, toggleSection, writeVersionSection } from '../../components/employer-demo/actions';
+import { addTranslation, applyFormat, applyTemplate, chooseStyle, editSection, editTranslation, goOn, greetState, hireAgain, markFlyerMade, publishNow, outlineOp, removeTranslation, sendForReview, setFacts, setPace, startJob, toggleSection, writeVersionSection } from '../../components/employer-demo/actions';
 import { ALL_ASKED, applyAiTurn, asksAhead, MOVE_ASKED, type OpenTarget } from '../../components/employer-demo/aiActions';
 import { askAi, resetAi, whenAnswered } from '../../components/employer-demo/ai';
 import { acceptPageDraft, acceptSuggestion, addOrgSocial, checkSuggestion, editedWrong, openConflicts, payBasis, removeOrgSocial, resolveConflict, showPageDraft, toggleJobSocial } from '../../components/employer-demo/context';
@@ -148,13 +148,13 @@ describe('the user asked: approving all, and moving across groups (round 7 revie
     expect(job(id).walk?.approved).not.toContain('apply');
   });
 
-  it('once the user has moved a section, the AI still moves another across groups only when asked', () => {
+  // Changed by phase 6 (section 19, B and F): a move into another group is its own action, refused unless the user asked.
+  it('once the user has moved a section, the AI still moves another into a group only when asked', () => {
     const tags = job('job-comms').tags;
-    const moved = [tags[0], 'apply', ...tags.slice(1).filter((k) => k !== 'apply')];
-    reorderSections('job-comms', moved);
+    outlineOp('job-comms', { op: 'drop', key: 'apply', after: tags[0], group: 'employer' });
+    const moved = job('job-comms').tags;
     const k = moved[moved.length - 1];
-    const further = [k, ...moved.filter((x) => x !== k)];
-    applyAiTurn('job-comms', 'tidy it up', { reply: 'Done.', actions: [{ type: 'reorder_sections', order: further }] }, open);
+    applyAiTurn('job-comms', 'tidy it up', { reply: 'Done.', actions: [{ type: 'move_section', section: k, group: 'employer', after: null }] }, open);
     expect(job('job-comms').tags).toEqual(moved);
     expect(lastAi('job-comms')?.text).toContain('moving a section into another group: only when you ask for it');
   });
@@ -164,14 +164,15 @@ describe('the user’s own order through a template change (round 7 review, shou
   it('sections keep their place; the new template’s go in where they belong', () => {
     const tags = job('job-comms').tags;
     const moved = [tags[0], 'apply', ...tags.slice(1).filter((k) => k !== 'apply')];
-    reorderSections('job-comms', moved);
+    // Changed by phase 6 (section 19, B): the user's own grouping is what the job keeps through a template change.
+    outlineOp('job-comms', { op: 'drop', key: 'apply', after: tags[0], group: 'employer' });
     const other = getState().formats.find((f) => f.key !== job('job-comms').format && !f.key.startsWith('pasted-') && f.order.some((o) => o.key === 'apply'))!;
     applyFormat('job-comms', other.key);
     const after = job('job-comms').tags;
     const kept = moved.filter((k) => after.includes(k));
     expect(after.filter((k) => kept.includes(k))).toEqual(kept);
     expect(after.indexOf('apply')).toBeLessThan(after.indexOf(kept.find((k) => k !== kept[0] && k !== 'apply')!));
-    expect(job('job-comms').ordered).toBe(true);
+    expect(job('job-comms').groupOf).toEqual({ apply: 'employer' });
   });
 });
 

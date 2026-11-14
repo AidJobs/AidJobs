@@ -22,6 +22,8 @@ export const NONE_OF_THESE = 'None of these';
 export const KEEP_FIXED = 'Keep them';
 export const NO_THANKS = 'No, thanks';
 export const LEAVE_IT = 'Leave it as it is';
+export const APPROVE_FIXED = 'Approve them';
+export const DISMISS_MARK = 'Dismiss the mark';
 export const GENUINE = "It's a genuine requirement";
 export const OTHER_WORDING = 'Suggest other wording';
 export const OPEN_PUBLISH = 'Open Check and publish';
@@ -151,7 +153,7 @@ export function promptFor(s: State, job: DemoJob, format: Format, step: Step, ke
       const starter = items.filter((i) => !i.own).map((i) => i.label);
       return [
         stepMsg(
-          `Then your organisation's fixed text, added word for word from your settings: ${items.map((i) => i.label).join(', ')}.${starter.length ? ` ${starter.join(', ')} ${starter.length === 1 ? 'is a starter text' : 'are starter texts'}, as your settings have none of your own.` : ''}${jobLang(job) !== 'en' && !s.org.fixedLangs?.includes(jobLang(job)) ? ` This is the first ${langOf(jobLang(job)).label} job: confirming them here keeps them for every ${langOf(jobLang(job)).label} job (in the demo their wording stays as your settings have it).` : ''} Keep these for this job, or tell me which to leave out.${s.org.socialAsked ? '' : " Your organisation's social links, if you want them on the job page, can be added below (optional)."}`,
+          `Then your organisation's fixed text, added word for word from your settings, as one block after the sections: ${items.map((i) => i.label).join(', ')}.${starter.length ? ` ${starter.join(', ')} ${starter.length === 1 ? 'is a starter text' : 'are starter texts'}, as your settings have none of your own.` : ''}${jobLang(job) !== 'en' ? ` Where your settings have no ${langOf(jobLang(job)).label} wording, a text shows in English marked "to translate", or translated by the AI and marked for you to approve.` : ''} Keep these for this job, or tell me which to leave out.${s.org.socialAsked ? '' : " Your organisation's social links, if you want them on the job page, can be added below (optional)."}`,
           key,
           [KEEP_FIXED],
         ),
@@ -169,6 +171,8 @@ export function promptFor(s: State, job: DemoJob, format: Format, step: Step, ke
       if (p.key.startsWith('dupe-')) return [stepMsg(head, key, ['Remove the repeat', LEAVE_IT])];
       if (p.key.startsWith('date-')) return [stepMsg(head, key, ['Use the closing date', LEAVE_IT])];
       if (p.key.startsWith('fill-')) return [stepMsg(`${head} Fill it in with the pencil, or tell me what it should say.`, key, [LEAVE_IT])];
+      if (p.key === 'fixed-machine') return [stepMsg(`${head}. Read them in Our commitments: change any with its pencil, or approve them as they are.`, key, [APPROVE_FIXED, LEAVE_IT])];
+      if (p.key.startsWith('to-update-')) return [stepMsg(`${head}. Bring it in line with the pencil, or dismiss the mark if it is right as it is.`, key, [DISMISS_MARK, LEAVE_IT])];
       return [stepMsg(head, key, [LEAVE_IT])];
     }
     case 'keep':
@@ -184,7 +188,7 @@ export const THIS_JOB = 'Only this job';
 /** Step 10: the first time the fixed text or the way to apply comes up, the offer to keep it for every job. */
 export function keepPrompt(s: State, job: DemoJob, what: 'fixed' | 'apply', key: string): ChatMsg[] {
   const how = what === 'fixed' ? `these fixed texts (${job.commitments.map((k) => COMMITMENTS.find((c) => c.key === k)?.label ?? k).join(', ')})` : `this way to apply (${{ system: 'through your careers site', email: `by email${job.apply.address ? ` to ${job.apply.address}` : ''}`, form: 'with an online form', formOnly: 'with an online form, without CVs' }[job.apply.method]})`;
-  return [stepMsg(`Shall I keep ${how} for every job? Each new job then starts with them, and they can be locked in Organisation settings, the only place they are changed afterwards. Jobs already published keep their own.`, key, [KEEP_ALL, THIS_JOB])];
+  return [stepMsg(`Shall I keep ${how} for every job? Each new job then starts with them, and they can be locked in Organisation settings. Jobs already published keep their own.`, key, [KEEP_ALL, THIS_JOB])];
 }
 
 export const PUBLISH_FREE = 'Publish free';
