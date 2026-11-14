@@ -10,7 +10,7 @@ import { fixedLabel, fixedList, offeredFixed } from './fixed';
 import { viewOf } from './langs';
 import { jobLang, langOf } from './translate';
 import { placeFor } from './MenuButton';
-import { groupOfKey, groupOrderOf, KEPT } from './outline';
+import { groupOfKey, groupOrderOf, KEPT, placeSaid } from './outline';
 import { contractPicks, deadlinePicks, eligibilityPicks, gradePicks, languagePicks, methodPicks, placePatch, placePicks, salaryPicks, safeguardingPicks, type Pick } from './answers';
 import { DOCUMENTS } from './apply';
 import { saveAboutForOrg } from './context';
@@ -719,7 +719,13 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inW
   const icons = Boolean(inWindow) && !s.reviewerAs;
   const g = groupingOf(job);
   const keys = job.walk ? job.tags : inOutlineOrder(job.sections, job.tags).map((x) => x.key);
-  const focusGrip = (key: string) => requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-grip-key="${key}"]`)?.focus({ preventScroll: true }));
+  const [said, setSaid] = useState('');
+  // Each move is announced with the section's new place (section 19, phase 6, C), and the grip keeps the focus.
+  const focusGrip = (key: string) => {
+    const now = getState().jobs.find((x) => x.id === job.id);
+    if (now) setSaid(`Moved. ${placeSaid(now.tags, groupingOf(now), key, now.sections.find((x) => x.key === key)?.title ?? key)}, ${now.tags.indexOf(key) + 1} of ${now.tags.length} in the job description`);
+    requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-grip-key="${key}"]`)?.focus({ preventScroll: true }));
+  };
   const openAdd = (after: string | null, anchor: HTMLElement | null, end: boolean) => anchor && setAdding({ after, anchor, end });
   const tools: DraftTools | undefined = icons
     ? {
@@ -753,6 +759,11 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inW
   return (
     <>
       <article ref={root} className="ej-doc aj-card flex flex-col gap-1 p-3 lg:p-5" aria-label="Job description" data-drop-top={dropAfter === null || undefined}>
+        {icons && (
+          <div className="sr-only" aria-live="polite">
+            {said}
+          </div>
+        )}
         <div className="px-3 pb-2">
           <div className="aj-faint" style={{ fontSize: 11 }}>
             {s.org.name}

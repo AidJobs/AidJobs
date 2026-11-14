@@ -215,6 +215,17 @@ describe('the four icons on the draft (section 19, phase 6, C and D)', () => {
     expect(q('.ej-addend-btn')).not.toBeNull();
   });
 
+  it('in the draft the arrow keys on a grip move its section, the move is announced with its new place, and the grip keeps the focus', () => {
+    render();
+    route('#job/job-comms');
+    const before = job('job-comms').tags.indexOf('responsibilities');
+    key(q('[data-grip-key="responsibilities"]'), 'ArrowUp');
+    expect(job('job-comms').tags.indexOf('responsibilities')).toBe(before - 1);
+    expect(q('.ej-doc > [aria-live="polite"]')?.textContent).toMatch(/^Moved\. .+: \d+ of \d+ in .+, \d+ of \d+ in the job description$/);
+    act(() => jest.advanceTimersByTime(20));
+    expect(document.activeElement?.getAttribute('data-grip-key')).toBe('responsibilities');
+  });
+
   it('How to apply’s pencil opens its application settings; its grip has no Remove', () => {
     render();
     route('#job/job-comms');
