@@ -244,6 +244,10 @@ def test_open_to_applicants_in_a_place_needs_the_place_alone():
                  "The briefing is open to applicants in Geneva on Tuesday."):
         assert restricted(text) == set(), text
     assert restricted("The post is open to applicants in Kenya.") == {"residence"}
+    for text in ("The role is open to applicants in English.", "Applications are open to applicants in May."):
+        assert restricted(text) == set(), text
+    assert restricted("This position is offered on a local contract actually starting in March.") == {"national_post"}
+    assert restricted("This is a local recruitment planning exercise for the post.") == {"national_post"}
 
 
 def test_review_eleven_second_round_points():

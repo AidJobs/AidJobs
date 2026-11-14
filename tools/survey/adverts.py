@@ -2052,7 +2052,9 @@ RESTRICTIONS: dict[str, re.Pattern] = {
                             r"(?:a )?(?:legal |permanent )?resident (?:in|of) (?:the )?(?-i:[A-Z])[\w .'-]{1,40}[.;]?\s*$)|"
                             r"(?m:^\s*(?:[-•*]\s*)?(?:must|should) be (?:based|located|resident|living) (?:in|on|within) "
                             r"(?:the )?(?-i:[A-Z])[\w .,'-]{0,40}[.;]?\s*$)|\bopen (?:only )?to (?:candidates|applicants) "
-                            r"in (?:the )?(?-i:[A-Z][\w.]*)(?: (?-i:[A-Z][\w.]*)){0,3}(?:,? only\b|\s*(?=[.;!?\n]|$))|"
+                            r"in (?:the )?(?!(?:January|February|March|April|May|June|July|August|September|October|"
+                            r"November|December|English|French|Spanish|Arabic|Portuguese|Swahili|Russian|Chinese)\b)"
+                            r"(?-i:[A-Z][\w.]*)(?: (?-i:[A-Z][\w.]*)){0,3}(?:,? only\b|\s*(?=[.;!?\n]|$))|"
                             r"\bopen (?:only )?to local (?:candidates|applicants)\b|"
                             r"\b(?:remote|home[- ]based)\b[^.\n]{0,50}?\b(?:can|may|must) be (?:based|located|performed) "
                             r"(?:anywhere )?(?:in|within) (?:the )?(?-i:[A-Z])|\b(?:preference|priority)\b[^.\n]{0,40}\b(?:to|for) "
@@ -2095,9 +2097,9 @@ TITLE_NATIONAL_POST = re.compile(r"\((?:[A-Z][a-z]+ )+national(?=\s*[;),])")
 # about this post or its terms, never the organisation's staff in general, a recruitment partner or a
 # country's contract law.
 LOCAL_POST = re.compile(r"\blocally[- ]engaged\b|\blocal(?:ly)? hire[ds]?\b|\bhired locally\b|"
-                        r"\blocal recruitment\b(?! (?:partners?|agenc|firms?|plans?|drives?|fairs?))|\brecrutement local\b|"
-                        r"\b(?:on|under) a local (?:employment )?contract\b(?! (?:law|legislation|act))|"
-                        r"\blocal contract\b(?! (?:law|legislation|act))", re.IGNORECASE)
+                        r"\blocal recruitment\b(?! (?:partners?|agenc(?:y|ies)|firms?|plans?|drives?|fairs?)\b)|"
+                        r"\brecrutement local\b|\b(?:on|under) a local (?:employment )?contract\b(?! (?:laws?|legislation|"
+                        r"acts?)\b)|\blocal contract\b(?! (?:laws?|legislation|acts?)\b)", re.IGNORECASE)
 # Words naming this post, judged on the sentence without the local phrase itself.
 THIS_POST = re.compile(r"\b(?:employment|position|vacancy|appointment|incumbent|post ?holder|successful candidate|"
                        r"poste)\b|\b(?:this|the) (?:post|role|job|assignment|contract)\b(?!-)|\bthis is an?\b", re.IGNORECASE)

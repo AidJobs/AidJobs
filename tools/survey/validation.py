@@ -47,7 +47,7 @@ import roles
 
 HERE = Path(__file__).resolve().parent
 GUIDE_11 = "6e31517863d07cac8b21875401d973ddb17a06f8dab4045ffa61425d786ad3de"   # guide 1.1, as reconciled
-GUIDE_12 = ""                      # guide 1.2 (Part 7 revised, 19.18), set once it is frozen
+GUIDE_12 = "1e2b640737908ddde7157f6266087d471901f1cdac5a784c33dda04c69719742"   # guide 1.2 (Part 7 revised, 19.18)
 # Guide 1.1's restriction categories, in the order of rounds 1 and 2's committed files; it counted
 # residence as nationality, so a 1.1 round reads the script's `residence` as `nationality`.
 RESTRICTIONS_11 = ["sex", "age", "religion", "marital_family", "nationality", "national_post", "disability",
