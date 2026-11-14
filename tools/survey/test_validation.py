@@ -417,3 +417,125 @@ def test_the_committed_file_passes_its_form_check_and_a_bad_one_fails(tmp_path):
         broken[0][k] = bad
         adverts.write_dicts(good, v.FIELDS, broken)
         assert v.check_problems(good), k
+
+
+# --- round 2 (19.17): a fresh draw after the rules are revised ----------------------------------------
+
+def test_a_later_round_never_draws_an_earlier_rounds_advert_and_keeps_the_same_strata():
+    rows = draw_rows() + [{"advert_id": f"e{i:015x}", "org_id": f"small-{i}", "source": "archive", "system": "Small",
+                           "language": "en", "held_out": "false"} for i in range(50)]
+    exclude = {rows[0]["advert_id"]}
+    first = {r["advert_id"] for r in v.draw_sample(rows, exclude)}
+    # Three of "Small"'s 50 were drawn before: 47 are left, and the system keeps its floor of 3.
+    earlier = first | {f"e{i:015x}" for i in range(3)}
+    second = v.draw_sample(rows, exclude, seed=20261114, earlier=earlier)
+    assert not {r["advert_id"] for r in second} & earlier
+    assert v.draw_problems(second, rows, exclude, earlier) == []
+    assert sum(r["system"] == "Small" for r in second) >= 3
+    assert any("earlier round" in p for p in v.draw_problems(v.draw_sample(rows, exclude), rows, exclude, first))
+
+
+def test_round_two_has_ids_from_v101_and_five_batches_with_no_pilot():
+    codes = v.codes_for(v.draw_sample(draw_rows(), set()), 20261114, 101, 0, 5)
+    assert sorted(codes) == [f"V{i:03d}" for i in range(101, 201)]
+    assert sorted(Counter(c["batch"] for c in codes.values()).items()) == [(f"batch-{i}", 20) for i in range(1, 6)]
+
+
+@pytest.fixture
+def round2(work, monkeypatch):
+    monkeypatch.setattr(v, "ROUND", 1)
+    monkeypatch.setattr(v, "SEED", v.SEED)
+    rows = draw_rows()
+    write_csv(roles.ROLES / "broad-adverts.csv", rows)
+    assert v.draw() == 0                                     # round 1, in work/validation
+    v.use_round(2)
+    assert v.draw() == 0
+    return rows
+
+
+def test_round_two_leaves_out_round_one_and_holds_its_rules(round2, monkeypatch):
+    first = json.loads((adverts.WORK / "validation" / "draw.json").read_text(encoding="utf-8"))["codes"]
+    second = v.load_draw()
+    assert min(second) == "V101" and v.VALID.name == "validation-2"
+    assert not {c["advert_id"] for c in first.values()} & {c["advert_id"] for c in second.values()}
+    # A rebuild that changes only measures keeps the draw; changed strata or rules refuse it.
+    rows = [dict(r, facts_given="pay") for r in round2]
+    write_csv(roles.ROLES / "broad-adverts.csv", rows)
+    assert v.load_draw() == second
+    with monkeypatch.context() as m:
+        m.setattr(v, "rules_hashes", lambda: {"adverts.py": "changed"})
+        with pytest.raises(SystemExit, match="rules"):
+            v.load_draw()
+    rows[5]["language"] = "fr" if rows[5]["language"] == "en" else "en"
+    write_csv(roles.ROLES / "broad-adverts.csv", rows)
+    with pytest.raises(SystemExit, match="changed since"):
+        v.load_draw()
+
+
+def test_a_round_two_draw_must_record_its_strata_and_rules(round2):
+    path = v.VALID / "draw.json"
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    for k in ("strata", "rules"):
+        saved.pop(k)
+    path.write_text(json.dumps(saved), encoding="utf-8")
+    with pytest.raises(SystemExit, match="does not record"):
+        v.load_draw()
+
+
+def test_an_earlier_rounds_committed_results_are_never_scored_over(round2):
+    v.use_round(1)
+    v.OUTPUT.write_text("round 1's results", encoding="utf-8")
+    assert v.score() == 1 and v.OUTPUT.read_text(encoding="utf-8") == "round 1's results"
+
+
+def test_round_two_is_scored_only_on_a_set_reconciled_with_the_frozen_guide(round2):
+    path = v.VALID / "reconciled.json"
+    path.write_text(json.dumps({"guide": "another", "items": {}}), encoding="utf-8")
+    (v.VALID / "reconciled.sha256").write_text(v.sha256(path) + "\n", encoding="utf-8")
+    assert v.score() == 1 and not v.OUTPUT.exists()
+
+
+def test_round_one_survives_a_rebuild_of_measures_through_its_commits_file(work, monkeypatch):
+    rows = draw_rows()
+    write_csv(roles.ROLES / "broad-adverts.csv", rows)
+    v.draw()
+    saved = json.loads((v.VALID / "draw.json").read_text(encoding="utf-8"))
+    old_file_sha = saved["drawn_from"]
+    for k in ("strata", "rules", "round"):                   # round 1 recorded only the whole file
+        saved.pop(k)
+    (v.VALID / "draw.json").write_text(json.dumps(saved), encoding="utf-8")
+    write_csv(roles.ROLES / "broad-adverts.csv", [dict(r, years_min="3") for r in rows])
+    monkeypatch.setattr(v, "round1_strata", lambda: (v.strata_hash(rows), old_file_sha))
+    assert v.load_draw() == saved["codes"]
+    monkeypatch.setattr(v, "round1_strata", lambda: ("other", old_file_sha))
+    with pytest.raises(SystemExit, match="changed since"):
+        v.load_draw()
+
+
+def test_round_two_is_coded_on_the_frozen_guide_only(round2, monkeypatch):
+    (v.VALID / "guide.md").write_text("A different guide.", encoding="utf-8")
+    assert v.frozen_guide_problems() and v.guide() == 1
+    monkeypatch.setattr(v, "FROZEN_GUIDE", v.sha256(v.VALID / "guide.md"))
+    assert v.frozen_guide_problems() == []
+
+
+def test_a_long_line_is_given_in_pieces_under_its_own_number():
+    ad = {"title": "Officer", "method": "feed", "lines": [{"text": "short", "heading": False, "tag": "p"},
+                                                          {"text": " ".join(["word"] * 40), "heading": False, "tag": "p"}]}
+    text, n = v.packet_text("V101", ad, "", chunk=50)
+    assert n == 2
+    body = text.split("Lines:\n", 1)[1].splitlines()
+    assert body[0] == "1 short" and body[1].startswith("2 word") and all(b.startswith("2 (continued) word")
+                                                                         for b in body[2:])
+    words = [w for b in body[1:] for w in b.replace("(continued)", "").split()[1:]]
+    assert words == ["word"] * 40
+    assert v.packet_text("V101", ad, "")[0].count("\n2 ") == 1          # round 1's packets are unchanged
+
+
+def test_check_needs_every_rounds_committed_file(tmp_path, monkeypatch):
+    monkeypatch.setattr(roles, "ROLES", tmp_path)
+    rows = v.score_rows([v.script_items(script_row(), set())] * 3, [v.items_of(answer())] * 3, {})
+    adverts.write_dicts(tmp_path / "broad-validation.csv", v.FIELDS, rows)
+    assert v.check() == 1
+    adverts.write_dicts(tmp_path / "broad-validation-2.csv", v.FIELDS, rows)
+    assert v.check() == 0
