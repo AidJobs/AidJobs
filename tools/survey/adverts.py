@@ -40,6 +40,7 @@ import sys
 import zlib
 from collections import Counter, defaultdict
 from datetime import UTC, datetime, timedelta
+from itertools import pairwise
 from pathlib import Path
 from urllib.parse import unquote, urljoin, urlsplit
 
@@ -2035,7 +2036,7 @@ RESTRICTIONS: dict[str, re.Pattern] = {
                               r"\b(?:to|for) (?:the )?(?:[a-z]+ )?(?:nationals?|citizens?|pacific islanders?)\b|"
                               r"\bnationals of\b[^.\n]{0,120}\bare preferred\b|\bpr[ée]f[ée]rence (?:est|sera) (?:donn[ée]e|"
                               r"accord[ée]e) (?:à|aux) (?:un[·.]?e? )?(?:oc[ée]anien|ressortissant)|"
-                              r"\bnational candidates?\b|\bcandidat(?:e)?s nationa(?:ux|les)\b)|"
+                              r"(?<![\w-])national candidates?\b|\bcandidat(?:e)?s nationa(?:ux|les)\b)|"
                               r"\((?:[A-Z][a-z]+ )+nationals?(?=\s*[;),])"),
     # Where applicants live or are based: a country, region, city or time zone, or commuting distance;
     # also a limit that nationality or residence can each meet. Recorded, not flagged (employer-side
@@ -2051,7 +2052,8 @@ RESTRICTIONS: dict[str, re.Pattern] = {
                             r"(?:a )?(?:legal |permanent )?resident (?:in|of) (?:the )?(?-i:[A-Z])[\w .'-]{1,40}[.;]?\s*$)|"
                             r"(?m:^\s*(?:[-•*]\s*)?(?:must|should) be (?:based|located|resident|living) (?:in|on|within) "
                             r"(?:the )?(?-i:[A-Z])[\w .,'-]{0,40}[.;]?\s*$)|\bopen (?:only )?to (?:candidates|applicants) "
-                            r"in (?:the )?(?-i:[A-Z])|\bopen (?:only )?to local (?:candidates|applicants)\b|"
+                            r"in (?:the )?(?-i:[A-Z][\w.]*)(?: (?-i:[A-Z][\w.]*)){0,3}(?:,? only\b|\s*(?=[.;!?\n]|$))|"
+                            r"\bopen (?:only )?to local (?:candidates|applicants)\b|"
                             r"\b(?:remote|home[- ]based)\b[^.\n]{0,50}?\b(?:can|may|must) be (?:based|located|performed) "
                             r"(?:anywhere )?(?:in|within) (?:the )?(?-i:[A-Z])|\b(?:preference|priority)\b[^.\n]{0,40}\b(?:to|for) "
                             r"(?:locals?|local (?:candidates|applicants|people|residents)|(?:people|candidates|applicants) "
@@ -2092,27 +2094,33 @@ TITLE_NATIONAL_POST = re.compile(r"\((?:[A-Z][a-z]+ )+national(?=\s*[;),])")
 # Locally engaged posts (the user's decision of 14 November 2026), counted only where the sentence is
 # about this post or its terms, never the organisation's staff in general, a recruitment partner or a
 # country's contract law.
-LOCAL_POST = re.compile(r"\blocally[- ]engaged\b|\blocal(?:ly)? hire[ds]?\b|\bhired locally\b|\blocal recruitment\b|"
-                        r"\brecrutement local\b|\b(?:on|under) a local (?:employment )?contract\b|\blocal contract\b",
-                        re.IGNORECASE)
-THIS_POST = re.compile(r"\b(?:employment|position|post|role|job|vacancy|appointment|assignment|contract|incumbent|"
-                       r"post ?holder|successful candidate|poste)\b|\bthis is an?\b", re.IGNORECASE)
+LOCAL_POST = re.compile(r"\blocally[- ]engaged\b|\blocal(?:ly)? hire[ds]?\b|\bhired locally\b|"
+                        r"\blocal recruitment\b(?! (?:partners?|agenc|firms?|plans?|drives?|fairs?))|\brecrutement local\b|"
+                        r"\b(?:on|under) a local (?:employment )?contract\b(?! (?:law|legislation|act))|"
+                        r"\blocal contract\b(?! (?:law|legislation|act))", re.IGNORECASE)
+# Words naming this post, judged on the sentence without the local phrase itself.
+THIS_POST = re.compile(r"\b(?:employment|position|vacancy|appointment|incumbent|post ?holder|successful candidate|"
+                       r"poste)\b|\b(?:this|the) (?:post|role|job|assignment|contract)\b(?!-)|\bthis is an?\b", re.IGNORECASE)
 WORKFORCE = re.compile(r"\bour (?:staff|teams?|employees|workforce|people)\b|\bstaff (?:are|is)\b|\bteams? include\b|"
-                       r"\bmost of (?:them|our)\b|\beveryone\b|\ball (?:our )?staff\b|\bpartners?\b|\bagenc(?:y|ies)\b|"
-                       r"\blaws?\b|\blegislation\b", re.IGNORECASE)
+                       r"\bmost of (?:them|our)\b|\beveryone\b|\ball (?:our )?staff\b", re.IGNORECASE)
 # Citizenship not required, or citizenship offered as one way among others to have the right to work.
-NOT_REQUIRED = re.compile(r"\bnot (?:be )?(?:required|mandatory|necessary)\b|\bn'est pas (?:exig|obligatoire|requis)",
+NOT_REQUIRED = re.compile(r"\b(?:citizenship|nationality|nationals?|citizens?|nationalit[ée])\b[^.;\n]{0,30}"
+                          r"(?:\bnot (?:be )?(?:required|mandatory|necessary)\b|\bn'est pas (?:exig|obligatoire|requis))",
                           re.IGNORECASE)
-RIGHT_TO_WORK_ALT = re.compile(r"\bor (?:a |an |the )?(?:valid )?(?:work permit|right to work|work authori[sz]ation|"
-                               r"(?:work )?visa)\b|\bou (?:un )?(?:permis de travail|titre de s[ée]jour)\b", re.IGNORECASE)
+RIGHT_TO_WORK_ALT = re.compile(r"\bor (?:(?:hold|have|possess|obtain) )?(?:a |an |the )?(?:valid )?(?:work permit|right to "
+                               r"work|work authori[sz]ation|(?:work )?visa)\b|\bou (?:(?:d[ée]tenir|avoir) )?(?:un )?"
+                               r"(?:permis de travail|titre de s[ée]jour)\b", re.IGNORECASE)
 # An organisation describing its own faith is not a restriction (guide 1.2, Part 7), unless the same
 # sentence addresses the person sought.
 ORG_SELF = re.compile(r"\b(?:our|we|us)\b|\bthe organi[sz]ation\b|\bmission\b|\bidentity\b|\bfounded\b|\bheritage\b",
                       re.IGNORECASE)
 PERSON_SOUGHT = re.compile(r"\bwe (?:seek|are seeking|are looking for)\b|\blooking for\b|\brecherche\b|\bpersonne\b|"
-                           r"\bcandidates?\b|\bapplicants?\b|\byou\b|\byour\b|\bpost ?holder\b|\bincumbent\b|"
-                           r"\bsuccessful\b|\brequired\b|\brequirement\b|\bprerequisite\b|\bessential\b|\bmust\b|"
-                           r"\bemployment\b|\bstaff\b|\bable to\b|\baffirm|\backnowledge|\badhere to\b", re.IGNORECASE)
+                           r"\bcandidates?\b|\bapplicants?\b|\bpost ?holder\b|\bincumbent\b|\bsuccessful candidate\b|"
+                           r"\brequired\b|\brequirement\b|\bprerequisite\b|\bessential\b|\bmust (?:be|have|hold)\b|"
+                           r"\bable to\b|\baffirm|\backnowledge|\badhere to\b", re.IGNORECASE)
+# The people served by a programme, before a French age line ("children … under 12").
+CHILDREN_SERVED = re.compile(r"\b(?:enfants?|children|child|pupils?|[ée]l[èe]ves|b[ée]b[ée]s|nourrissons|patients?|"
+                             r"b[ée]n[ée]ficiaires)\b", re.IGNORECASE)
 # A French eligibility list ("open to young people: … under 30;") has an eligibility cue above it.
 ELIGIBILITY = re.compile(r"accessible|ouvert|[ée]ligib|conditions|crit[èe]res|profil|candidat|doi(?:t|vent)|"
                          r"\bêtre\b|requis", re.IGNORECASE)
@@ -2151,6 +2159,19 @@ def _sentence(text: str, m: re.Match, stops: str = ".!?\n") -> str:
     return text[start:min(ends) if ends else len(text)]
 
 
+def _clause(text: str, m: re.Match) -> str:
+    """A match's clause: its sentence cut at ; and at a comma before "and", "but", "et" or "mais"."""
+    start = max(text.rfind(c, 0, m.start()) for c in ".!?;\n") + 1
+    ends = [i for i in (text.find(c, m.end()) for c in ".!?;\n") if i >= 0]
+    end = min(ends) if ends else len(text)
+    cuts = [start] + [start + c.end() for c in re.finditer(r",\s+(?:and|but|et|mais)\s+", text[start:end],
+                                                           re.IGNORECASE)] + [end]
+    for a, b in pairwise(cuts):
+        if a <= m.start() < b:
+            return text[a:b]
+    return text[start:end]
+
+
 def _clause_before(text: str, m: re.Match) -> str:
     """The text of a match's clause up to the match (a clause ends at . ! ? ; or a new line)."""
     start = max(text.rfind(c, 0, m.start()) for c in ".!?;\n") + 1
@@ -2173,13 +2194,14 @@ def _strength(text: str, m: re.Match) -> str:
 def _kept(kind: str, text: str, m: re.Match) -> bool:
     """Whether a match of `kind` is a restriction on who may apply, judged from its surroundings."""
     own = re.sub(r"\([^)]*\)", " ", m.group(0))      # "Applicants (youth) must be aged …" is about applicants
-    sentence, clause = _sentence(text, m), _sentence(text, m, ".!?;\n")
+    sentence, clause = _sentence(text, m), _clause(text, m)
     applicant = re.search(APPLICANT, own, re.IGNORECASE)
     if kind == "age":
         before = text[max(0, m.start() - 40):m.start()]
         french_item = re.match(r"\s*(?:[-•*]\s*)?de moins de \d", m.group(0))
         if french_item:
-            return bool(ELIGIBILITY.search(text[max(0, m.start() - 300):m.start()]))
+            above = text[max(0, m.start() - 300):m.start()]
+            return bool(ELIGIBILITY.search(above)) and not CHILDREN_SERVED.search(above)
         # An "Age:" label is about the applicant whatever precedes it.
         if re.match(r"\s*age\s*:", m.group(0), re.IGNORECASE):
             return True
@@ -2222,7 +2244,8 @@ def restriction_labels(text: str, title: str = "") -> dict[str, str]:
     if "national_post" not in found:
         for m in LOCAL_POST.finditer(text):
             sentence = _sentence(text, m)
-            if THIS_POST.search(sentence) and not WORKFORCE.search(sentence) and not GENERAL_NOTE.search(sentence):
+            rest = sentence.replace(m.group(0), " ")
+            if THIS_POST.search(rest) and not WORKFORCE.search(sentence) and not GENERAL_NOTE.search(sentence):
                 found["national_post"] = "limit"
                 break
     if "national_post" not in found and TITLE_NATIONAL_POST.search(title or ""):

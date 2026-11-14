@@ -228,6 +228,33 @@ def test_a_french_age_line_needs_an_eligibility_list():
     assert restricted("Programme :\nde moins de 30 ans ;") == set()
 
 
+def test_a_local_phrase_does_not_prove_the_post_by_itself():
+    for text in ("The landlord signed a local contract for the office lease.",
+                 "The supplier signed a local contract for fuel.",
+                 "Experience of local recruitment in post-conflict settings is useful.",
+                 "Come to the job fair about our local recruitment plans."):
+        assert restricted(text) == set(), text
+    for text in ("This position is offered on a local contract under Kenyan labour law.",
+                 "The incumbent is hired locally and works with partner ministries.", "This is a local recruitment."):
+        assert restricted(text) == {"national_post"}, text
+
+
+def test_open_to_applicants_in_a_place_needs_the_place_alone():
+    for text in ("The role is open to applicants in French and English.",
+                 "The briefing is open to applicants in Geneva on Tuesday."):
+        assert restricted(text) == set(), text
+    assert restricted("The post is open to applicants in Kenya.") == {"residence"}
+
+
+def test_review_eleven_second_round_points():
+    assert restricted("We welcome non-national candidates.") == set()
+    assert restricted("Applicants must be citizens of Kenya or hold a valid work permit.") == set()
+    assert restricted("Kenyan citizenship is required, and a driving licence is not necessary.") == {"nationality"}
+    assert restricted("Our mission is spiritually grounded and you will lead the team.") == set()
+    assert restricted("Les enfants doivent être accompagnés :\nde moins de 12 ans ;") == set()
+    assert restricted("Local candidates only, and women are encouraged to apply.") == {"residence"}
+
+
 # --- the "Not" list: never flagged -------------------------------------------------------------------
 
 def test_the_right_to_work_is_never_a_restriction():
