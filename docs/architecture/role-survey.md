@@ -1076,3 +1076,25 @@ With 18 to 21 positives, each precision carries a 95% margin of about ±0.13 (Es
 
 **Next:** Phase 0's guide and wave 1a's deep layer; the wave-1 families, proposed from the role map. A later round could take nationality's remaining wordings (the national-candidates welcome, member-country wording), the headings, contract lengths and years, each on a fresh draw.
 
+### 19.19 Phase 0, wave 1a and the deep layer's scale: plan approved (15 November 2026)
+
+**Investigated read-only** (no request; no production crawl), then one stage-gated plan. PR #156's merge and housekeeping were verified first: `main` at `1c10919` (approved head `f8747d5`, 14 November 2026, 19:01:38 UTC); CI green on `main` as recorded (CI backend 43629821179, Secrets 43629821193); branch and review clone gone; survey-raw-archive intact (10,573 files; the three rounds' `reconciled.sha256` match their `reconciled.json`; guide hashes intact). The main folder's two never-stage files and the employer-demo worktree were not touched. Code slots: W-06 holds one (PR #145 open; conflicts with main in `ci.yml` and `growth-and-seo-plan.md`, that stream's to resolve); W-35 between pull requests; this investigation took none; the build may take one slot once the plan is approved, with crawler-foundation merges first for the user's review time.
+
+**Evidence counts (1,294 evidence adverts; family precision an Estimate, 0.69):**
+- 11 families with 30 or more: programme management 108, communications and advocacy 88, finance 85, grants and partnerships 80, policy and research 75, MEAL 67, ICT 42, leadership 39, administration 37, HR 35, climate and environment (`technical.climate_environment`) 30;
+- 12 more with 8 to 29; 228 unplaced.
+- AI test set unchanged: pilot 20 and test 30 in `survey-raw-archive/.../work/ai-test-set.json` (held-out flag = the 30 test ids only; do not redraw).
+
+**Decided by the user on 15 November 2026** (plan approved with these choices):
+1. **Wave 1a families (four):** programme management, MEAL, communications and advocacy, finance.
+2. **Deep-layer scale: Option A** — about 20 adverts per family coded by judgement (stratified; AI test set excluded); measured parts and duty banks from every advert in those families. **Option B** (every advert in the chosen families coded by judgement, second coder on 15%) is deferred as a later, separate step and would change the lean setting of 11 November 2026 (19.9 item 7) only when that step is approved.
+3. **The user's 10-advert scoring session** (~30 minutes): after the dual-coded pilot of 20 is sealed and before guide v1.1 freezes, so the scores can inform the last anchor tweaks (decision 2 of 10 November 2026 stands).
+4. **The US$5 Phase 5 model round** deferred until Stage 3's library outputs are ready (a separate stop then for the vault key).
+
+**The approved plan, in order** (approving it covers building, coding, the independent review where risk asks one, and the pull requests; each merge names its head commit and covers deleting the merged branch):
+- **Stage 0 (this pull request):** PR #156's row in the ledger, `main` at `1c10919`, and these decisions recorded.
+- **Stage 1 — Phase 0:** guide v1 with anchors for 1 and 2 on all nine dimensions (worked examples from AidJobs' own invented adverts only); pilot of 20 coded by Grok 4.7 and Composer 2.5; agreement targets 70% exact and weighted kappa 0.6 per dimension; calibrate; freeze v1.1 with its hash; fix the provisional automatic anchors in `adverts.py` with a rebuild that keeps the advert set, its text, the AI test set and the role map byte-identical (`advert_set.py` unchanged).
+- **Stage 2 — deep layer** for the four families at Option A; then **Stage 3 — library script and schema** (may start alongside coding; must not claim deep fields until coding is sealed). Lessons from rounds 2 and 3 apply (groups of about 5; copy answers from transcripts; never assemble twice; never Write and Shell on the same file in parallel; sealed sets never edited). Stop if any measure validated in rounds 2 or 3 changes. Copycheck on every committed document. Not in this step: the generator, the fairness-check product build, nationality's remaining wordings, headings, contract lengths or years, or re-measuring from AidJobs' own crawled jobs.
+
+**Next:** Phase 0's guide (Stage 1), in this stream once Stage 0 is merged.
+
