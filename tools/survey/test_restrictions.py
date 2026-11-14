@@ -165,6 +165,69 @@ def test_the_form_check_accepts_a_preference_mark():
     assert "residence" in adverts.LISTS["restrictions"]
 
 
+# --- review 11's points (role-survey/review-11.md) ----------------------------------------------------
+
+def test_locally_engaged_forms_count_only_for_this_post():
+    for text in ("The incumbent is hired locally.", "Employment is on a local contract.",
+                 "This is a local hire position."):
+        assert restricted(text) == {"national_post"}, text
+    for text in ("Our staff are hired locally and know the district.", "Apply through our local recruitment partner.",
+                 "Employment is governed by local contract law.",
+                 "Our teams include medical staff, most of them hired locally."):
+        assert restricted(text) == set(), text
+
+
+def test_citizenship_not_required_or_offered_with_a_work_permit_is_not_a_limit():
+    for text in ("Citizenship of any country is not required.",
+                 "Applicants must hold citizenship or a valid work permit.",
+                 "We seek a (Senior national officer) for the regional office."):
+        assert "nationality" not in restricted(text), text
+    assert "national_post" not in restricted("Brief.", title="Programme Lead (Senior national officer)")
+
+
+def test_an_organisation_describing_its_own_faith_is_not_a_restriction():
+    for text in ("Our mission is spiritually grounded in the communities we serve.",
+                 "A mature and personal Christian faith shapes our mission."):
+        assert restricted(text) == set(), text
+
+
+def test_residence_needs_the_applicant_to_be_limited():
+    for text in ("The office is located within commuting distance of the station.",
+                 "The school serves children living within commuting distance of the campus.",
+                 "You will support colleagues based in other time zones.",
+                 "Must be based in the field three days a week."):
+        assert restricted(text) == set(), text
+
+
+def test_the_decided_phrases_are_all_read():
+    for text in ("National candidates only.", "This post is open to national candidates.",
+                 "Ce poste est ouvert aux candidats nationaux."):
+        assert restricted(text) == {"nationality"}, text
+    for text in ("Ce poste est ouvert aux candidats locaux.", "This remote role is open to applicants in the US only."):
+        assert restricted(text) == {"residence"}, text
+
+
+def test_a_preference_word_must_govern_the_match():
+    assert adverts.restrictions_column("Applicants must be citizens of Kenya, preferably bilingual.") == "nationality"
+    assert adverts.restrictions_column("Open only to Kenyan nationals, with preference for a master's degree.") == \
+        "nationality"
+
+
+def test_a_skip_applies_to_the_clause_of_the_match():
+    for text in ("Candidates must be based in Kenya and be willing to travel to the field.",
+                 "Applicants must be based in France regardless of nationality.",
+                 "Local candidates only; women are encouraged to apply."):
+        assert restricted(text) == {"residence"}, text
+
+
+def test_a_picture_of_something_else_is_not_a_photograph_of_the_applicant():
+    assert restricted("Please email a colour picture of the building with your report.") == set()
+
+
+def test_a_french_age_line_needs_an_eligibility_list():
+    assert restricted("Programme :\nde moins de 30 ans ;") == set()
+
+
 # --- the "Not" list: never flagged -------------------------------------------------------------------
 
 def test_the_right_to_work_is_never_a_restriction():
