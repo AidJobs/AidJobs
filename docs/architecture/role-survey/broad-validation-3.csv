@@ -1,0 +1,12 @@
+measure,script_positives_in_pool,sampled_script_positives,true_positives,precision,positive_cases,recall_estimate,coder_agreement,kappa,result
+restriction:any,150,63,59,0.937,64,0.547,0.951,0.896,validated
+restriction:sex,2,2,2,1.000,2,1.000,1.000,1.000,not validated
+restriction:age,6,5,5,1.000,8,0.457,1.000,1.000,not validated
+restriction:religion,25,3,3,1.000,3,1.000,1.000,1.000,not validated
+restriction:marital_family,0,0,0,,0,,0.981,0.000,not validated
+restriction:nationality,52,21,18,0.857,21,0.489,0.951,0.853,Estimate
+restriction:residence,48,21,19,0.905,22,0.452,0.942,0.832,validated
+restriction:national_post,25,18,17,0.944,21,0.447,0.990,0.970,validated
+restriction:disability,0,0,0,,0,,1.000,,not validated
+restriction:photo_appearance,2,2,2,1.000,2,1.000,1.000,1.000,not validated
+restriction:preferred,37,10,10,1.000,11,0.627,1.000,1.000,not validated
