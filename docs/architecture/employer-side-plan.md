@@ -532,7 +532,7 @@ Each phase on `demo/employer`, with a preview for the user's look before the nex
   **Checks:** 1,131 tests pass (1,070 before; 61 new). On the earlier code (`3cf77a5`) the two new test files cannot load, their modules not existing; with only the new pure modules left in place, every rule test fails there except four guards of what must not change (a job in the group order left as it was, what waits not parked, a change by the rules still marking a version behind, reviewers seeing no icons) and the new modules' own tests. Tests changed with this plan, none removed: the chat's look test; phase 5's five outline and order tests, now moves into a group, always grouped; the fixed-text tests (confirmed once per language, now the organisation's wording or a mark; a locked text left out, now refused; the Fixed text part's tick box); the walk tests' "Leave it", now "Leave it as it is"; the template panel's and the phone's outline tests (a heading renamed by clicking it); the reviewers' window test (the outline read only); and about 40 test jobs given a contract or a closing date, which publishing now needs. Type check, lint (no errors; no warnings in the demo), and a production build pass. Screens checked at 1366, 412, 390, and 360 px, light and dark (72), by a headless browser driven outside the repository: the chat's bubble, the draft's icons, a grip's menu, the outline panel and the phone's sheet, the fixed texts with the offer, the Also-in note, a linked version, the link list, and Organisation settings; no sideways scroll. Keyboard and screen reader: every icon labelled; Enter on a grip opens its menu with the focus inside, the arrow keys move through it, Escape gives the focus back; the arrow keys on a grip move its section and the move is announced; the + panel takes the focus and gives it back. **Not run:** the real-AI walk, as the AI is off in this working copy and the preview's OpenRouter account answers 402 (payment required); the AI's rules here are covered by tests.
   **The independent review of phase 6** (15 November 2026, a separate read-only agent, [the report](83d6dcbb-1ff8-4738-8baa-de79ab90e4fc); code, UX, accessibility, tests, and plan compliance; verdict: changes needed, 1 must-fix, 6 should-fix, 4 minor). The user approved fixing all of them the same day. Fixed, each with a test: typing "undo" (and the AI's undo) restores the widened undo step, not an older version; an explicit skip parks with hold so the next question waits with "Next question" (offers still decline on "not now" / "No, thanks"); the AI's move, rename, reorder, and headings-inside act on the language tab in view; linking languages is its own undo step; the flyer names Our commitments once; Publish now refuses when an essential is missing; a published starter's machine translation is cleared when safeguarding or country changes, so it is marked again; reviewers no longer see 🔗; a chat line edit clears the icon undo step; translating a fixed text in the job's own language marks a live job Updated; a locked pencil and Leave out carry the reason in their accessible name. 1,138 tests pass; type check passes. **Next:** Phase 6 amendment (add your own group, section, and sub-section), then the user's review of Phase 6, then Phase 7, then the user's assessment of the whole demo (with OpenRouter credit topped up if it is to be assessed with the AI).
 
-- [ ] **Phase 6 amendment, add your own group, section, and sub-section (the user's clarification of 15 November 2026):** on top of the outline already there, free-text add (and remove) of a group, a section, or a sub-section; catalog chips stay; outline stays group → section; sub-sections in ✎ / the draft; AI accepts unknown names and writes content that fits. "Phase 6 amendment" below. Reverses the earlier "not wanted" line (a misunderstanding). No code until the independent plan review's findings are taken and the user approves the build. The merge rule does not apply: `demo/employer` is never merged.
+- [ ] **Phase 6 amendment, add your own group, section, and sub-section (the user's clarification of 15 November 2026):** on top of the outline already there, free-text add (and remove) of a group, a section, or a sub-section; catalog chips stay; outline stays group → section; sub-sections in ✎ / the draft; AI accepts unknown names and writes content that fits. "Phase 6 amendment" below; rewritten the same day after the independent plan review (changes needed; every finding taken). No code until the user approves the build. The merge rule does not apply: `demo/employer` is never merged.
 - [ ] **Phase 7, managing saved profiles (the user's decisions of 15 November 2026):** a side-menu **Job profiles** page (`#profiles` / `#profiles/<id>`), quiet Manage-jobs-style list, open-profile panel with light fact edit, rename, delete with restore Undo, and Use for a new job through `startJobFromProfile`; profiles also keep `groupOrder` / `groupOf` on save and restore them on start. "Phase 7 plan" below; approved by the user on 15 November 2026 with the three recommendations locked; rewritten the same day after the independent plan review (changes needed; every finding taken with the reviewer’s defaults). No code until the user approves the build. The merge rule does not apply: `demo/employer` is never merged.
 
 ### Phase 4 plan (approved by the user, 12 November 2026)
@@ -911,68 +911,75 @@ Managing saved profiles (Phase 7); a projects list in Organisation settings; the
 
 **Reversal (15 November 2026):** the earlier line "sections with names of the user's own beyond the available ones (not wanted)" was a misunderstanding. The user wants to add their own groups, sections, and sub-sections. That is the Phase 6 amendment below; it is built before Phase 7.
 
-### Phase 6 amendment (add your own group, section, and sub-section; the user's clarification of 15 November 2026)
+### Phase 6 amendment (add your own group, section, and sub-section; the user's clarification of 15 November 2026; rewritten after the independent plan review the same day)
 
-**Status.** Phase 6 as built is not finished for the user: the outline only adds from a fixed catalog. On 15 November 2026 the user clarified they had misunderstood the earlier "not wanted" line, and asked to complete Phase 6 first with this capability, review Phase 6, then do Phase 7. No code in this step until the independent plan review's findings are taken and the user approves the build. The merge rule does not apply: `demo/employer` is never merged.
+**Status.** Phase 6 as built is not finished for the user: the outline only adds from a fixed catalog. On 15 November 2026 the user clarified they had misunderstood the earlier "not wanted" line, and asked to complete Phase 6 first with this capability, review Phase 6, then do Phase 7. One independent read-only review of this amendment the same day ([the report](e1ae0a0b-01bb-4e88-ae04-0a6eb7693f30): changes needed, 5 must-fix, 4 should-fix, 1 minor); every finding is built into this text with the reviewer's defaults. No new product decision. No code until the user approves the build. The merge rule does not apply: `demo/employer` is never merged.
 
-**In one sentence.** On top of the outline already there, the user can add a **group**, a **section**, or a **sub-section** with a free-text name, and remove ones they do not want — so the total can go up or down. Templates and catalog chips stay as the starting set.
+**In one sentence.** On top of the outline already there, the user can add a **group**, a **section**, or a **sub-section** with a free-text name, and remove ones they do not want. Templates and catalog chips stay as the starting set.
 
 #### A. What you can add
 
-1. **Group** — a new top-level bucket in the outline (beside About the employer, The job, and the rest), named by the user.
-2. **Section** — a new row under a group (an existing group or a custom one), named by the user.
-3. **Sub-section** — a free heading **inside** a section (in the draft / ✎), not a third row type in the outline tree. Make the existing "Add a heading inside this section" obvious and reliable; the AI must write for it.
+1. **Group** — a new top-level bucket the user names (`{ id, label }` on the job and on each version; id like `g-…`, never a catalog key). The five catalog groups always stay, even when empty, so their chips stay. Only an added group can be removed.
+2. **Section** — a new row under a group, with a free-text heading and its own id (`c-…`, never the typed name, never a catalog key). Duplicate names are two ids. Blank refused. A typed name that matches a chip does not add the catalog section — the chip does that.
+3. **Sub-section** — a free heading **inside** a section, only in the draft / ✎ (not a third outline row). Make "Add a heading inside this section" obvious. A heading with no name is not saved (do not rename it to "More").
 
-The outline tree stays **group → section**. Sub-sections stay under the section in ✎ and in the draft.
+The outline tree stays **group → section**.
 
 #### B. How it feels
 
-- Catalog **+ chips** stay (recommended ones marked). Beside them: a quiet way to **add your own** (group, section, or sub-section).
-- When adding, ask what it is: **group** (default), **section** (which group), or **sub-section** (which section). Then the free-text name.
-- Blank names refused. Two sections both called "Notes" are allowed.
-- Remove a custom group, section, or sub-section the same way as today (× / grip menu / ✎), with Undo.
-- Rename in place as today.
-- Create your own / save as org template stays the path to keep a structure for every job — this amendment does not auto-save custom structure as a format.
+- Catalog **+ chips** stay. Under each group's chips: **Add your own** (names a section in that group). At the bottom of the outline: **Add a group**. The draft's + offers **Add your own** section at that place, not a new group. Sub-sections only via ✎.
+- No multi-choice dialog. Blank names refused; duplicate names allowed.
+- Click an added group's title to rename it; catalog group titles do not rename. Sections rename in place as today.
+- Remove an added group (× / grip) with Undo; its sections go with it, except How to apply, which returns under Applying. Removing the last section of an added group does **not** remove the group — the empty group stays until the user removes it.
+- Create your own / save as org template is still how a structure is kept for every job — this amendment does not auto-save. When the user does save a template, keep the added groups.
 
 #### C. How to apply and fixed texts
 
-Keep the flexible Phase 6 approach: rename freely; leave a section out if the user wants. Publishing still needs a working way to apply (the essentials already checked). Fixed texts stay their own block after the sections; leave individual ones out as today.
+How to apply (`apply`) stays unremovable on every route, including from inside a group the user added. "Leave out" means every other section. A custom section titled "How to apply" is a different id and can be removed. Publishing still needs a working way to apply (essentials as today). Fixed texts stay their own block; leave individual ones out as today.
 
-#### D. Languages
+#### D. Data and languages
 
-Minimal and the same as catalog sections: a new custom section starts empty in other languages; when languages are linked, structure follows as today. No special machinery only for custom names.
+`groupOrder` / `groupOf` may include added group ids. `groupOrderOf`, `cleanGrouping`, `jobGrouped`, and `versionForward` keep those ids when they are on the job's (or version's) custom-group list, and still ensure the five catalog groups are present. Put the custom-group list on the Undo snapshot.
+
+Languages: same as a catalog section. Unlinked: the new group or section exists only in the language in view. Linked: structure follows; text uses today's carry rules. No special translator for custom names. The group's label is per language view and copies as structure when linked.
+
+A custom section adds no fact questions. The walk writes it when its turn comes, from facts already known. On add, one empty section until the user or the AI writes it.
+
+Do not change job profiles in this amendment; "Same as last time" may still drop unknown keys until Phase 7.
 
 #### E. The AI
 
-Must accept unknown group, section, and sub-section names (today it refuses anything not in the catalog). When asked to write one, it writes content that fits that name. Add / remove / rename custom ones when the user asks; do not invent them unasked.
+The prompt treats headings already on the job as real sections, including ones not in `sectionTypes`. New actions: `add_group` (label), `remove_group` (added group only). `add_section` may send a heading and a group id already on the job; the demo mints the id. `move_section` and `move_group` accept those ids. `write_section` writes lines that fit that heading for any section on the job except How to apply. `sub` may add and write a heading the user named even when the section is still empty. Add, remove, or rename only when the user names it. "Write it all" writes only sections already on the job.
 
 #### F. Build order
 
-1. Data: custom groups and custom sections on the job (and versions); bring-forward leaves old jobs as they are.
-2. Outline: add your own (group / section), remove, rename; chips unchanged.
-3. Sub-sections: ✎ path clear; add / remove / rename; shown in the draft.
-4. Draft + panel: + menu offers add your own; Undo notes.
-5. AI: accept unknown names; write relevant content; refusals only when unsafe or unasked.
+1. Data: custom groups and custom sections; fix `groupOrderOf` / `cleanGrouping` / `jobGrouped` / `versionForward` / Undo snapshot / template save; old jobs unchanged.
+2. Outline: Add a group, Add your own section, remove, rename; chips unchanged; reviewers still read-only.
+3. Sub-sections: ✎ clear; blank heading not saved as "More".
+4. Draft + panel: + offers Add your own section; Undo notes.
+5. AI: prompt + actions as in E.
 6. Checks, push to `demo/employer` (never merge), plan record and W-51.
 
 #### G. Checks
 
 Each new behaviour has a test that fails on today's code:
 
-- Add a custom group; it shows in the outline and can be removed with Undo
-- Add a custom section under a group (catalog or custom); remove; rename; duplicates allowed; blank refused
-- Add a sub-section inside a section via ✎; AI or rules can write for it
-- Catalog chips still add the known sections
-- Linked languages: custom section structure follows as for catalog sections
-- AI accepts and writes a custom section / sub-section by name; does not invent one unasked
-- Reviewers still read-only
-- No AidJobs backend fetch
+- Add a custom group; it survives load and Undo; rename; remove with Undo; How to apply returns under Applying
+- The five catalog groups remain even when empty; only an added group can be removed; an empty added group stays
+- Add a custom section; blank refused; two with the same name; chips still add catalog sections
+- Sub-section via ✎; blank heading not saved as "More"
+- Unlinked language unchanged when adding; linked structure follows
+- Custom section asks no extra facts
+- AI accepts and writes a custom section / sub-section by name; does not invent one unasked; add_group / remove_group
+- Saving a template keeps the added group
+- Reviewers read-only; no AidJobs backend fetch
 
 Screens at 1366, 412, 390, and 360 px, light and dark. Keyboard through add, rename, remove. Type check, lint, production build. Preview on `demo/employer`, never merged; then one independent review of this amendment; then the user's review of Phase 6 as a whole.
 
 #### H. Not in this amendment
 
-Phase 7 (profiles); auto-saving every custom structure as an org template; a projects list; showing sub-sections as a third row level in the outline tree; the real-AI walk (unless OpenRouter credit is topped up).
+Phase 7 (profiles); auto-saving every custom structure as an org template; a projects list; sub-sections as a third row level in the outline tree; the real-AI walk (unless OpenRouter credit is topped up).
+
 
 ### Phase 7 plan (managing saved profiles; approved by the user, 15 November 2026; rewritten after the independent plan review the same day)
 
