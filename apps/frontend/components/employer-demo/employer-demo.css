@@ -1837,10 +1837,10 @@ button.ej-step:hover {
   font-size: 12px;
 }
 
-/* The progress line: original size; less space below so it sits closer to the language/Preview tab rule. */
+/* The progress line: original size; tight under the header rule (Preview / Earlier versions icons sit in that header). */
 .ej-pline {
   flex-shrink: 0;
-  padding: 8px 14px 0;
+  padding: 2px 14px 6px;
   border-bottom: 1px solid var(--hair);
 }
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { FileUp, Link2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { editSection } from './actions';
 import { acceptPageDraft, acceptSuggestion, addOrgSocial, canEditOrgSocial, PROJECT_SECTION, rejectPageDraft, rejectSuggestion, removeOrgSocial, socialLabel, toggleJobSocial } from './context';
 import { draftFromPage, MAX_TEXT, readPageVia } from './pages';
@@ -20,23 +20,17 @@ export function PageField({ job, s, kind, open, compact }: { job: DemoJob; s: St
   const secKey = kind === 'about' ? 'about' : PROJECT_SECTION;
   const saved = asText(job.sections.find((x) => x.key === secKey)?.lines ?? []);
   const [url, setUrl] = useState(kind === 'about' ? s.org.website : '');
-  const [text, setText] = useState(compact ? saved : '');
-  const [baseline, setBaseline] = useState(compact ? saved : '');
+  /** null = show the section as saved; a string = the user is editing the box. */
+  const [edit, setEdit] = useState<string | null>(null);
+  const [paste, setPaste] = useState('');
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const file = useRef<HTMLInputElement>(null);
   const ro = Boolean(s.reviewerAs);
   const what = kind === 'about' ? 'About us' : 'About the project';
-  const dirty = text !== baseline;
-  // Sync from the job only when the box is not mid-edit (Accept draft, another editor).
-  useEffect(() => {
-    if (!compact) return;
-    if (text !== baseline) return;
-    if (saved === baseline) return;
-    setText(saved);
-    setBaseline(saved);
-  }, [compact, saved, text, baseline]);
-  const draft = async (t: string, source: 'your website' | 'the project page' | 'you told us', social: string[] = []) => {
+  const text = compact ? (edit ?? saved) : paste;
+  const dirty = compact ? edit !== null && edit !== saved : paste.trim().length > 0;
+  const makeDraft = async (t: string, source: 'your website' | 'the project page' | 'you told us', social: string[] = []) => {
     setBusy(true);
     setNote('');
     try {
@@ -52,26 +46,16 @@ export function PageField({ job, s, kind, open, compact }: { job: DemoJob; s: St
     const r = await readPageVia(kind === 'about' ? 'website' : 'project', url);
     setBusy(false);
     if (!r.ok) return setNote(`${r.reason.charAt(0).toUpperCase()}${r.reason.slice(1)}: paste its text below, or upload the file.`);
-    await draft(r.text, kind === 'about' ? 'your website' : 'the project page', r.social);
+    await makeDraft(r.text, kind === 'about' ? 'your website' : 'the project page', r.social);
   };
-  const roundTrip = (raw: string) =>
-    raw
-      .split('\n')
-      .map((l) => l.replace(/^[•*]\s*/, '- '))
-      .filter((l) => l.trim())
-      .map((l) => (l.startsWith('- ') ? `• ${l.slice(2)}` : l))
-      .join('\n');
   const saveText = () => {
-    if (ro || !dirty) return;
-    const next = text.slice(0, MAX_TEXT);
-    editSection(job.id, secKey, next, true, kind === 'project' ? { title: 'About the project' } : {});
-    const stored = roundTrip(next);
-    setText(stored);
-    setBaseline(stored);
+    if (ro || !compact || edit === null) return;
+    editSection(job.id, secKey, edit.slice(0, MAX_TEXT), true, kind === 'project' ? { title: 'About the project' } : {});
+    setEdit(null);
     setNote('');
   };
   const cancelText = () => {
-    setText(baseline);
+    setEdit(null);
     setNote('');
   };
   return (
@@ -102,7 +86,7 @@ export function PageField({ job, s, kind, open, compact }: { job: DemoJob; s: St
       <textarea
         style={{ ...inputStyle, minHeight: compact ? 96 : 64 }}
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => (compact ? setEdit(e.target.value) : setPaste(e.target.value))}
         placeholder={compact ? `Write ${what} here` : 'Or paste the text here'}
         aria-label={`Text for ${what}`}
         disabled={ro}
@@ -116,12 +100,12 @@ export function PageField({ job, s, kind, open, compact }: { job: DemoJob; s: St
             <button type="button" className="aj-pill" style={{ height: 30 }} disabled={busy || ro || !dirty} onClick={cancelText}>
               Cancel
             </button>
-            <button type="button" className="aj-text-btn" style={{ height: 30 }} disabled={busy || ro || text.trim().length < 40} onClick={() => draft(text, 'you told us')}>
+            <button type="button" className="aj-text-btn" style={{ height: 30 }} disabled={busy || ro || text.trim().length < 40} onClick={() => makeDraft(text, 'you told us')}>
               Draft from this text
             </button>
           </>
         ) : (
-          <button type="button" className="aj-pill" style={{ height: 30 }} disabled={busy || ro || text.trim().length < 40} onClick={() => draft(text, 'you told us')}>
+          <button type="button" className="aj-pill" style={{ height: 30 }} disabled={busy || ro || text.trim().length < 40} onClick={() => makeDraft(text, 'you told us')}>
             Draft from this text
           </button>
         )}
@@ -143,10 +127,10 @@ export function PageField({ job, s, kind, open, compact }: { job: DemoJob; s: St
             const r = await readJobFile(f);
             if (r.error !== undefined) return setNote(r.error);
             if (compact) {
-              setText(r.text.slice(0, MAX_TEXT));
+              setEdit(r.text.slice(0, MAX_TEXT));
               return;
             }
-            await draft(r.text, 'you told us');
+            await makeDraft(r.text, 'you told us');
           }}
         />
       </div>

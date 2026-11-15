@@ -893,6 +893,18 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inW
           { label: 'Move down', run: () => (outlineOp(job.id, { op: 'by', key: sec.key, by: 1, reading: true }), focusGrip(sec.key)) },
           { label: 'Move to group…', items: groupOrderOf(g).filter((x) => x !== groupOfKey(g, sec.key)).map((x) => ({ label: groupLabelOf(x, job.customGroups), run: () => (outlineOp(job.id, { op: 'toGroup', key: sec.key, group: x }), focusGrip(sec.key)) })) },
           { label: 'Add a section below', run: () => openAdd(sec.key, document.querySelector<HTMLElement>(`[data-grip-key="${sec.key}"]`), false) },
+          ...(!keys.includes(PROJECT_SECTION)
+            ? [
+                {
+                  label: 'Add About the project',
+                  run: () => {
+                    outlineOp(job.id, { op: 'add', key: PROJECT_SECTION, after: sec.key });
+                    renameSection(job.id, PROJECT_SECTION, 'About the project');
+                    focusGrip(PROJECT_SECTION);
+                  },
+                },
+              ]
+            : []),
           ...(KEPT.includes(sec.key) ? [] : [{ label: 'Remove', danger: true, run: () => outlineOp(job.id, { op: 'remove', key: sec.key }) }]),
           ...(sec.key === 'about' && s.me.role === 'owner' && sec.lines.length > 0 && sec.lines.join('\n').trim() !== s.org.about.trim() ? [{ label: 'Save as our About us', run: () => saveAboutForOrg(job.id) }] : []),
         ],
