@@ -986,6 +986,8 @@ Phase 7 (profiles); auto-saving every custom structure as an org template; a pro
 
 **Status.** Built on `demo/employer` on 15 November 2026 after the user approved this plan. After the Phase 6 amendment and its review fixes (`91fd6e3`), the user reviewed the preview and found the flow and several UX points wrong; settled in chat the same day. Independent review of this revision next, then Phase 7. The merge rule does not apply: `demo/employer` is never merged.
 
+**Master assessment (15 November 2026, after polish follow-ups):** open bugs and independent HR/chrome findings are recorded in [`employer-demo-master-assessment-2026-11-15.md`](./employer-demo-master-assessment-2026-11-15.md) so they survive chat loss. English first; fix order in that file. Phase 7 stays held until the user says English chrome is good enough. Round 2 (full multi-persona master pass) appends to the same file.
+
 **In one sentence.** After the template, gather org and project context first; then tone and pace; then write and approve strictly in outline order — with fluid drag, clear Add a group, one chat reply per turn, and quiet chrome fixes.
 
 #### A. What the user reported (complete list)
