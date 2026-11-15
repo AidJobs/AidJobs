@@ -6,6 +6,7 @@ import asyncio
 import logging
 from typing import Dict, List, Optional
 
+import feedparser
 import httpx
 import psycopg2
 
@@ -65,15 +66,13 @@ class SimpleRSSCrawler:
             )
         except FetchError as exc:
             logger.error("Error fetching RSS feed %s: %s", url, exc)
-            return Response(0, "", stop=str(exc))
+            return Response(0, "", stop="fetch failed")
         except Exception as exc:
             logger.error("Error fetching RSS feed %s: %s", url, exc)
-            return Response(0, "", stop=stored_text(exc, 120))
+            return Response(0, "", stop="fetch failed")
 
     async def fetch_feed(self, url: str):
         """Backward-compatible feedparser parse, or None on failure (tests / old callers)."""
-        import feedparser
-
         answer = await self.fetch_feed_response(url)
         if answer.stop or answer.status != 200 or not answer.body:
             return None
@@ -172,11 +171,7 @@ class SimpleRSSCrawler:
                 raise OwnershipLost("crawl_source needs the run that owns the source")
             thin = [job for job, reason in rejected if too_thin(job, reason)]
             counts = await run.save(
-                self.save_jobs,
-                admitted,
-                source_id,
-                org_name,
-                base_url=careers_url,
+                self.save_jobs, admitted, source_id, org_name, base_url=careers_url,
                 thin=thin,
             )
 

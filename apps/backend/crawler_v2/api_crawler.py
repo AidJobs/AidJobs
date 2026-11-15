@@ -80,10 +80,10 @@ class SimpleAPICrawler:
             )
         except FetchError as exc:
             logger.error("Error fetching API %s: %s", url, exc)
-            return Response(0, "", stop=str(exc))
+            return Response(0, "", stop="fetch failed")
         except Exception as exc:
             logger.error("Error fetching API %s: %s", url, exc)
-            return Response(0, "", stop=stored_text(exc, 120))
+            return Response(0, "", stop="fetch failed")
 
     async def fetch_api(self, url: str, headers: Optional[Dict] = None) -> Optional[Dict]:
         """Backward-compatible parsed JSON, or None on failure."""
@@ -184,11 +184,7 @@ class SimpleAPICrawler:
                 raise OwnershipLost("crawl_source needs the run that owns the source")
             thin = [job for job, reason in rejected if too_thin(job, reason)]
             counts = await run.save(
-                self.save_jobs,
-                admitted,
-                source_id,
-                org_name,
-                base_url=careers_url,
+                self.save_jobs, admitted, source_id, org_name, base_url=careers_url,
                 thin=thin,
             )
 
