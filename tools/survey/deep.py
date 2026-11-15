@@ -5,6 +5,10 @@ Run on the user's machine; CI runs only `check` and the tests:
   python tools/survey/deep.py draw [--family F|--all]
   python tools/survey/deep.py pretags [--family F|--all]
   python tools/survey/deep.py packets [--family F|--all]
+  python tools/survey/deep.py answers --family F [FILE]
+  python tools/survey/deep.py agreement --family F
+  python tools/survey/deep.py disagreements --family F
+  python tools/survey/deep.py reconcile --family F
   python tools/survey/deep.py check
 
 Twenty adverts per wave-1a family, stratified by organisation type, level, language and source;
@@ -24,8 +28,20 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import adverts
+import phase0
 import roles
 import validation as v
+
+# Scoring dimensions (same as phase0 pilot).
+SCORE_KEYS = phase0.SCORE_KEYS
+WEIGHTS = phase0.WEIGHTS
+ANSWER_KEYS = phase0.ANSWER_KEYS
+TARGETS = phase0.TARGETS
+score_ok = phase0.score_ok
+answer_problems = phase0.answer_problems
+load_answers = phase0.load_answers
+quadratic_weighted_kappa = phase0.quadratic_weighted_kappa
+agreement_of = phase0.agreement_of
 
 HERE = Path(__file__).resolve().parent
 STAGE2 = adverts.WORK / "stage2"
@@ -366,6 +382,156 @@ def packets(args) -> int:
     return sum(packets_one(fam) for fam in families)
 
 
+def answers_dir(family: str) -> Path:
+    return family_dir(family) / "answers"
+
+
+def answer_paths(family: str, file_arg: str | None) -> list[Path]:
+    base = answers_dir(family)
+    if file_arg is None:
+        return [base / "a.jsonl", base / "b.jsonl"]
+    path = Path(file_arg)
+    if not path.is_absolute() and len(path.parts) == 1:
+        return [base / path]
+    return [path]
+
+
+def answers_one(path: Path, codes: dict[str, dict]) -> int:
+    if not path.exists():
+        print(f"answers: {path} is missing")
+        return 1
+    rows = load_answers(path)
+    problems = []
+    seen = []
+    for a in rows:
+        problems += answer_problems(a, set(codes))
+        seen.append(a.get("id"))
+    if len(seen) != len(set(seen)):
+        problems.append("duplicate advert ids in the answers file")
+    want = sorted(codes)
+    if set(seen) != set(want):
+        problems.append(f"expected ids {want}, got {sorted(seen)}")
+    for p in problems:
+        print(p)
+    print(f"answers: {path.name} {len(rows)} rows, {len(problems)} problems")
+    return 1 if problems else 0
+
+
+def answers(args) -> int:
+    codes = load_draw(args.family)
+    paths = answer_paths(args.family, getattr(args, "file", None))
+    return max(answers_one(p, codes) for p in paths)
+
+
+def coder_answers(family: str, name: str) -> dict[str, dict]:
+    path = answers_dir(family) / f"{name}.jsonl"
+    if not path.exists():
+        raise SystemExit(f"{family}: answers/{name}.jsonl is missing")
+    codes = load_draw(family)
+    rows = load_answers(path)
+    problems = [q for a in rows for q in answer_problems(a, set(codes))]
+    if problems:
+        raise SystemExit(f"{family}: coder {name} refused: " + "; ".join(problems[:5]))
+    return {a["id"]: a for a in rows}
+
+
+def agreement(args) -> int:
+    family = args.family
+    codes, a, b = load_draw(family), coder_answers(family, "a"), coder_answers(family, "b")
+    ids = sorted(i for i in codes if i in a and i in b)
+    if len(ids) != len(codes):
+        print(f"agreement {family}: only {len(ids)} of {len(codes)} adverts have both coders")
+    table = {k: agreement_of(k, a, b, ids) for k in SCORE_KEYS}
+    out = {"family_id": family, "adverts": len(ids), "targets": TARGETS, "dimensions": table}
+    low = [
+        k for k, r in table.items()
+        if (r["exact"] is not None and r["exact"] < TARGETS["exact"])
+        or (r["kappa"] is not None and r["kappa"] < TARGETS["kappa"])
+    ]
+    (family_dir(family) / "agreement.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
+    print(f"agreement {family}: {len(ids)} adverts; below target on {len(low)}: "
+          + ", ".join(f"{k} exact={table[k]['exact']} kappa={table[k]['kappa']}" for k in low))
+    for k, r in table.items():
+        print(f"  {k}: exact={r['exact']}, kappa={r['kappa']}")
+    return 0
+
+
+def disagreements(args) -> int:
+    family = args.family
+    codes, a, b = load_draw(family), coder_answers(family, "a"), coder_answers(family, "b")
+    ids = sorted(i for i in codes if i in a and i in b)
+    rows = []
+    for i in ids:
+        for k in SCORE_KEYS:
+            if a[i][k] != b[i][k]:
+                rows.append({
+                    "id": i, "dimension": k,
+                    "coder_a": "" if a[i][k] is None else a[i][k],
+                    "coder_b": "" if b[i][k] is None else b[i][k],
+                    "decision": "", "reason": "",
+                })
+    path = family_dir(family) / "disagreements.csv"
+    with path.open("w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=["id", "dimension", "coder_a", "coder_b", "decision", "reason"])
+        w.writeheader()
+        w.writerows(rows)
+    print(f"disagreements {family}: {len(rows)} cells across {len({r['id'] for r in rows})} adverts")
+    return 0
+
+
+def reconcile(args) -> int:
+    """Seal the reconciled set for one family. Refuses if already sealed or decisions are incomplete."""
+    family = args.family
+    root = family_dir(family)
+    seal = root / "reconciled.sha256"
+    out = root / "reconciled.json"
+    if seal.exists():
+        if not out.exists() or sha256(out) != seal.read_text(encoding="utf-8").strip():
+            print(f"reconcile {family}: seal does not match reconciled.json")
+            return 1
+        print(f"reconcile {family}: already sealed; sealed sets are never edited")
+        return 0
+    codes, a, b = load_draw(family), coder_answers(family, "a"), coder_answers(family, "b")
+    path = root / "disagreements.csv"
+    if not path.exists():
+        print(f"reconcile {family}: disagreements.csv missing; run disagreements first")
+        return 1
+    decisions = list(csv.DictReader(path.open(encoding="utf-8")))
+    pending = [d for d in decisions if d.get("decision", "").strip() == ""]
+    if pending:
+        print(f"reconcile {family}: {len(pending)} disagreements still have an empty decision")
+        return 1
+    by = {(d["id"], d["dimension"]): d for d in decisions}
+    rows = []
+    for i in sorted(codes):
+        if i not in a or i not in b:
+            print(f"reconcile {family}: missing coder answers for {i}")
+            return 1
+        row = {"id": i}
+        for k in SCORE_KEYS:
+            if a[i][k] == b[i][k]:
+                row[k] = a[i][k]
+            else:
+                d = by.get((i, k))
+                if not d:
+                    print(f"reconcile {family}: no decision row for {i}/{k}")
+                    return 1
+                raw = d["decision"].strip()
+                if raw.lower() in ("null", "none", "n/a"):
+                    val = None
+                else:
+                    val = int(raw)
+                if not score_ok(k, val):
+                    print(f"reconcile {family}: bad decision for {i}/{k}: {raw!r}")
+                    return 1
+                row[k] = val
+        rows.append(row)
+    out.write_text(json.dumps({"made_at": utc_now(), "family_id": family, "adverts": rows}, indent=1), encoding="utf-8")
+    seal.write_text(sha256(out) + "\n", encoding="utf-8")
+    print(f"reconcile {family}: sealed {len(rows)} adverts; sha256 {seal.read_text(encoding='utf-8').strip()[:12]}…")
+    return 0
+
+
 def check_draw(family: str, rows: list[dict], exclude: set[str]) -> list[str]:
     problems = []
     path = family_dir(family) / "draw.json"
@@ -437,11 +603,24 @@ def main(argv: list[str] | None = None) -> int:
     p_pk = sub.add_parser("packets")
     p_pk.add_argument("--family", choices=sorted(FAMILIES))
     p_pk.add_argument("--all", action="store_true")
+    p_ans = sub.add_parser("answers")
+    p_ans.add_argument("--family", choices=sorted(FAMILIES), required=True)
+    p_ans.add_argument("file", nargs="?")
+    p_ag = sub.add_parser("agreement")
+    p_ag.add_argument("--family", choices=sorted(FAMILIES), required=True)
+    p_dis = sub.add_parser("disagreements")
+    p_dis.add_argument("--family", choices=sorted(FAMILIES), required=True)
+    p_rec = sub.add_parser("reconcile")
+    p_rec.add_argument("--family", choices=sorted(FAMILIES), required=True)
     sub.add_parser("check")
     args = parser.parse_args(argv)
     if args.cmd in ("draw", "pretags", "packets") and not args.all and not args.family:
         parser.error(f"{args.cmd} needs --family or --all")
-    return {"draw": draw, "pretags": pretags, "packets": packets, "check": check}[args.cmd](args)
+    return {
+        "draw": draw, "pretags": pretags, "packets": packets,
+        "answers": answers, "agreement": agreement, "disagreements": disagreements,
+        "reconcile": reconcile, "check": check,
+    }[args.cmd](args)
 
 
 if __name__ == "__main__":

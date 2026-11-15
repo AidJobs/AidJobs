@@ -1,0 +1,203 @@
+{
+  "built_at": "2026-11-15T14:27:26Z",
+  "built_from": {
+    "measured_generated_at": "2026-11-15T14:27:26Z",
+    "normative_row_count": 13,
+    "normative_sources_sha256": "a67565f39eab4087a1650414cba420f6e57c9a27ce7943bee8cebba98110373c",
+    "wave_1a_broad_measured_sha256": "2522bf583d6d6186874d36dff4217d242132fdf5fe4748c40b09d66ea8e65fe8",
+    "wave_1a_families": [
+      "programme_management",
+      "meal",
+      "communications_advocacy",
+      "finance"
+    ]
+  },
+  "deep_fields_ready": {
+    "duty_bank_phrasing": false,
+    "reference_jds": false,
+    "signature_fact_questions": false
+  },
+  "deep_option_a_scores": {
+    "archive_reconciled_pointer": "survey-raw-archive/role-survey-reading/work/stage2/meal/reconciled.json",
+    "label": "Estimate",
+    "note": "Full nine-dimension sealed scores are not copied from reconciled.json into committed library JSON until deep coding is reconciled and verified.",
+    "seal_prefix": "cc3f7f7e7711",
+    "status": "sealed_in_archive"
+  },
+  "duty_bank": {
+    "archive_measured_pointer": "survey-raw-archive/role-survey-reading/work/measured.jsonl",
+    "deep_fields_ready": false,
+    "grouping_counts": {
+      "archive_pointer": "survey-raw-archive/role-survey-reading/work/duty-groups/meal.json",
+      "evidence_note": "Counts only from the broad-layer duty-line grouping run; paraphrases stay in the archive (survey-raw-archive/.../work/duty-groups/).",
+      "label": "Fact",
+      "lines_in_reported_groups": 321,
+      "n_adverts": 31,
+      "n_duty_lines": 555,
+      "n_groups_reported": 32,
+      "n_organisations": 19,
+      "pct_lines_covered": 57.8
+    },
+    "phrasing": null
+  },
+  "family_id": "meal",
+  "measured_broad": {
+    "evidence_label": "Fact",
+    "evidence_note": "Counts and medians from the committed broad layer (wave-1a-broad-measured.json); not deep Option A sealed scores.",
+    "family_id": "meal",
+    "held_out": false,
+    "language_mix": {
+      "en": 51,
+      "fr": 16
+    },
+    "layer": "broad",
+    "level_mix": {
+      "assistant": 2,
+      "coordinator_manager": 9,
+      "head_adviser": 1,
+      "intern_fellow": 2,
+      "officer": 41,
+      "unknown": 12
+    },
+    "n_adverts": 67,
+    "n_organisations": 35,
+    "org_type_mix": {
+      "domestic_charity": 7,
+      "donor_government": 7,
+      "foundation": 1,
+      "ingo": 32,
+      "national_ngo_south": 8,
+      "research": 8,
+      "un_agency": 4
+    },
+    "partial_score": {
+      "label": "Estimate",
+      "median": 20.0,
+      "n_scored": 67,
+      "note": "Broad partial score only; not deep sealed scores.",
+      "q1": 18.3,
+      "q3": 22.9
+    },
+    "section_type_frequency": {
+      "about_organisation": 29,
+      "commitments_safeguarding": 4,
+      "competencies": 2,
+      "context": 25,
+      "data_protection": 2,
+      "deliverables": 7,
+      "desirable_requirements": 10,
+      "equal_opportunity": 6,
+      "essential_requirements": 141,
+      "field_conditions": 1,
+      "header_facts": 53,
+      "how_to_apply": 37,
+      "languages": 17,
+      "pay_benefits": 14,
+      "preamble": 39,
+      "responsibilities": 40,
+      "role_purpose": 34,
+      "scope": 10,
+      "selection_process": 2,
+      "unclassified": 25,
+      "working_relationships": 4
+    },
+    "section_type_words_median": {
+      "about_organisation": 100,
+      "commitments_safeguarding": 125.5,
+      "competencies": 97.5,
+      "context": 203,
+      "data_protection": 64.5,
+      "deliverables": 64,
+      "desirable_requirements": 158.0,
+      "equal_opportunity": 63.5,
+      "essential_requirements": 45,
+      "field_conditions": 42,
+      "header_facts": 4,
+      "how_to_apply": 106,
+      "languages": 19,
+      "pay_benefits": 167.5,
+      "preamble": 43,
+      "responsibilities": 238.5,
+      "role_purpose": 182.0,
+      "scope": 108.5,
+      "selection_process": 108.0,
+      "unclassified": 75,
+      "working_relationships": 116.0
+    },
+    "source_mix": {
+      "archive": 47,
+      "board": 11,
+      "feed": 1,
+      "step-f-feed": 8
+    },
+    "words_role_median": 653,
+    "words_total_median": 1107,
+    "years_min_median": 4.0,
+    "years_min_n": 44
+  },
+  "name_en": "MEAL",
+  "normative_sources": {
+    "default": [
+      {
+        "edition": "2017 revision",
+        "label": "Fact",
+        "name": "Core Humanitarian Competency Framework",
+        "publisher": "CHS Alliance",
+        "source_id": "chcf"
+      },
+      {
+        "edition": "second edition (2024)",
+        "label": "Fact",
+        "name": "Core Humanitarian Standard on Quality and Accountability",
+        "publisher": "CHS Alliance, Groupe URD and Sphere",
+        "source_id": "chs-2024"
+      },
+      {
+        "edition": "current",
+        "label": "Fact",
+        "name": "UN generic job profiles",
+        "publisher": "United Nations Secretariat (OneHR)",
+        "source_id": "un-generic-job-profiles"
+      }
+    ],
+    "default_source_ids": [
+      "chcf",
+      "chs-2024",
+      "un-generic-job-profiles"
+    ],
+    "variants": {
+      "un_organisation_type": {
+        "label": "Estimate",
+        "note": "Templates do not insert this standard by default (role-survey.md 19.21); the chat asks whether the role works to a named standard. Cite only when organisation type is UN.",
+        "source_ids": [
+          "un-values-behaviours"
+        ],
+        "sources": [
+          {
+            "edition": "2021 (ST/SGB/2024/4)",
+            "label": "Fact",
+            "name": "UN Values and Behaviours Framework",
+            "publisher": "United Nations Secretariat",
+            "source_id": "un-values-behaviours"
+          }
+        ]
+      }
+    }
+  },
+  "recognition": {
+    "label": "Estimate",
+    "status": "pending"
+  },
+  "reference_jds": [],
+  "requirements_by_level": {
+    "label": "Estimate",
+    "status": "pending"
+  },
+  "schema_version": "0.1.0",
+  "signature_fact_questions": [],
+  "standards_application": {
+    "label": "Estimate",
+    "note": "Standards-first findings from role-survey.md 19.21; template wording comes later."
+  },
+  "wave": "1a"
+}
