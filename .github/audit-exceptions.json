@@ -1,4 +1,12 @@
 {
   "version": 1,
-  "exceptions": []
+  "exceptions": [
+    {
+      "ecosystem": "pypi",
+      "package": "soupsieve",
+      "advisory": "GHSA-mmhr-3c5m-f64f",
+      "reason": "DoS in descendant combinators on untrusted HTML (CVE-2026-126190). Fixed in soupsieve 4.0.0 (published 2026-11-03), which the backend lock cannot take until exclude_newer moves past that date in its own pull request (scripts/lock.sh). Crawler selectors run on employer pages we fetch; bump is the real fix.",
+      "review_by": "2026-11-22"
+    }
+  ]
 }
