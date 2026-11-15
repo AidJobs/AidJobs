@@ -4,6 +4,7 @@ from datetime import date, datetime, timezone
 import pytest
 
 from contracts.admission import page_verdicts
+from contracts.expiry import RETURN_ON_SIGHT_SQL
 from contracts.persist import observation_link, observe_known
 from crawler_v2.job_pages import (
     ROTATION_CRAWLS,
@@ -207,6 +208,9 @@ class FakeCursor:
     def execute(self, sql, params=None):
         self.statements.append((" ".join(sql.split()), params))
 
+    def fetchone(self):
+        return None
+
 
 def _saved(job_id="job-1", url=None, **fields):
     row = {"id": job_id, "apply_url": url or _row(1)["apply_url"], "status": "active",
@@ -237,7 +241,10 @@ def test_a_thin_row_of_one_saved_open_job_updates_only_its_last_seen_time():
 def test_a_job_expired_by_absence_is_observed_but_was_not_open():
     outcome, statements, seen, not_open = _observe([_saved(status="expired")])
     assert outcome == "observed"
-    assert len(statements) == 1
+    assert statements[0][0].startswith("UPDATE jobs SET last_seen_at")
+    assert [sql for sql, _p in statements[1:]] == [
+        " ".join(RETURN_ON_SIGHT_SQL.split())
+    ], "then the return on sight (contracts.expiry), nothing else"
     assert (seen, not_open) == ([], ["job-1"])
 
 

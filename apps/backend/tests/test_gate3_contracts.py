@@ -441,13 +441,17 @@ def test_crawlers_persist_through_the_single_helper():
     assert not (root / "crawler_v2" / "orchestrator.py").exists()
     text = (root / "orchestrator.py").read_text(encoding="utf-8")
     # The run's finish records its lifecycle evidence (W-06) with the one rule that touches no
-    # database; nothing else from the contracts package, and nothing that writes jobs.
+    # database, and expires by absence and runs the daily pass with the expiry rules, which change
+    # only a job's lifecycle; nothing else from the contracts package, nothing that writes fields.
     imports = [
         line.strip()
         for line in text.splitlines()
         if line.strip().startswith(("from contracts", "import contracts"))
     ]
-    assert imports == ["from contracts.lifecycle import run_lifecycle"]
+    assert imports == [
+        "from contracts.expiry import daily_pass, expire_absent",
+        "from contracts.lifecycle import run_lifecycle",
+    ]
 
 
 def test_package_does_not_mention_a_key_version():

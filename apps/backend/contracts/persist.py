@@ -6,6 +6,7 @@ The crawler that already owns the transaction calls it and keeps that boundary.
 import json
 from datetime import date, datetime, timezone
 
+from contracts.expiry import return_on_sight
 from contracts.identity import both_keys
 from contracts.models import CrawlRun
 from contracts.upsert import VALIDATED_FIELDS, calendar_day, upsert
@@ -74,6 +75,7 @@ def persist_candidate(
     seen: list | None = None,
     not_open: list | None = None,
     open_on: date | None = None,
+    returned: list | None = None,
 ) -> str:
     """Validate, decide with the contract upsert, then write that decision.
 
@@ -84,6 +86,8 @@ def persist_candidate(
     the run's start count read "passed" on the same calendar; without it, the UTC day.
     A job reported in seen may still have to be left out by the caller: one this run created, or
     one that was in not_open earlier in the run (a row can change a job's deadline).
+    A matched job that was expired returns on sight, after this write (contracts.expiry);
+    returned receives its id.
     """
     if candidate.get("admitted") is not True:
         return "rejected"
@@ -132,6 +136,7 @@ def persist_candidate(
             _remember(recorded, decision, row.get("id"))
         _note_seen(seen, not_open, before.get(row["id"]), payload.get("source_id"),
                    _open_on(open_on, observed_at))
+        _return_if_expired(cursor, before.get(row["id"]), returned)
         return decision
 
     row = catalog[0]
@@ -149,7 +154,16 @@ def persist_candidate(
             assignments[name] = payload[name]
     _update(cursor, row["id"], assignments)
     _remember(recorded, decision, row.get("id"))
+    _return_if_expired(cursor, prior, returned)
     return decision
+
+
+def _return_if_expired(cursor, prior, returned) -> None:
+    """The return on sight, for a matched job that was expired before this write."""
+    if not prior or prior.get("status") != "expired" or prior.get("id") is None:
+        return
+    if return_on_sight(cursor, prior["id"], prior.get("deadline")) and returned is not None:
+        returned.append(str(prior["id"]))
 
 
 _OBSERVABLE_COLUMNS = ("id", "apply_url", "status", "deadline", "deleted_at")
@@ -185,6 +199,7 @@ def observe_known(
     open_on: date | None = None,
     seen: list | None = None,
     not_open: list | None = None,
+    returned: list | None = None,
 ) -> str:
     """The observation path (crawler plan, C3 and C4 amendment; contract §6; W-36).
 
@@ -192,8 +207,9 @@ def observe_known(
     apply link matches exactly one job of the same source that is not hidden and is active or
     expired by absence; a job whose stored deadline has passed is expired by its deadline and is
     not matched. Only that job's last_seen_at is written: no other field, no identity, no
-    lifecycle, no hiding. Returns 'observed', 'ambiguous' (two or more such jobs: nothing is
-    observed), 'ineligible' (only hidden, passed or other jobs have the link) or 'unknown'.
+    hiding; a job expired by absence returns on sight (contract §6), and returned receives its
+    id. Returns 'observed', 'ambiguous' (two or more such jobs: nothing is observed),
+    'ineligible' (only hidden, passed or other jobs have the link) or 'unknown'.
     """
     day = _open_on(open_on, observed_at)
     matches = by_link.get(observation_link(row.get("apply_url")), [])
@@ -212,6 +228,7 @@ def observe_known(
     job = eligible[0]
     cursor.execute("UPDATE jobs SET last_seen_at = %s WHERE id = %s", (observed_at, job["id"]))
     _note_seen(seen, not_open, {**job, "source_id": source_id}, source_id, day)
+    _return_if_expired(cursor, job, returned)
     return "observed"
 
 

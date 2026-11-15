@@ -227,6 +227,9 @@ class FakeCursor:
             return list(self.rows)
         return []
 
+    def fetchone(self):
+        return None
+
 
 def _stored(**overrides):
     row = {name: None for name in LOAD_COLUMNS}

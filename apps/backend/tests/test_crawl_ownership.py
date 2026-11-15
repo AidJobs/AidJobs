@@ -2222,3 +2222,447 @@ def test_a_stale_finish_writes_no_lifecycle_record(db):
     assert _lifecycle(stale_run)["counted"] is None
     assert _lifecycle(stale_run)["listing_complete"] is None
     assert _lifecycle(new_run)["counted"] is None
+
+
+# ---------------------------------------------------------------------------
+# Expiry (W-06, step 4.6, pull request 3): by absence in a counting run's finish, the return on
+# sight in the writer, and the daily pass. Expiry changes status and expired_at only.
+# ---------------------------------------------------------------------------
+
+PARTIAL = {"pages": 1, "expected": 9, "complete": False, "stop": "HTTP 202 on page 2"}
+
+
+def _seen_long_ago():
+    _sql("UPDATE jobs SET last_seen_at = NOW() - interval '5 days',"
+         " created_at = NOW() - interval '5 days'")
+
+
+def _back_in_time(run_id, hours):
+    """Move a finished run, and the sightings it recorded, back by `hours`."""
+    _sql(
+        """
+        UPDATE jobs SET last_seen_at = last_seen_at - make_interval(hours => %s)
+        WHERE last_seen_at >= (SELECT ran_at FROM crawl_logs WHERE id = %s)
+        """,
+        (hours, run_id),
+    )
+    _sql("UPDATE crawl_logs SET ran_at = ran_at - make_interval(hours => %s) WHERE id = %s",
+         (hours, run_id))
+
+
+def _lifecycle_states():
+    return {
+        r[0]: (r[1], r[2], r[3])
+        for r in _sql(
+            "SELECT title, status, expired_at IS NOT NULL, deleted_at IS NOT NULL FROM jobs"
+        )
+    }
+
+
+def _expiry_record(run_id):
+    return tuple(_sql("SELECT expired, returned FROM crawl_logs WHERE id = %s", (run_id,))[0])
+
+
+def _all_but_lifecycle():
+    return {
+        r[0]: r[1]
+        for r in _sql(
+            "SELECT title, (to_jsonb(j) - 'status' - 'expired_at' - 'last_seen_at')::text"
+            " FROM jobs j"
+        )
+    }
+
+
+def _two_counting_runs(source, listed, *, hours=25):
+    first = _manual_run(source, _listing_crawl(listed, COMPLETE))
+    assert _lifecycle(first)["counted"] is True
+    _back_in_time(first, hours)
+    second = _manual_run(source, _listing_crawl(listed, COMPLETE))
+    assert _lifecycle(second)["counted"] is True
+    return first, second
+
+
+def test_a_job_missing_from_two_counting_runs_a_day_apart_expires_and_nothing_else_changes(db):
+    source, other = _add_source(), _add_source("Other")
+    for n in (1, 2, 3, 4):
+        _store_job(source["id"], n)
+    _store_job(source["id"], 5, hidden=True)
+    _store_job(source["id"], 6, deadline="2000-01-01")
+    _store_job(other["id"], 7)
+    _seen_long_ago()
+    first = _manual_run(source, _listing_crawl([1, 2, 3], COMPLETE))
+    assert _lifecycle(first)["counted"] is True
+    assert _expiry_record(first) == (0, 0), "one counting run is not enough"
+    assert _lifecycle_states()["Programme Officer 4"] == ("active", False, False)
+    _back_in_time(first, 25)
+    before = _all_but_lifecycle()
+    second = _manual_run(source, _listing_crawl([1, 2, 3], COMPLETE))
+    assert _lifecycle(second)["counted"] is True
+    assert _expiry_record(second) == (1, 0)
+    states = _lifecycle_states()
+    assert states.pop("Programme Officer 4") == ("expired", True, False)
+    assert states == {
+        "Programme Officer 1": ("active", False, False),
+        "Programme Officer 2": ("active", False, False),
+        "Programme Officer 3": ("active", False, False),
+        "Programme Officer 5": ("active", False, True),
+        "Programme Officer 6": ("active", False, False),
+        "Programme Officer 7": ("active", False, False),
+    }, "hidden, passed (left to the daily pass) and another source's jobs untouched"
+    assert _all_but_lifecycle() == before, "expiry writes only status and expired_at"
+
+
+def test_two_counting_runs_less_than_24_hours_apart_expire_nothing(db):
+    source = _add_source()
+    for n in (1, 2, 3, 4):
+        _store_job(source["id"], n)
+    _seen_long_ago()
+    _first, second = _two_counting_runs(source, [1, 2, 3], hours=23)
+    assert _expiry_record(second) == (0, 0)
+    assert _lifecycle_states()["Programme Officer 4"] == ("active", False, False)
+
+
+async def _zero_jobs(src, run):
+    return {"status": "ok", "message": "Found 0 jobs", "listing": COMPLETE, "valid": 0,
+            "counts": {"found": 0, "inserted": 0, "updated": 0, "skipped": 0}}
+
+
+async def _failing(src, run):
+    return _fail()
+
+
+@pytest.mark.parametrize("second", [
+    pytest.param(lambda: _listing_crawl([1, 2, 3], PARTIAL), id="partial"),
+    pytest.param(lambda: _zero_jobs, id="zero-jobs"),
+    pytest.param(lambda: _listing_crawl([1], COMPLETE), id="fewer-than-half-matched"),
+    pytest.param(lambda: _failing, id="failed"),
+])
+def test_a_run_that_does_not_count_expires_nothing(db, second):
+    source = _add_source()
+    for n in (1, 2, 3, 4):
+        _store_job(source["id"], n)
+    _seen_long_ago()
+    first = _manual_run(source, _listing_crawl([1, 2, 3], COMPLETE))
+    _back_in_time(first, 25)
+    run_id = _manual_run(source, second())
+    assert _lifecycle(run_id)["counted"] is False
+    assert _expiry_record(run_id) == (0, 0)
+    assert {state[0] for state in _lifecycle_states().values()} == {"active"}
+
+
+def _counting_rows(source_id, hours=(50, 25)):
+    """Finished counting runs of the source, `hours` ago."""
+    for ago in hours:
+        _sql(
+            "INSERT INTO crawl_logs (source_id, ran_at, found, inserted, updated, skipped,"
+            " status, message, counted) VALUES (%s, NOW() - make_interval(hours => %s),"
+            " 0, 0, 0, 0, 'ok', 'Found jobs', TRUE)",
+            (source_id, ago),
+        )
+
+
+@pytest.mark.parametrize("finish, expires", [
+    pytest.param(lambda: _listing_crawl([1, 2, 3], PARTIAL), False, id="partial"),
+    pytest.param(lambda: _zero_jobs, False, id="zero-jobs"),
+    pytest.param(lambda: _listing_crawl([1], COMPLETE), False, id="fewer-than-half-matched"),
+    pytest.param(lambda: _failing, False, id="failed"),
+    pytest.param(lambda: _listing_crawl([1, 2, 3], COMPLETE), True, id="counting"),
+])
+def test_only_a_counting_run_applies_expiry_already_due(db, finish, expires):
+    source = _add_source()
+    for n in (1, 2, 3, 4):
+        _store_job(source["id"], n)
+    _seen_long_ago()
+    _counting_rows(source["id"])
+    run_id = _manual_run(source, finish())
+    assert _lifecycle(run_id)["counted"] is expires
+    assert _expiry_record(run_id) == ((1 if expires else 0), 0)
+    assert (_lifecycle_states()["Programme Officer 4"][0] == "expired") is expires
+
+
+def test_a_job_seen_by_any_crawl_since_is_not_expired(db):
+    source = _add_source()
+    for n in (1, 2, 3, 4):
+        _store_job(source["id"], n)
+    _seen_long_ago()
+    first = _manual_run(source, _listing_crawl([1, 2, 3], COMPLETE))
+    _back_in_time(first, 25)
+    partial = _manual_run(source, _listing_crawl([4], PARTIAL))
+    assert _lifecycle(partial)["counted"] is False
+    second = _manual_run(source, _listing_crawl([1, 2, 3], COMPLETE))
+    assert _lifecycle(second)["counted"] is True
+    assert _expiry_record(second) == (0, 0), "seen by the partial crawl after the first run"
+    assert _lifecycle_states()["Programme Officer 4"] == ("active", False, False)
+
+
+@pytest.mark.parametrize("minutes, expires", [(5, False), (15, True)])
+def test_a_run_started_just_after_a_sighting_is_not_taken_to_have_missed_it(db, minutes, expires):
+    source = _add_source()
+    for n in (1, 2, 3, 4):
+        _store_job(source["id"], n)
+    _seen_long_ago()
+    first, _ = _two_counting_runs(source, [1, 2, 3])
+    _sql("UPDATE jobs SET status = 'active', expired_at = NULL")
+    # Job 4 seen `minutes` before the first run started, as if the app's clock ran behind.
+    _sql(
+        "UPDATE jobs SET last_seen_at = (SELECT ran_at FROM crawl_logs WHERE id = %s)"
+        " - make_interval(mins => %s) WHERE title = 'Programme Officer 4'",
+        (first, minutes),
+    )
+    third = _manual_run(source, _listing_crawl([1, 2, 3], COMPLETE))
+    states = _lifecycle_states()
+    assert (states["Programme Officer 4"][0] == "expired") is expires
+    assert _expiry_record(third)[0] == (1 if expires else 0)
+
+
+def _expire(title, *, deadline=None, days_ago=1):
+    _sql(
+        "UPDATE jobs SET status = 'expired', deadline = %s,"
+        " expired_at = NOW() - make_interval(days => %s) WHERE title = %s",
+        (deadline, days_ago, title),
+    )
+
+
+def test_an_expired_job_seen_by_any_crawl_returns_unless_its_deadline_has_passed(db):
+    source = _add_source()
+    for n in (1, 2, 3, 4, 5):
+        _store_job(source["id"], n)
+    _expire("Programme Officer 1")
+    _expire("Programme Officer 2", deadline="2000-01-01")
+    _expire("Programme Officer 3", deadline="2000-01-01")
+    _expire("Programme Officer 4", deadline="2999-12-31")
+    rows = [
+        _job(1),
+        _job(2),
+        {**_job(3), "deadline": "2999-12-31"},
+        {**_job(4), "deadline": "2000-01-01"},
+        _job(5),
+    ]
+    run_id = _manual_run(source, _crawl_rows(rows))
+    states = _lifecycle_states()
+    assert states == {
+        "Programme Officer 1": ("active", False, False),
+        "Programme Officer 2": ("expired", True, False),
+        "Programme Officer 3": ("active", False, False),
+        "Programme Officer 4": ("expired", True, False),
+        "Programme Officer 5": ("active", False, False),
+    }, "1 expired by absence; 2 by its deadline; 3 a new deadline; 4 now passed"
+    assert _expiry_record(run_id)[1] == 2
+    assert _lifecycle(run_id)["matched_active"] == 1, "a returned job was not open at the start"
+
+
+def test_a_reading_without_a_deadline_returns_only_a_job_expired_by_absence(db):
+    source = _add_source()
+    for n in (1, 2):
+        _store_job(source["id"], n)
+    _expire("Programme Officer 1", deadline="2999-12-31")
+    _expire("Programme Officer 2", deadline="2000-01-01")
+    run_id = _manual_run(source, _crawl_rows([{**_job(n), "deadline": ""} for n in (1, 2)]))
+    assert [r[0] for r in _sql("SELECT deadline FROM jobs")] == [None, None], "both cleared"
+    states = _lifecycle_states()
+    assert states["Programme Officer 1"] == ("active", False, False)
+    assert states["Programme Officer 2"] == ("expired", True, False), (
+        "expired by its deadline: only a reading with a deadline on or after today brings it back"
+    )
+    assert _expiry_record(run_id)[1] == 1
+
+
+def test_a_partial_crawl_returns_a_job_too(db):
+    source = _add_source()
+    _store_job(source["id"], 1)
+    _expire("Programme Officer 1")
+    run_id = _manual_run(source, _listing_crawl([1], PARTIAL))
+    assert _lifecycle(run_id)["counted"] is False
+    assert _lifecycle_states()["Programme Officer 1"] == ("active", False, False)
+    assert _expiry_record(run_id) == (0, 1)
+
+
+def test_a_hidden_job_expired_by_absence_returns_and_stays_hidden(db):
+    source = _add_source()
+    _store_job(source["id"], 1, hidden=True)
+    _expire("Programme Officer 1")
+    _manual_run(source, _listing_crawl([1], PARTIAL))
+    assert _lifecycle_states()["Programme Officer 1"] == ("active", False, True)
+
+
+def test_the_observation_path_returns_a_job_expired_by_absence(db):
+    source = _add_source()
+    for n in (1, 2):
+        _store_job(source["id"], n)
+    _expire("Programme Officer 1")
+    _expire("Programme Officer 2", deadline="2000-01-01")
+    before = _all_but_lifecycle()
+    run_id = _manual_run(source, _observing_crawl([_thin(1), _thin(2)]))
+    assert _sql("SELECT observed FROM crawl_logs WHERE id = %s", (run_id,))[0][0] == 1
+    assert _expiry_record(run_id) == (0, 1)
+    assert _lifecycle_states() == {
+        "Programme Officer 1": ("active", False, False),
+        "Programme Officer 2": ("expired", True, False),
+    }
+    assert _all_but_lifecycle() == before
+
+
+@pytest.mark.parametrize("cls", [SimpleCrawler, SimpleRSSCrawler, SimpleAPICrawler])
+def test_every_save_step_reports_returned_jobs_and_drops_a_rolled_back_one(failing_updates, cls):
+    source = _add_source()
+    for n in (1, 2):
+        _store_job(source["id"], n)
+    _expire("Programme Officer 1")
+    _expire("Programme Officer 2")
+    run_id, _ = _orch()._begin(source["id"], False)
+    rows = [{**_job(1), "location_raw": "Reject me"}, _job(2)]
+    counts = _crawler(cls).save_jobs(rows, source["id"], "Example", run_token=run_id)
+    assert counts["failed"] == 1
+    stored = {r[0]: str(r[1]) for r in _sql("SELECT title, id FROM jobs")}
+    assert counts["returned_ids"] == [stored["Programme Officer 2"]]
+    states = _lifecycle_states()
+    assert states["Programme Officer 1"] == ("expired", True, False), "its save rolled back"
+    assert states["Programme Officer 2"] == ("active", False, False)
+
+
+def _job_fields(title):
+    return _sql(
+        "SELECT status, expired_at IS NOT NULL, deleted_at IS NOT NULL, description IS NOT NULL"
+        " FROM jobs WHERE title = %s",
+        (title,),
+    )[0]
+
+
+def _daily_pass_jobs(source_id):
+    """One job per case of the daily pass, by number."""
+    for n in range(1, 10):
+        _store_job(source_id, n, hidden=(n == 2))
+    _sql("UPDATE jobs SET description = 'The full advert'")
+    cases = {
+        1: "deadline = CURRENT_DATE - 1",
+        2: "deadline = CURRENT_DATE - 1",
+        3: "deadline = CURRENT_DATE",
+        4: "deadline = NULL",
+        5: "deadline = CURRENT_DATE - 91",
+        6: "deadline = CURRENT_DATE - 89",
+        7: "status = 'expired', expired_at = NOW() - interval '91 days'",
+        8: "status = 'expired', expired_at = NOW() - interval '89 days'",
+        9: "status = 'expired', deadline = CURRENT_DATE - 95, expired_at = NOW()",
+    }
+    for n, assignment in cases.items():
+        _sql(f"UPDATE jobs SET {assignment} WHERE title = %s", (f"Programme Officer {n}",))
+
+
+def test_the_daily_pass_expires_every_passed_deadline_and_drops_descriptions_after_90_days(db):
+    source = _add_source()
+    _daily_pass_jobs(source["id"])
+    before = _all_but_lifecycle()
+    orch = _orch()
+    assert orch._daily_pass_once() == {"expired": 4, "descriptions_dropped": 3, "left": 0}
+    expected = {
+        1: ("expired", True, False, True),
+        2: ("expired", True, True, True),
+        3: ("active", False, False, True),
+        4: ("active", False, False, True),
+        5: ("expired", True, False, False),
+        6: ("expired", True, False, True),
+        7: ("expired", True, False, False),
+        8: ("expired", True, False, True),
+        9: ("expired", True, False, False),
+    }
+    for n, fields in expected.items():
+        assert _job_fields(f"Programme Officer {n}") == fields, n
+    after = _all_but_lifecycle()
+    for title, text in before.items():
+        if '"description"' in text and after[title] != text:
+            assert after[title] == text.replace('"description": "The full advert"',
+                                                '"description": null'), title
+    assert orch._daily_pass_once() is None, "once per database day"
+
+
+def test_the_preview_counts_the_descriptions_the_daily_pass_drops(db):
+    from tests.test_expiry import expiry_preview
+
+    source = _add_source()
+    _daily_pass_jobs(source["id"])
+    previewed = _sql(expiry_preview.DESCRIPTIONS_SQL)[0][0]
+    outcome = _orch()._daily_pass_once()
+    assert previewed == outcome["descriptions_dropped"] == 3, "5 (still active), 7 and 9"
+
+
+def test_an_active_job_is_judged_on_its_deadline_alone_for_the_description_drop(db):
+    from tests.test_expiry import expiry_preview
+
+    source = _add_source()
+    _store_job(source["id"], 1)
+    _sql("UPDATE jobs SET description = 'The full advert', deadline = CURRENT_DATE - 2,"
+         " expired_at = NOW() - interval '200 days'")
+    assert _sql(expiry_preview.DESCRIPTIONS_SQL)[0][0] == 0
+    assert _orch()._daily_pass_once() == {"expired": 1, "descriptions_dropped": 0, "left": 0}
+    assert _job_fields("Programme Officer 1") == ("expired", True, False, True)
+
+
+def test_the_daily_pass_skips_a_row_a_crawl_holds_and_finishes_it_on_the_next_round(db):
+    source = _add_source()
+    for n in (1, 2):
+        _store_job(source["id"], n, deadline="2000-01-01")
+    holder = psycopg2.connect(ADMIN_URL)
+    try:
+        with holder.cursor() as cur:
+            cur.execute("SELECT id FROM jobs WHERE title = 'Programme Officer 1' FOR UPDATE")
+        orch = _orch()
+        started = time.monotonic()
+        assert orch._daily_pass_once() == {"expired": 1, "descriptions_dropped": 0, "left": 1}
+        assert time.monotonic() - started < 5, "it does not wait for the crawl's lock"
+        assert _job_fields("Programme Officer 1")[0] == "active"
+    finally:
+        holder.rollback()
+        holder.close()
+    assert orch._daily_pass_once() == {"expired": 1, "descriptions_dropped": 0, "left": 0}
+    assert _job_fields("Programme Officer 1")[0] == "expired"
+    assert orch._daily_pass_once() is None
+
+
+def test_the_preview_selects_exactly_what_the_finish_would_expire(db):
+    from contracts.expiry import EXPIRE_BY_ABSENCE_SQL
+    from tests.test_expiry import expiry_preview
+
+    source = _add_source()
+    for n in (1, 2, 3, 4, 5, 6):
+        _store_job(source["id"], n)
+    _store_job(source["id"], 7, hidden=True)
+    _store_job(source["id"], 8, deadline="2000-01-01")
+    _seen_long_ago()
+    for hours in (50, 25):
+        _sql(
+            "INSERT INTO crawl_logs (source_id, ran_at, found, inserted, updated, skipped,"
+            " status, message, counted) VALUES (%s, NOW() - make_interval(hours => %s),"
+            " 0, 0, 0, 0, 'ok', 'Found jobs', TRUE)",
+            (source["id"], hours),
+        )
+    _sql("UPDATE jobs SET last_seen_at = NOW() - interval '1 hour'"
+         " WHERE title IN ('Programme Officer 1', 'Programme Officer 2')")
+    _sql("UPDATE jobs SET last_seen_at = NOW() - interval '30 hours'"
+         " WHERE title = 'Programme Officer 3'")
+    params = {"source_id": source["id"]}
+    conn = psycopg2.connect(ADMIN_URL)
+    try:
+        conn.set_session(readonly=True)
+        with conn.cursor() as cur:
+            cur.execute(expiry_preview.ABSENT_SQL, params)
+            previewed = sorted(r[0] for r in cur.fetchall())
+            lines = []
+            expiry_preview.preview(cur, lines.append)
+        conn.rollback()
+        conn.set_session(readonly=False)
+        with conn.cursor() as cur:
+            cur.execute(EXPIRE_BY_ABSENCE_SQL, params)
+            expired_ids = [r[0] for r in cur.fetchall()]
+            cur.execute("SELECT title FROM jobs WHERE id = ANY(%s::uuid[])",
+                        ([str(i) for i in expired_ids],))
+            expired = sorted(r[0] for r in cur.fetchall())
+        conn.rollback()
+    finally:
+        conn.close()
+    assert previewed == expired == [f"Programme Officer {n}" for n in (4, 5, 6)]
+    text = "\n".join(lines)
+    assert "missed by at least one counting run since last seen: 4" in text, "3 missed one"
+    assert "next counting run's finish (at least; that run adds one more counting run): 3" in text
+    assert "would expire by absence, all sources: 3" in text
+    assert "Example: 1 (0)" in text, "job 8's passed deadline, for the daily pass"
+    assert {state[0] for state in _lifecycle_states().values()} == {"active"}

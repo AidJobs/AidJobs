@@ -13,6 +13,7 @@ import psycopg2.errors
 from psycopg2.extras import RealDictCursor
 
 from app.log_safety import REQUEST_ID, redact_exception, redact_text, stored_text
+from contracts.expiry import daily_pass, expire_absent
 from contracts.lifecycle import run_lifecycle
 from crawler_v2.run_handle import RunHandle, crawl_budget
 from crawler_v2.simple_crawler import SimpleCrawler
@@ -110,6 +111,8 @@ class CrawlerOrchestrator:
         self._closing: set = set()
         self._scheduler_task: Optional[asyncio.Task] = None
         self._recovery_task: Optional[asyncio.Task] = None
+        # The database's day of the last complete daily pass in this process.
+        self._daily_pass_day = None
     
     def _get_db_conn(self, retries=3, timeout=10):
         """Get database connection with retry logic and IPv4 preference"""
@@ -716,11 +719,11 @@ class CrawlerOrchestrator:
             (run_status, message, failures, nochange, next_run_at, new_status, source_id),
         )
 
-    def _record_lifecycle(self, cur, run_id, result: Dict, *, active_at_start) -> None:
+    def _record_lifecycle(self, cur, run_id, result: Dict, *, active_at_start) -> Dict:
         """Store the run's completeness and whether it counts, inside its ownership-checked finish.
 
-        Nothing is expired here: whether the crawl counts as evidence of absence is recorded on
-        the run itself, never read from extraction_logs (contract §6, B4 record).
+        Whether the crawl counts as evidence of absence is recorded on the run itself, never read
+        from extraction_logs (contract §6, B4 record). Returns the record.
         """
         record = run_lifecycle(
             result,
@@ -756,6 +759,30 @@ class CrawlerOrchestrator:
                 record["counted"],
                 run_id,
             ),
+        )
+        return record
+
+    def _record_expiry(self, cur, source_id, run_id, *, counted, returned: int) -> None:
+        """Expire by absence when this run counts (contract §6), inside its finish, and record
+        what it expired and returned. A failed expiry is rolled back alone and recorded empty:
+        the run's own record still stands, and the next counting run expires what this missed.
+        """
+        expired = 0
+        if counted is True:
+            cur.execute("SAVEPOINT run_expiry")
+            try:
+                expired = len(expire_absent(cur, source_id))
+                cur.execute("RELEASE SAVEPOINT run_expiry")
+            except Exception as exc:
+                cur.execute("ROLLBACK TO SAVEPOINT run_expiry")
+                logger.error(
+                    "[orchestrator] Expiry by absence failed for run %s: %s",
+                    run_id, redact_exception(exc),
+                )
+                expired = None
+        cur.execute(
+            "UPDATE crawl_logs SET expired = %s, returned = %s WHERE id = %s",
+            (expired, returned, run_id),
         )
 
     def _finish(self, source_id, run_id, result: Dict, *, mode: str, health) -> bool:
@@ -804,7 +831,13 @@ class CrawlerOrchestrator:
                             run_id, source_id,
                         )
                         return False
-                    self._record_lifecycle(cur, run_id, result, active_at_start=owned[1])
+                    record = self._record_lifecycle(
+                        cur, run_id, result, active_at_start=owned[1]
+                    )
+                    self._record_expiry(
+                        cur, source_id, run_id, counted=record["counted"],
+                        returned=int(result.get("returned") or 0),
+                    )
                     # Only this run's own lock: the one taken in the same transaction as its row.
                     cur.execute(
                         """
@@ -860,6 +893,7 @@ class CrawlerOrchestrator:
             if not counts.get(name):
                 counts[name] = value
         result["matched_active"] = run.matched_active()
+        result["returned"] = len(run.returned)
         try:
             await self.finish_run(source, run.token, result, mode=mode)
         except Exception:
@@ -1015,6 +1049,41 @@ class CrawlerOrchestrator:
             'message': 'Hard deletion of jobs past their deadline is disabled',
         }
 
+    def _daily_pass_once(self) -> Optional[Dict]:
+        """The daily pass (contract §6, growth plan, step 4.6): every source, crawled or not.
+
+        Runs once per day of the database's calendar; None when today's pass is already done.
+        A pass that had to skip rows a crawl was holding is tried again on the next round.
+        """
+        conn = self._get_db_conn()
+        try:
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(_STEP_TIMEOUTS_SQL)
+                    cur.execute("SELECT CURRENT_DATE")
+                    day = cur.fetchone()[0]
+                    if day == self._daily_pass_day:
+                        conn.rollback()
+                        return None
+                    outcome = daily_pass(cur)
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+        finally:
+            conn.close()
+        if not outcome["left"]:
+            self._daily_pass_day = day
+        logger.info(
+            "[orchestrator] Daily pass for %s: %d expired by deadline, %d descriptions dropped,"
+            " %d left for the next round",
+            day, outcome["expired"], outcome["descriptions_dropped"], outcome["left"],
+        )
+        return outcome
+
+    async def daily_pass_once(self) -> Optional[Dict]:
+        return await asyncio.to_thread(self._daily_pass_once)
+
     async def run_due_sources_once(self, wait: bool = True) -> Dict:
         """Queue every due source not already queued in this process.
 
@@ -1149,6 +1218,11 @@ class CrawlerOrchestrator:
         max_consecutive_errors = 5
 
         while self.running:
+            # Its own error must not stop the crawls, nor theirs the pass.
+            try:
+                await self.daily_pass_once()
+            except Exception as e:
+                logger.error(f"[orchestrator] Daily pass error: {redact_exception(e)}")
             try:
                 await self.run_due_sources_once()
                 consecutive_errors = 0

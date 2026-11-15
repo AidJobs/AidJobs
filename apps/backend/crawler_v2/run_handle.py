@@ -15,7 +15,8 @@ class RunHandle:
     Saves run in a worker thread. A save cannot be cancelled once it has started, so the handle
     keeps it; the orchestrator waits for it before finishing the run. The counts of completed
     saves are kept too, so a run that times out still records what it saved, and so are the
-    open jobs they matched, for the run's lifecycle record.
+    open jobs they matched and the expired jobs they made open again, for the run's lifecycle
+    record.
     """
 
     def __init__(self, token, source_id):
@@ -27,6 +28,7 @@ class RunHandle:
         self.seen_active: set = set()
         self.created: set = set()
         self.not_open: set = set()
+        self.returned: set = set()
         self._pending: set = set()
 
     async def save(self, save_jobs, jobs, source_id, org_name, **kwargs):
@@ -50,6 +52,7 @@ class RunHandle:
         self.seen_active.update(result.get("seen_active") or ())
         self.created.update(result.get("created_ids") or ())
         self.not_open.update(result.get("not_open_ids") or ())
+        self.returned.update(result.get("returned_ids") or ())
 
     def matched_active(self) -> int:
         """Open jobs the run's rows matched: never one the run created, nor one that was not open
