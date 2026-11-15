@@ -1,0 +1,28 @@
+{
+  "url": "https://boards.example.org/api/jobs",
+  "reader": "json-api",
+  "report": {
+    "pages": 1,
+    "expected": 2,
+    "complete": true,
+    "stop": null
+  },
+  "jobs": [
+    {
+      "title": "Data Analyst",
+      "apply_url": "https://boards.example.org/jobs/a1",
+      "record_class": "api",
+      "location_raw": "Remote",
+      "deadline": "2026-12-01",
+      "description": "Analyse programme data across regions.",
+      "employment_type": "Fixed-term",
+      "posted_on": "2026-11-01"
+    },
+    {
+      "title": "Needs Location",
+      "apply_url": "https://boards.example.org/jobs/a2",
+      "record_class": "api",
+      "deadline": "2026-12-15"
+    }
+  ]
+}

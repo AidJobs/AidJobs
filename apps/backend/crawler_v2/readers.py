@@ -1,19 +1,31 @@
-"""The readers of an HTML listing, in the order they are tried (ledger W-35).
+"""The readers of a listing, in the order they are tried (ledger W-35).
 
-Each is chosen by what the fetched page shows, never by its address: the PageUp career-site
+HTML: chosen by what the fetched page shows, never by its address: the PageUp career-site
 reader, then the "Sites" engine reader, then the general rule-based reader. A reader that fails
 or reads no rows passes the page to the next; the general reader's own failure fails the crawl.
 
-The adapters call the crawler's own methods, looked up when they run, so the paging walks stay
-where they are (contract §11) and a test that replaces one of those methods still reaches it.
+RSS and API (pull request 3b): one feed reader and one generic JSON reader. Each turns the first
+response into field-contract candidates; completeness only when the listing states a total.
+
+The HTML adapters call the crawler's own methods, looked up when they run, so the paging walks
+stay where they are (contract §11) and a test that replaces one of those methods still reaches it.
 """
 from __future__ import annotations
 
 import contextvars
+import json
 import logging
 from typing import Dict, List, Optional
 
+import feedparser
+
 from contracts.reader import Fetch, ListingResult, Reader, Request, Response
+from crawler_v2.feed_fields import (
+    job_from_json_item,
+    job_from_rss_entry,
+    jobs_array,
+    json_listing_report,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +123,65 @@ class GeneralReader(Reader):
 
 def html_readers(crawler) -> List[Reader]:
     return [PageUpReader(crawler), SitesReader(crawler), GeneralReader(crawler)]
+
+
+class RssFeedReader(Reader):
+    """One RSS or Atom feed body as a listing. Reports no completeness: a truncated feed looks
+    the same as a full one (growth plan, section 4.1; W-39 for stronger rules)."""
+
+    name = "rss-feed"
+    source_types = frozenset({"rss"})
+    record_class = "rss"
+    label = "RSS feed reader"
+
+    async def read(self, first: Response, source: Dict, fetch: Optional[Fetch] = None):
+        del fetch
+        if first.stop or first.status != 200 or not (first.body or "").strip():
+            return ListingResult(self.name)
+        feed = feedparser.parse(first.body)
+        base = source.get("careers_url") or ""
+        jobs = []
+        for entry in getattr(feed, "entries", None) or []:
+            job = job_from_rss_entry(entry, base)
+            if job:
+                jobs.append(job)
+        logger.info("RSS feed reader found %s jobs", len(jobs))
+        return ListingResult(self.name, jobs)
+
+
+class JsonApiReader(Reader):
+    """A generic JSON listing. Reports completeness only when the body states a total."""
+
+    name = "json-api"
+    source_types = frozenset({"api", "json"})
+    record_class = "api"
+    label = "JSON API reader"
+
+    async def read(self, first: Response, source: Dict, fetch: Optional[Fetch] = None):
+        del fetch
+        if first.stop or first.status != 200 or not (first.body or "").strip():
+            return ListingResult(self.name)
+        try:
+            data = json.loads(first.body)
+        except (TypeError, ValueError) as exc:
+            logger.warning("JSON API reader: body is not JSON: %s", exc)
+            return ListingResult(self.name)
+        base = source.get("careers_url") or ""
+        jobs = []
+        for item in jobs_array(data):
+            job = job_from_json_item(item, base)
+            if job:
+                jobs.append(job)
+        logger.info("JSON API reader found %s jobs", len(jobs))
+        return ListingResult.from_report(self.name, jobs, json_listing_report(jobs, data))
+
+
+def rss_readers(_crawler=None) -> List[Reader]:
+    return [RssFeedReader()]
+
+
+def api_readers(_crawler=None) -> List[Reader]:
+    return [JsonApiReader()]
 
 
 async def read_listing(

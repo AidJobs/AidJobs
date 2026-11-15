@@ -431,11 +431,16 @@ def test_validate_rejections_are_recorded_on_the_crawl():
 
 
 def test_crawlers_persist_through_the_single_helper():
-    """Gate 4 wires the three savers. The orchestrators still only dispatch."""
+    """Gate 4 wires the one saver. RSS/API (W-35 3b) delegate to it; orchestrators dispatch."""
     root = Path(__file__).resolve().parents[1]
-    for name in ("simple_crawler.py", "rss_crawler.py", "api_crawler.py"):
+    html = (root / "crawler_v2" / "simple_crawler.py").read_text(encoding="utf-8")
+    assert "from contracts.persist import persist_candidate" in html
+    assert "from contracts.upsert" not in html
+    assert "from contracts.validate" not in html
+    for name in ("rss_crawler.py", "api_crawler.py"):
         text = (root / "crawler_v2" / name).read_text(encoding="utf-8")
-        assert "from contracts.persist import persist_candidate" in text
+        assert "SimpleCrawler(self.db_url).save_jobs" in text
+        assert "from contracts.persist import persist_candidate" not in text
         assert "from contracts.upsert" not in text
         assert "from contracts.validate" not in text
     assert not (root / "crawler_v2" / "orchestrator.py").exists()

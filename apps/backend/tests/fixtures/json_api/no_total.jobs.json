@@ -1,0 +1,14 @@
+{
+  "url": "https://boards.example.org/api/jobs",
+  "reader": "json-api",
+  "report": null,
+  "jobs": [
+    {
+      "title": "Logistics Coordinator",
+      "apply_url": "https://boards.example.org/openings/77",
+      "record_class": "api",
+      "location_raw": "Amman, Jordan",
+      "deadline": "2026-11-30"
+    }
+  ]
+}

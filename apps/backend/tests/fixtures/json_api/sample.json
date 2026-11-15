@@ -1,0 +1,19 @@
+{
+  "total": 2,
+  "jobs": [
+    {
+      "title": "Data Analyst",
+      "url": "https://boards.example.org/jobs/a1",
+      "location": "Remote",
+      "deadline": "2026-12-01",
+      "description": "Analyse programme data across regions.",
+      "employmentType": "Fixed-term",
+      "published_at": "2026-11-01"
+    },
+    {
+      "title": "Needs Location",
+      "apply_url": "https://boards.example.org/jobs/a2",
+      "deadline": "15/12/2026"
+    }
+  ]
+}
