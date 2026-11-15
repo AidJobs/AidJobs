@@ -1109,4 +1109,24 @@ With 18 to 21 positives, each precision carries a 95% margin of about ±0.13 (Es
 | Not for wave 1a | — | **CIPS** (`cips-global-standard`) → `supply_chain`; **CPMS** → `protection`; **INEE** → `education` (ideas only, CC BY-NC-SA); **Sphere** technical chapters → wash / nutrition / FSL / shelter / health; **IASC** → gender/GBV lens on sector modules; **CIPD** unused (decision 5 above). |
 
 **Next:** Phase 0's guide (Stage 1). Stage 2 must not start without the standards table above.
+### 19.20 Phase 0 guide v1 and pilot sealed (15 November 2026)
 
+**Verified first:** PR #157 merged at approved head `c7a3d2f` as `fcf6399` (14 November 2026, 20:25:59 UTC); Secrets green on `main` (run 43637464614); CI backend skipped (docs only); main folder already at `fcf6399`; branch `w54/phase0-records` gone; survey-raw-archive intact; employer-demo untouched. The abort mid-start left no damage; a stray `w54/standards-handover` working-tree rename was folded into `w54/phase0`.
+
+**Guide v1** (`role-survey/scoring-guide.md`): full 0–3 anchors for all nine dimensions; invented Riverbend / Coastal / Highland examples only; copycheck 0 matches. Independent review (`review-12.md`): changes needed; seven must-fixes taken before coding (specificity and must-haves partitions; field-realism 0 vs example; fairness stop-order; `[email]`/`[phone]`; findability "staff"; `Type:` line for length).
+
+**Tools:** `tools/survey/phase0.py` (draw from fixed `ai-test-set.json` pilot, packets of five with `Type:`, answers, agreement with quadratic weighted kappa, disagreements, sealed reconcile); tests in CI's Role survey step.
+
+**Pilot of 20:** Grok 4.7 (coder A) and Composer 2.5 (coder B), eight concurrent runs; answers copied via `take_answers.py`. Form check clean. Sealed before the user's session (`reconciled.sha256` `0e068308fdcf…`). Packets, answers and the seal stay in `survey-raw-archive/.../work/phase0/`.
+
+**Agreement (exact / quadratic weighted κ):** decision facts 0.80 / 0.77; realistic must-haves 0.90 / 0.69; field realism 0.90 / 1.00 (pass). Below target: specificity 0.45 / 0.18; right length 0.20 / 0.37; readability 0.55 / 0.59; clear outcomes 0.85 / 0.32; fairness 0.90 / 0.50; findability 0.75 / 0.47. Fifty-four cells reconciled with written reasons (length from guide cut-points on measured words; findability from the measuring script; other gaps took the lower score). Sealed set not edited after the seal.
+
+**User's 10-advert session:** skipped (user, 15 November 2026). Calibration used the sealed dual-coded pilot only.
+
+**Guide v1.1** (frozen): same file as v1 with six failing dimensions clarified (specificity 2-vs-3; right-length decision tree; readability L−F checklist; clear-outcomes 3 needs scope and a target; fairness stop-order; findability G = 8). Hash `8f9ad29291b96db26c040729160aad0abb975dbc216240ba10dc24d6f9277259`. Changelog at the end of `scoring-guide.md`.
+
+**Rescore on v1.1** (new seal `reconciled-v1.1.sha256` `d35e4ecf5a85…`; v1 seal untouched): pass on decision facts, realistic must-haves, field realism, readability. Still below target: specificity (exact 0.80, κ ≈ 0 — almost all scores are 2, so κ is uninformative), clear outcomes, fairness, right length, findability. Right length and findability are automatic from the script after the rebuild; the remaining coded gaps stay for a later version if deep-layer dual coding hits them.
+
+**Automatic anchors in `adverts.py`:** aligned to v1.1 (grouped contract/closing facts; length cut-points; findability needs all eight facts). Rebuild: `advert_set.py`, advert text, AI test set, role map and `broad-sections.csv` byte-identical; only `broad-adverts.csv` score columns changed.
+
+**Next:** Stage 2 deep layer for the four wave-1a families (standards first per 19.19).

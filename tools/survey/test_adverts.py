@@ -398,17 +398,25 @@ def test_duty_lines_and_their_specificity():
 
 
 def test_the_partial_scores():
+    # Guide v1.1: contract type+length and closing day+time each count as one fact; pay doubles.
     assert adverts.score_decision_facts(set(adverts.DECISION_FACTS)) == 3
     assert adverts.score_decision_facts(set(adverts.DECISION_FACTS) - {"pay"}) == 2
     assert adverts.score_decision_facts(set(adverts.DECISION_FACTS) - {"start_date"}) == 2   # 3 needs every fact
     assert adverts.score_decision_facts({"how_to_apply"}) == 0
+    assert adverts.score_decision_facts({"pay", "contract_type"}) == 1  # length missing → contract absent
     assert adverts.score_readability(16) == 3 and adverts.score_readability(40) == 0
+    # Length: in band + share ≤ 1/3 → 3; below lower but ≥ half lower → 2; far short → 0; share > 1/2 → 0
     assert adverts.score_length("ingo", 1200, 800, 0.2) == 3
-    assert adverts.score_length("ingo", 1200, 400, 0.2) == 3       # under the ceiling is not penalised
-    assert adverts.score_length("ingo", 1200, 200, 0.2) == 2
+    assert adverts.score_length("ingo", 1200, 400, 0.2) == 2
+    assert adverts.score_length("ingo", 1200, 200, 0.2) == 0
     assert adverts.score_length("ingo", 2400, 2000, 0.2) == 0
     assert adverts.score_length("ingo", 1200, 800, 0.6) == 0
+    assert adverts.score_length("ingo", 1200, 800, 0.4) == 2   # in band, share above one third
     assert adverts.score_length("foundation", 1200, 800, 0.2) is None
+    # Findability: 3 needs all eight Google facts, not seven
+    role = type("R", (), {"function": "finance", "level": "officer"})()
+    assert adverts.score_findability(role, "Finance Officer", {k: True for k in range(8)}) == 3
+    assert adverts.score_findability(role, "Finance Officer", {k: True for k in range(7)}) == 2
 
 
 def given(text):
