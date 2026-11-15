@@ -67,7 +67,8 @@ def utc_now() -> str:
 
 
 def sha256_file(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    """Hash file bytes with CRLF normalised to LF so Windows checkouts match CI."""
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
 
 def read_normative_rows(path: Path = NORMATIVE) -> list[dict]:

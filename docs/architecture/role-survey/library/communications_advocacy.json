@@ -3,8 +3,8 @@
   "built_from": {
     "measured_generated_at": "2026-11-15T14:27:26Z",
     "normative_row_count": 13,
-    "normative_sources_sha256": "a67565f39eab4087a1650414cba420f6e57c9a27ce7943bee8cebba98110373c",
-    "wave_1a_broad_measured_sha256": "2522bf583d6d6186874d36dff4217d242132fdf5fe4748c40b09d66ea8e65fe8",
+    "normative_sources_sha256": "bb505ba7997de7dea1ea79d785cae84ee756c4ca3621d691ba9bb4a3b6942868",
+    "wave_1a_broad_measured_sha256": "d9abc8fc085aa9d699e01b5f0b1545e310ee0e5ddc5284ca69f03d06e98abd51",
     "wave_1a_families": [
       "programme_management",
       "meal",
