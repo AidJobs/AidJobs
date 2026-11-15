@@ -35,9 +35,13 @@ def test_orchestrator_imports_the_three_production_crawlers():
     assert "from crawler_v2.simple_crawler import SimpleCrawler" in orchestrator
     assert "from crawler_v2.rss_crawler import SimpleRSSCrawler" in orchestrator
     assert "from crawler_v2.api_crawler import SimpleAPICrawler" in orchestrator
-    for name in ("simple_crawler.py", "rss_crawler.py", "api_crawler.py"):
+    html = (ROOT / "crawler_v2" / "simple_crawler.py").read_text(encoding="utf-8")
+    assert "persist_candidate" in html
+    assert "organisation_id" not in html
+    for name in ("rss_crawler.py", "api_crawler.py"):
         text = (ROOT / "crawler_v2" / name).read_text(encoding="utf-8")
-        assert "persist_candidate" in text
+        assert "SimpleCrawler(self.db_url).save_jobs" in text
+        assert "persist_candidate" not in text
         assert "organisation_id" not in text
     assert "organisation_id" not in (ROOT / "contracts" / "persist.py").read_text(encoding="utf-8")
 

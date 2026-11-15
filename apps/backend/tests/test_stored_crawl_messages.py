@@ -142,35 +142,40 @@ def _html_crawler(error):
     return crawler, {**SOURCE, "source_type": "html"}
 
 
-def _rss_crawler(error):
+def _rss_crawler(error, monkeypatch):
+    from crawler_v2 import rss_crawler as mod
     from crawler_v2.rss_crawler import SimpleRSSCrawler
 
     crawler = SimpleRSSCrawler("postgresql://example")
 
-    async def fetch_feed(url):
+    async def fetch_feed_response(self, url):
         raise error
 
-    crawler.fetch_feed = fetch_feed
+    monkeypatch.setattr(mod.SimpleRSSCrawler, "fetch_feed_response", fetch_feed_response)
     return crawler, {**SOURCE, "source_type": "rss"}
 
 
-def _api_crawler(error):
+def _api_crawler(error, monkeypatch):
+    from crawler_v2 import api_crawler as mod
     from crawler_v2.api_crawler import SimpleAPICrawler
 
     crawler = SimpleAPICrawler("postgresql://example")
 
-    async def fetch_api(url):
+    async def fetch_api_response(self, url, headers=None):
         raise error
 
-    crawler.fetch_api = fetch_api
+    monkeypatch.setattr(mod.SimpleAPICrawler, "fetch_api_response", fetch_api_response)
     return crawler, {**SOURCE, "source_type": "api"}
 
 
 @pytest.mark.parametrize("make", [_html_crawler, _rss_crawler, _api_crawler],
                          ids=["html", "rss", "api"])
 @pytest.mark.parametrize("error", [RuntimeError(LEAK), _crossing(200)], ids=["leak", "crossing"])
-def test_each_crawlers_failure_message_is_masked(make, error, caplog):
-    crawler, source = make(error)
+def test_each_crawlers_failure_message_is_masked(make, error, caplog, monkeypatch):
+    # HTML helper takes only the error; RSS/API need monkeypatch for the shared fetch methods.
+    crawler, source = (
+        make(error, monkeypatch) if make is not _html_crawler else make(error)
+    )
     with caplog.at_level(logging.DEBUG):
         result = asyncio.run(crawler.crawl_source(source))
     assert result["status"] == "failed"

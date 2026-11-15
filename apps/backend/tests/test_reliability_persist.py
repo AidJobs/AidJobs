@@ -7,6 +7,7 @@ from contracts.run_ownership import OwnershipLost, save_failure_outcome
 from crawler_v2.api_crawler import SimpleAPICrawler
 from crawler_v2.rss_crawler import SimpleRSSCrawler
 from crawler_v2.run_handle import RunHandle
+from crawler_v2.simple_crawler import SimpleCrawler
 
 
 class RaisingConn:
@@ -24,16 +25,16 @@ class RaisingConn:
         self.closed = True
 
 
-def _crawler(cls, conn):
-    crawler = cls("postgresql://example")
-    crawler._get_db_conn = lambda: conn
-    return crawler
+def _patch_shared_save(monkeypatch, conn):
+    """W-35 3b: RSS/API save through SimpleCrawler.save_jobs; patch that connection."""
+    monkeypatch.setattr(SimpleCrawler, "_get_db_conn", lambda self: conn)
 
 
 @pytest.mark.parametrize("cls", [SimpleRSSCrawler, SimpleAPICrawler])
-def test_save_jobs_rolls_back_and_reraises(cls):
+def test_save_jobs_rolls_back_and_reraises(cls, monkeypatch):
     conn = RaisingConn()
-    crawler = _crawler(cls, conn)
+    _patch_shared_save(monkeypatch, conn)
+    crawler = cls("postgresql://example")
     job = {"title": "Officer", "apply_url": "https://example.org/jobs/1", "admitted": True}
     with pytest.raises(RuntimeError, match="persist failed"):
         crawler.save_jobs([job], "src-1", "Example", run_token="run-1")
@@ -42,13 +43,12 @@ def test_save_jobs_rolls_back_and_reraises(cls):
 
 
 @pytest.mark.parametrize("cls", [SimpleRSSCrawler, SimpleAPICrawler])
-def test_empty_save_jobs_returns_before_sql(cls):
-    crawler = cls("postgresql://example")
-
-    def connect():
+def test_empty_save_jobs_returns_before_sql(cls, monkeypatch):
+    def connect(self):
         raise AssertionError("empty save must not open a connection")
 
-    crawler._get_db_conn = connect
+    monkeypatch.setattr(SimpleCrawler, "_get_db_conn", connect)
+    crawler = cls("postgresql://example")
     assert crawler.save_jobs([], "src-1", "Example", run_token="run-1") == {
         "inserted": 0,
         "updated": 0,
@@ -59,13 +59,12 @@ def test_empty_save_jobs_returns_before_sql(cls):
 
 
 @pytest.mark.parametrize("cls", [SimpleRSSCrawler, SimpleAPICrawler])
-def test_save_jobs_without_a_run_token_writes_nothing(cls):
-    crawler = cls("postgresql://example")
-
-    def connect():
+def test_save_jobs_without_a_run_token_writes_nothing(cls, monkeypatch):
+    def connect(self):
         raise AssertionError("a save without a token must not open a connection")
 
-    crawler._get_db_conn = connect
+    monkeypatch.setattr(SimpleCrawler, "_get_db_conn", connect)
+    crawler = cls("postgresql://example")
     job = {"title": "Officer", "apply_url": "https://example.org/jobs/1", "admitted": True}
     with pytest.raises(OwnershipLost):
         crawler.save_jobs([job], "src-1", "Example")
@@ -107,7 +106,8 @@ def test_a_run_handle_needs_its_token():
 
 
 def test_success_status_and_found_stay_pre_admission():
+    # W-35 3b: status from _listing_outcome (empty → warn); found is still the listing size.
     for cls in (SimpleRSSCrawler, SimpleAPICrawler):
         source = inspect.getsource(cls.crawl_source)
-        assert "'ok' if jobs else 'warn'" in source
-        assert "'found': len(jobs)" in source
+        assert "_listing_outcome" in source
+        assert '"found": len(jobs)' in source

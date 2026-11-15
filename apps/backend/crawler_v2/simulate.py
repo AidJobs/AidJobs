@@ -1,7 +1,8 @@
-"""Admin simulation of a listing read (ledger W-35 pull request 3a).
+"""Admin simulation of a listing read (ledger W-35).
 
-Runs the crawl's own HTML readers on the first page only (no later-page fetches), then
-admission's verdict on each row: admitted, needs its job page, or rejected with the reason.
+HTML: the crawl's own readers on the first page only (no later-page fetches).
+RSS and API: the feed / JSON readers on the fetched body (pull request 3b).
+Then admission's verdict on each row: admitted, needs its job page, or rejected with the reason.
 """
 from __future__ import annotations
 
@@ -10,7 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from contracts.admission import admit_batch, too_thin
 from contracts.reader import ListingResult, Request, Response
-from crawler_v2.readers import html_readers, read_listing
+from crawler_v2.readers import api_readers, html_readers, read_listing, rss_readers
 
 # Fixed stop handed to every later-page request so Sites and PageUp walks stay on page one.
 FIRST_PAGE_ONLY = "first page only"
@@ -39,6 +40,26 @@ async def simulate_html(crawler, html: str, careers_url: str) -> Dict[str, Any]:
         fetch=_refuse_later_pages,
     )
     return summarise(result, "html")
+
+
+async def simulate_rss(body: str, careers_url: str) -> Dict[str, Any]:
+    """Read one feed body through the RSS feed reader."""
+    result = await read_listing(
+        rss_readers(),
+        Response(200, body, content_type="application/rss+xml"),
+        {"careers_url": careers_url},
+    )
+    return summarise(result, "rss")
+
+
+async def simulate_api(body: str, careers_url: str) -> Dict[str, Any]:
+    """Read one JSON listing body through the generic JSON reader."""
+    result = await read_listing(
+        api_readers(),
+        Response(200, body, content_type="application/json"),
+        {"careers_url": careers_url},
+    )
+    return summarise(result, "api")
 
 
 def summarise(result: ListingResult, record_class: str) -> Dict[str, Any]:
@@ -70,8 +91,7 @@ def summarise(result: ListingResult, record_class: str) -> Dict[str, Any]:
 def summarise_jobs(
     jobs: List[Dict], record_class: str, reader: Optional[str] = None
 ) -> Dict[str, Any]:
-    """Admission summary for RSS/API (or any pre-read list) until those readers join the
-    interface (pull request 3b)."""
+    """Admission summary for a pre-read list (tests; Simulate uses the readers)."""
     return summarise(ListingResult(reader or "unknown", list(jobs)), record_class)
 
 

@@ -327,10 +327,15 @@ def test_crawlers_schedule_projection_after_commit_and_do_not_reindex():
     commit = commit.split("def schedule_after_commit", 1)[0]
     assert commit.index("conn.commit()") < commit.index("schedule_after_commit")
 
-    for name in ("simple_crawler.py", "rss_crawler.py", "api_crawler.py"):
+    html = (ROOT / "crawler_v2" / "simple_crawler.py").read_text(encoding="utf-8")
+    assert "commit_and_schedule" in html
+    assert "reindex_jobs" not in html
+    assert "recorded=recorded" in html
+    # W-35 3b: RSS/API use the one HTML save step (no private commit_and_schedule).
+    for name in ("rss_crawler.py", "api_crawler.py"):
         text = (ROOT / "crawler_v2" / name).read_text(encoding="utf-8")
-        assert "commit_and_schedule" in text
+        assert "SimpleCrawler(self.db_url).save_jobs" in text
+        assert "commit_and_schedule" not in text
         assert "reindex_jobs" not in text
-        assert "recorded=recorded" in text
     orchestrator = (ROOT / "orchestrator.py").read_text(encoding="utf-8")
     assert "reindex_jobs" not in orchestrator

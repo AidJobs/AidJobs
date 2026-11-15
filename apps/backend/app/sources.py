@@ -945,10 +945,10 @@ async def simulate_extract(
     source_id: str,
     admin: str = Depends(admin_required)
 ):
-    """Simulate listing extraction without DB writes (W-35 3a).
+    """Simulate listing extraction without DB writes (W-35).
 
     HTML: the crawl's own readers on the first page only, with admission's verdict per row.
-    RSS and API: today's extractors until pull request 3b, with the same admission summary.
+    RSS and API: the feed / JSON readers on the fetched body, with the same admission summary.
     """
     if not psycopg2:
         raise HTTPException(status_code=503, detail="Database driver not available")
@@ -982,7 +982,7 @@ async def simulate_extract(
         if source_type == 'json':
             source_type = 'api'
         
-        from crawler_v2.simulate import summarise_jobs, simulate_html
+        from crawler_v2.simulate import simulate_api, simulate_html, simulate_rss
 
         db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
         if not db_url:
@@ -1010,15 +1010,29 @@ async def simulate_extract(
         elif source_type == 'rss':
             from crawler_v2.rss_crawler import SimpleRSSCrawler
             rss_crawler = SimpleRSSCrawler(db_url)
-            feed = await rss_crawler.fetch_feed(source['careers_url'])
-            jobs = rss_crawler.extract_jobs_from_feed(feed, source['careers_url']) if feed else []
-            return summarise_jobs(jobs, "rss", reader="rss")
+            answer = await rss_crawler.fetch_feed_response(source['careers_url'])
+            if answer.stop or answer.status != 200 or not answer.body:
+                return {
+                    "ok": False,
+                    "error": (
+                        f"Refused: {answer.stop}" if answer.stop else f"HTTP {answer.status}"
+                    ),
+                    "error_category": "runtime",
+                }
+            return await simulate_rss(answer.body, source['careers_url'])
         elif source_type == 'api':
             from crawler_v2.api_crawler import SimpleAPICrawler
             api_crawler = SimpleAPICrawler(db_url)
-            data = await api_crawler.fetch_api(source['careers_url'])
-            jobs = api_crawler.extract_jobs_from_json(data, source['careers_url']) if data else []
-            return summarise_jobs(jobs, "api", reader="api")
+            answer = await api_crawler.fetch_api_response(source['careers_url'])
+            if answer.stop or answer.status != 200 or not answer.body:
+                return {
+                    "ok": False,
+                    "error": (
+                        f"Refused: {answer.stop}" if answer.stop else f"HTTP {answer.status}"
+                    ),
+                    "error_category": "runtime",
+                }
+            return await simulate_api(answer.body, source['careers_url'])
         else:
             raise HTTPException(
                 status_code=400, 

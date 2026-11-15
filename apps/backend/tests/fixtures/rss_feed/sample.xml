@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Example Careers</title>
+    <link>https://careers.example.org/jobfeed</link>
+    <description>Open roles</description>
+    <item>
+      <title>Programme Officer</title>
+      <link>https://careers.example.org/jobs/101</link>
+      <description>Location: Nairobi, Kenya. Deadline: 2026-12-15. Full description of the role.</description>
+      <pubDate>Mon, 10 Nov 2026 12:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Thin Listing Row</title>
+      <link>https://careers.example.org/jobs/102</link>
+      <description>No location or deadline in this summary.</description>
+      <pubDate>2026-11-11</pubDate>
+    </item>
+  </channel>
+</rss>

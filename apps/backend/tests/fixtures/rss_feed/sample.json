@@ -1,0 +1,23 @@
+{
+  "url": "https://careers.example.org/jobfeed",
+  "reader": "rss-feed",
+  "report": null,
+  "jobs": [
+    {
+      "title": "Programme Officer",
+      "apply_url": "https://careers.example.org/jobs/101",
+      "record_class": "rss",
+      "description": "Location: Nairobi, Kenya. Deadline: 2026-12-15. Full description of the role.",
+      "location_raw": "Nairobi, Kenya",
+      "deadline": "2026-12-15",
+      "posted_on": "2026-11-10"
+    },
+    {
+      "title": "Thin Listing Row",
+      "apply_url": "https://careers.example.org/jobs/102",
+      "record_class": "rss",
+      "description": "No location or deadline in this summary.",
+      "posted_on": "2026-11-11"
+    }
+  ]
+}

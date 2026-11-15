@@ -366,9 +366,17 @@ def test_persist_source_has_no_second_writer():
 
 
 def test_three_crawlers_use_one_helper_and_do_not_reactivate():
-    for name in ("simple_crawler.py", "rss_crawler.py", "api_crawler.py"):
+    html = (ROOT / "crawler_v2" / "simple_crawler.py").read_text(encoding="utf-8")
+    assert "persist_candidate" in html
+    assert "jobs_side" not in html
+    collapsed = html.lower().replace(" ", "")
+    assert "deleted_at=null" not in collapsed
+    assert "hashlib" not in html
+    # W-35 3b: RSS and API delegate to the one HTML save step (no private persist copy).
+    for name in ("rss_crawler.py", "api_crawler.py"):
         text = (ROOT / "crawler_v2" / name).read_text(encoding="utf-8")
-        assert "persist_candidate" in text
+        assert "SimpleCrawler(self.db_url).save_jobs" in text
+        assert "persist_candidate" not in text
         assert "jobs_side" not in text
         collapsed = text.lower().replace(" ", "")
         assert "deleted_at=null" not in collapsed
@@ -397,5 +405,9 @@ def test_production_extractor_does_not_insert():
     assert not (db_url and (enable_storage is None or enable_storage))
     for name in ("rss_crawler.py", "api_crawler.py"):
         text = (ROOT / "crawler_v2" / name).read_text(encoding="utf-8")
-        assert "Extractor(enable_ai=False, enable_snapshots=False, shadow_mode=False)" in text
+        # W-35 3b: feed/JSON readers; dead pipeline.extractor calls removed.
+        assert "pipeline.extractor" not in text
+        assert "Extractor(" not in text
         assert "db_insert" not in text
+        assert "SimpleCrawler(self.db_url).save_jobs" in text
+        assert "read_listing" in text
