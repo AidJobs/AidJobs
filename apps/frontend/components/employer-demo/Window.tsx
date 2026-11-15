@@ -1116,14 +1116,14 @@ function JobWindow({ id }: { id: string }) {
     const wasSetup = Boolean(job.setup);
     const keys = pick.order.map((o) => o.key);
     if (pick.tab === 'own') {
-      const key = createFormat(pick.name.trim(), pick.order, toneOf(job.style ?? proposedStyle(s)), pick.groupOrder);
+      const key = createFormat(pick.name.trim(), pick.order, toneOf(job.style ?? proposedStyle(s)), pick.groupOrder, pick.customGroups);
       if (wasSetup) applyTemplate(job.id, key, undefined, keys, pickGrouping(pick));
       else applyFormat(job.id, key);
     } else {
       // The template as adjusted in the panel: its sections, their groups and order, and any heading renamed for this job.
       if (wasSetup) applyTemplate(job.id, pick.key, undefined, keys, pickGrouping(pick));
       else if (pick.key !== job.format) applyFormat(job.id, pick.key);
-      applyOutline(job.id, pick.order, pick.groupOrder);
+      applyOutline(job.id, pick.order, pick.groupOrder, pick.customGroups);
     }
     setPick(null);
     if (phone) setView(wasSetup ? 'chat' : 'job');

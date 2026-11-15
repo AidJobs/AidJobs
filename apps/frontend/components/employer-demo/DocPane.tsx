@@ -10,7 +10,7 @@ import { fixedLabel, fixedList, offeredFixed } from './fixed';
 import { viewOf } from './langs';
 import { jobLang, langOf } from './translate';
 import { placeFor } from './MenuButton';
-import { groupOfKey, groupOrderOf, KEPT, placeSaid } from './outline';
+import { groupLabelOf, groupOfKey, groupOrderOf, KEPT, placeSaid } from './outline';
 import { contractPicks, deadlinePicks, eligibilityPicks, gradePicks, languagePicks, methodPicks, placePatch, placePicks, salaryPicks, safeguardingPicks, type Pick } from './answers';
 import { DOCUMENTS } from './apply';
 import { saveAboutForOrg } from './context';
@@ -605,6 +605,7 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
   const box = useRef<HTMLDivElement>(null);
   const [place] = useState(() => placeFor(at.anchor, 'left', at.end));
   const [ownName, setOwnName] = useState<string | null>(null);
+  const ownDone = useRef(false);
   const view = viewOf(job, lang);
   const g = { ...(view?.grouping ?? groupingOf(job)), customGroups: view?.customGroups ?? job.customGroups };
   const keys = view?.keys ?? job.tags;
@@ -632,8 +633,10 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
     });
   };
   const addOwn = (heading: string) => {
+    if (ownDone.current) return;
     const name = heading.trim();
     if (!name) return;
+    ownDone.current = true;
     const op = { op: 'addCustom' as const, heading: name, group: here, ...(at.end ? {} : { after: at.after }) };
     if (version) versionOp(job.id, version, op);
     else outlineOp(job.id, op);
@@ -770,7 +773,7 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inW
         grip: (sec) => [
           { label: 'Move up', run: () => (outlineOp(job.id, { op: 'by', key: sec.key, by: -1, reading: true }), focusGrip(sec.key)) },
           { label: 'Move down', run: () => (outlineOp(job.id, { op: 'by', key: sec.key, by: 1, reading: true }), focusGrip(sec.key)) },
-          { label: 'Move to group…', items: groupOrderOf(g).filter((x) => x !== groupOfKey(g, sec.key)).map((x) => ({ label: GROUPS.find((y) => y.key === x)?.label ?? x, run: () => (outlineOp(job.id, { op: 'toGroup', key: sec.key, group: x }), focusGrip(sec.key)) })) },
+          { label: 'Move to group…', items: groupOrderOf(g).filter((x) => x !== groupOfKey(g, sec.key)).map((x) => ({ label: groupLabelOf(x, job.customGroups), run: () => (outlineOp(job.id, { op: 'toGroup', key: sec.key, group: x }), focusGrip(sec.key)) })) },
           { label: 'Add a section below', run: () => openAdd(sec.key, document.querySelector<HTMLElement>(`[data-grip-key="${sec.key}"]`), false) },
           ...(KEPT.includes(sec.key) ? [] : [{ label: 'Remove', danger: true, run: () => outlineOp(job.id, { op: 'remove', key: sec.key }) }]),
           ...(sec.key === 'about' && s.me.role === 'owner' && sec.lines.length > 0 && sec.lines.join('\n').trim() !== s.org.about.trim() ? [{ label: 'Save as our About us', run: () => saveAboutForOrg(job.id) }] : []),

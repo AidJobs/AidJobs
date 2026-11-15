@@ -7,8 +7,7 @@ import { dismissToUpdate, editVersionSection, keepTranslation, refreshTranslatio
 import { AddPanel, StepNote } from './DocPane';
 import FixedBlock from './FixedBlock';
 import Grip, { dropAt, type GripAction } from './Grip';
-import { GROUPS } from './engine';
-import { groupOfKey, groupOrderOf, KEPT } from './outline';
+import { groupLabelOf, groupOfKey, groupOrderOf, KEPT } from './outline';
 import { jobLang, langOf, stale, stillOwn, totalLines, untranslated, versionsOf } from './translate';
 import type { DemoJob, GroupKey, JobLang, Section, State } from './types';
 import { inputStyle, radioKeys } from './ui';
@@ -231,7 +230,7 @@ export function LangDoc({ job, s, lang, readOnly = false }: { job: DemoJob; s: S
   const left = untranslated(job, t);
   const isStale = stale(job, t);
   const keys = t.sections.map((x) => x.key);
-  const g = { groupOrder: t.groupOrder, groupOf: t.groupOf };
+  const g = { groupOrder: t.groupOrder, groupOf: t.groupOf, customGroups: t.customGroups };
   const focusGrip = (key: string) => requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-grip-key="ver:${key}"]`)?.focus({ preventScroll: true }));
   const openAdd = (after: string | null, anchor: HTMLElement | null, end: boolean) => anchor && setAdding({ after, anchor, end });
   const tools: Tools | undefined = readOnly
@@ -240,7 +239,7 @@ export function LangDoc({ job, s, lang, readOnly = false }: { job: DemoJob; s: S
         grip: (sec) => [
           { label: 'Move up', run: () => (versionOp(job.id, lang, { op: 'by', key: sec.key, by: -1, reading: true }), focusGrip(sec.key)) },
           { label: 'Move down', run: () => (versionOp(job.id, lang, { op: 'by', key: sec.key, by: 1, reading: true }), focusGrip(sec.key)) },
-          { label: 'Move to group…', items: groupOrderOf(g).filter((x) => x !== groupOfKey(g, sec.key)).map((x) => ({ label: GROUPS.find((y) => y.key === x)?.label ?? x, run: () => (versionOp(job.id, lang, { op: 'toGroup', key: sec.key, group: x }), focusGrip(sec.key)) })) },
+          { label: 'Move to group…', items: groupOrderOf(g).filter((x) => x !== groupOfKey(g, sec.key)).map((x) => ({ label: groupLabelOf(x, t.customGroups), run: () => (versionOp(job.id, lang, { op: 'toGroup', key: sec.key, group: x }), focusGrip(sec.key)) })) },
           { label: 'Add a section below', run: () => openAdd(sec.key, document.querySelector<HTMLElement>(`[data-grip-key="ver:${sec.key}"]`), false) },
           ...(KEPT.includes(sec.key) ? [] : [{ label: 'Remove', danger: true, run: () => versionOp(job.id, lang, { op: 'remove', key: sec.key }) }]),
         ],

@@ -1,7 +1,7 @@
 'use client';
 
 import { Languages, Plus, Sparkles, X } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import Tip from '@/components/site/Tip';
 import { SECTION_BY_KEY, SECTIONS } from './engine';
 import Grip, { dropAt, groupDropAt, type GripAction } from './Grip';
@@ -43,9 +43,17 @@ function InlineHeading({ value, onCommit, readOnly, label }: { value: string; on
   );
 }
 
-/** A quiet name field that opens when "Add your own" or "Add a group" is chosen. */
+/** A quiet name field that opens when "Add your own" or "Add a group" is chosen. Enter and blur commit once. */
 function NameField({ label, onCommit, onCancel }: { label: string; onCommit: (v: string) => void; onCancel: () => void }) {
   const [draft, setDraft] = useState('');
+  const done = useRef(false);
+  const finish = (v: string) => {
+    if (done.current) return;
+    done.current = true;
+    const name = v.trim();
+    if (name) onCommit(name);
+    else onCancel();
+  };
   return (
     <input
       className="ej-ol-input"
@@ -55,19 +63,18 @@ function NameField({ label, onCommit, onCancel }: { label: string; onCommit: (v:
       placeholder={label}
       aria-label={label}
       onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => {
-        if (draft.trim()) onCommit(draft.trim());
-        else onCancel();
-      }}
-      onKeyDown={(e) => {
+      onBlur={() => finish(draft)}
+      onKeyDown={(e: ReactKeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
           e.preventDefault();
-          if (draft.trim()) onCommit(draft.trim());
-          else onCancel();
+          finish(draft);
         }
         if (e.key === 'Escape') {
           e.stopPropagation();
-          onCancel();
+          if (!done.current) {
+            done.current = true;
+            onCancel();
+          }
         }
       }}
     />

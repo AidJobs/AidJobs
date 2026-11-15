@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { addTranslation, alsoIn, applyFormat, applyTemplate, approveFixed, approveSection, bringBackFixed, chooseStyle, createFormat, editFixed, editSection, editVersionSection, goOn, hireAgain, keepForAll, keepWordingForAll, leaveOutFixed, leavePoint, moveFixed, NEXT_QUESTION, outlineOp, publish, publishBlock, publishNow, removeVersionSection, resetFixed, restoreVersion, reviewTranslation, sendChat, setApply, setFacts, setJobLang, setLinked, setPace, settleQuestion, startJob, toggleCommitment, toggleSection, translateFixed, undoStep, unparkPart, USE_WORDINGS, versionOp } from '../../components/employer-demo/actions';
+import { addTranslation, alsoIn, applyFormat, applyOutline, applyTemplate, approveFixed, approveSection, bringBackFixed, chooseStyle, createFormat, editFixed, editSection, editVersionSection, goOn, hireAgain, keepForAll, keepWordingForAll, leaveOutFixed, leavePoint, moveFixed, NEXT_QUESTION, outlineOp, publish, publishBlock, publishNow, removeVersionSection, resetFixed, restoreVersion, reviewTranslation, sendChat, setApply, setFacts, setJobLang, setLinked, setPace, settleQuestion, startJob, toggleCommitment, toggleSection, translateFixed, undoStep, unparkPart, USE_WORDINGS, versionOp } from '../../components/employer-demo/actions';
 import { fixedShown, fixedWordingNow } from '../../components/employer-demo/fixed';
 import { FlyerNotice } from '../../components/employer-demo/Flyer';
 import { createElement } from 'react';
@@ -823,23 +823,66 @@ describe('add your own group, section, and sub-section (section 19, phase 6 amen
     applyAiTurn('job-comms', 'add a section called Kit list in Field pack', { reply: 'Added.', actions: [{ type: 'add_section', heading: 'Kit list', group: gid }] }, open);
     const key = job('job-comms').tags.find((k) => k.startsWith('c-'))!;
     expect(job('job-comms').sections.find((x) => x.key === key)?.title).toBe('Kit list');
+    // Sub-heading on the still-empty section lands on sec.subs (not only subsPlan).
+    applyAiTurn('job-comms', 'add a heading Inside week one under Kit list', { reply: 'Done.', actions: [{ type: 'sub', section: key, op: 'add', heading: 'Inside week one' }] }, open);
+    expect(job('job-comms').sections.find((x) => x.key === key)?.subs?.[0].title).toBe('Inside week one');
     applyAiTurn('job-comms', 'write Kit list', { reply: 'Done.', actions: [{ type: 'write_section', section: 'Kit list', lines: ['- Pack a first-aid kit'] }] }, open);
     expect(job('job-comms').sections.find((x) => x.key === key)?.lines).toEqual(['- Pack a first-aid kit']);
-    applyAiTurn('job-comms', 'add a heading Inside week one under Kit list', { reply: 'Done.', actions: [{ type: 'sub', section: key, op: 'add', heading: 'Inside week one' }] }, open);
     expect(job('job-comms').sections.find((x) => x.key === key)?.subs?.[0].title).toBe('Inside week one');
     const before = job('job-comms').tags.length;
     applyAiTurn('job-comms', 'hello', { reply: 'Hi.', actions: [{ type: 'add_section', heading: 'Invented', group: 'job' }] }, open);
     expect(job('job-comms').chat.filter((m) => m.ai).at(-1)?.text).toMatch(/only when you name it|Invented/i);
     expect(job('job-comms').tags.length).toBe(before);
+    applyAiTurn('job-comms', 'move this into the job group', { reply: 'No.', actions: [{ type: 'remove_group', group: gid }] }, open);
+    expect(job('job-comms').customGroups?.[0].id).toBe(gid);
     applyAiTurn('job-comms', 'remove the Field pack group', { reply: 'Removed.', actions: [{ type: 'remove_group', group: gid }] }, open);
     expect(job('job-comms').customGroups).toBeUndefined();
   });
 
-  it('saving a template keeps the added group', () => {
+  it('a catalog add through the chat keeps added groups', () => {
+    outlineOp('job-comms', { op: 'addGroup', label: 'Field notes' });
+    const gid = job('job-comms').customGroups![0].id;
+    applyAiTurn('job-comms', 'add First weeks', { reply: 'Added.', actions: [{ type: 'add_section', section: 'firstweeks' }] }, open);
+    expect(job('job-comms').tags).toContain('firstweeks');
+    expect(job('job-comms').customGroups?.[0].id).toBe(gid);
+  });
+
+  it('changing template keeps custom sections and added groups when the job has its own grouping', () => {
+    outlineOp('job-comms', { op: 'addGroup', label: 'Annex' });
+    const gid = job('job-comms').customGroups![0].id;
+    outlineOp('job-comms', { op: 'addCustom', heading: 'Extra note', group: gid });
+    const custom = job('job-comms').tags.find((k) => k.startsWith('c-'))!;
+    const title = job('job-comms').sections.find((x) => x.key === custom)?.title;
+    applyFormat('job-comms', job('job-comms').format === 'house' ? 'un' : 'house');
+    expect(job('job-comms').tags).toContain(custom);
+    expect(job('job-comms').customGroups?.[0].id).toBe(gid);
+    expect(job('job-comms').sections.find((x) => x.key === custom)?.title).toBe(title);
+  });
+
+  it('saving a template and applying the outline keep the added group', () => {
     outlineOp('job-comms', { op: 'addGroup', label: 'Annex' });
     const gid = job('job-comms').customGroups![0].id;
     const order = job('job-comms').tags.map((k) => ({ key: k, heading: job('job-comms').sections.find((x) => x.key === k)?.title ?? k }));
-    const key = createFormat('With annex', order, 'warm', job('job-comms').groupOrder, job('job-comms').customGroups);
+    const groupOrder = job('job-comms').groupOrder;
+    const key = createFormat('With annex', order, 'warm', groupOrder, job('job-comms').customGroups);
     expect(getState().formats.find((f) => f.key === key)?.customGroups?.[0]).toEqual({ id: gid, label: 'Annex' });
+    outlineOp('job-comms', { op: 'removeGroup', group: gid });
+    expect(job('job-comms').customGroups).toBeUndefined();
+    const after = job('job-comms').tags.map((k) => ({ key: k, heading: job('job-comms').sections.find((x) => x.key === k)?.title ?? k }));
+    applyOutline('job-comms', after, groupOrder, [{ id: gid, label: 'Annex' }]);
+    expect(job('job-comms').customGroups?.[0]).toEqual({ id: gid, label: 'Annex' });
+  });
+
+  it('reviewers stay read-only on the outline; the amendment does not fetch AidJobs', () => {
+    update((s) => ({ ...s, reviewerAs: 'daniel' }));
+    outlineOp('job-comms', { op: 'addGroup', label: 'Should not land' });
+    expect(job('job-comms').customGroups).toBeUndefined();
+    update((s) => ({ ...s, reviewerAs: null }));
+    const fs = require('fs') as typeof import('fs');
+    const path = require('path') as typeof import('path');
+    for (const f of ['outline.ts', 'OutlineEditor.tsx', 'DocPane.tsx']) {
+      const src = fs.readFileSync(path.join(__dirname, '../../components/employer-demo', f), 'utf8');
+      expect({ f, fetch: /\bfetch\s*\(/.test(src) }).toEqual({ f, fetch: false });
+    }
   });
 });

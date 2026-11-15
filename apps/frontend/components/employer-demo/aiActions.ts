@@ -599,7 +599,7 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         const group = typeof a.group === 'string' ? a.group : '';
         const groupLabel = view?.customGroups?.find((g) => g.id === group)?.label ?? j.customGroups?.find((g) => g.id === group)?.label ?? '';
         if (!isCustomGroup(group) || !groupsOf(viewGrouping).includes(group)) refused.push('removing a group: only one you added');
-        else if (!namedIn(said, groupLabel) && !namedIn(said, 'group')) refused.push('removing a group: only when you ask for it');
+        else if (!namedIn(said, groupLabel)) refused.push(`removing a group: only when you name it`);
         else if (inVersion) versionOp(id, inVersion, { op: 'removeGroup', group });
         else outlineOp(id, { op: 'removeGroup', group });
         break;
@@ -829,10 +829,13 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         const l = oneOf(a.language, LANG_KEYS);
         const t = l ? getState().jobs.find((x) => x.id === id)?.translations?.[l] : undefined;
         // As with a version's tab open: its About us and How to apply are translations, checked like any other line.
+        // Custom sections already on the version are written by key; How to apply is never written here.
+        const onVersion = Boolean(section && t?.sections.some((x) => x.key === section));
+        const canWrite = Boolean(section && section !== 'apply' && (SECTION_BY_KEY[section] || (isCustomSection(section) && onVersion)));
         if (!l || !t) refused.push('a version that does not exist');
-        else if (!SECTION_BY_KEY[section]) refused.push(`a section the demo does not have ("${section.slice(0, 30)}")`);
+        else if (!canWrite) refused.push(`a section the demo does not have ("${(section || name || '').slice(0, 30)}")`);
         else {
-          if (!t.sections.some((x) => x.key === section)) addVersionSection(id, l, section);
+          if (!onVersion && SECTION_BY_KEY[section]) addVersionSection(id, l, section);
           const out = checkLines(a.lines, section, s, j, said ?? '');
           if ('refused' in out) refused.push(out.refused);
           else writeVersionSection(id, l, section, out.lines);

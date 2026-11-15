@@ -40,9 +40,9 @@ export function startPick(s: State, job: DemoJob, tab: Pick['tab']): Pick {
   return { tab, name: '', ...pickOf(s, job, key), from: key };
 }
 
-/** The pick's grouping, as the outline and the job read it. */
+/** The pick's grouping, as the outline and the job read it (including groups the user added). */
 export function pickGrouping(pick: Pick) {
-  return formatGrouping({ order: pick.order, groupOrder: pick.groupOrder });
+  return { ...formatGrouping({ order: pick.order, groupOrder: pick.groupOrder }), customGroups: pick.customGroups };
 }
 
 /**
@@ -60,7 +60,13 @@ export function refitPick(s: State, before: DemoJob, after: DemoJob, pick: Pick)
   const all = [...kept, ...added];
   // The user's own grouping stays; a section the new type brings goes in at the end of its group.
   const g = pickGrouping({ ...pick, order: kept });
-  const placed = added.reduce((acc, a) => addToGroup(acc.keys, acc.grouping, a.key), { keys: kept.map((o) => o.key), grouping: g });
+  const placed = added.reduce(
+    (acc, a) => {
+      const next = addToGroup(acc.keys, acc.grouping, a.key);
+      return { keys: next.keys, grouping: { ...next.grouping, customGroups: pick.customGroups } };
+    },
+    { keys: kept.map((o) => o.key), grouping: g },
+  );
   return { ...pick, order: groupedEntries(placed.keys.map((k) => all.find((o) => o.key === k)!), placed.grouping) };
 }
 
