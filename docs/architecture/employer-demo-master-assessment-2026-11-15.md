@@ -110,7 +110,7 @@
 | Chat & walk auditor | Every prompt, quick reply, Undo in chat, double answers, dead ends | [Chat walk auditor](5fe61c7e-1041-4c21-9756-9c7e4ef396c9) |
 | Chrome / icons / tabs auditor | Every control in JD window: tabs, Eye, History, progress, grip, +, pencil, Approve | [JD chrome every control](8d96528d-fe48-4e80-94ce-9d18050e0141) |
 | Design uniformity & friction | Rows, alignment, labels, empty states, confirmations, recoverability | [Design friction uniformity](8af77d24-3d2a-472e-83b7-d73abbd1357b) |
-| Phone / small screen | Sheets, clipped tools, Preview, publish path on ~390px | [Phone small-screen JD](pending — relaunched if id missing below) |
+| Phone / small screen | Sheets, clipped tools, Preview, publish path on ~390px | [Phone small-screen JD](db60b9f0-3ac7-408e-a061-3678032625cb) |
 
 **Findings from Round 2:** *(append below when agents complete; do not delete Round 1.)*
 
