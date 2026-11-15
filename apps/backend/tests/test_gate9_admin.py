@@ -26,12 +26,12 @@ def test_organisation_screen_does_not_touch_organisation_rows():
 
 def test_core_admin_routes_use_the_single_prefix():
     sources = (ROOT / "app" / "sources.py").read_text(encoding="utf-8")
-    presets = (ROOT / "app" / "presets.py").read_text(encoding="utf-8")
     assert '@router.get("/api/admin/sources")' in sources
     assert '@router.post("/api/admin/sources")' in sources
     assert '"/admin/sources' not in sources
-    assert '"/api/admin/presets/sources"' in presets
+    assert not (ROOT / "app" / "presets.py").exists()
     main = (ROOT / "main.py").read_text(encoding="utf-8")
+    assert "presets" not in main
     assert "include_router(crawl_router)" not in main
     assert "from app.crawl import" not in main
     assert "https://*.vercel.app" not in main

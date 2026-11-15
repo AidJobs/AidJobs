@@ -737,7 +737,8 @@ def test_rss_api_and_admin_head_use_the_shared_fetch(monkeypatch):
     assert "fetch_url" in inspect.getsource(_policy_head)
     from app import sources as source_routes
 
-    assert _policy_head_calls(source_routes.test_source) == 2
+    # W-35 3a: Test is one policy HEAD for every source type (no v1 API branch).
+    assert _policy_head_calls(source_routes.test_source) == 1
 
 
 def _policy_head_calls(func) -> int:
@@ -790,4 +791,4 @@ def test_admin_source_test_route_is_test_source():
     }
     assert sources._policy_head not in registered
     assert sources.admin_required in _dependency_calls(route.dependant)
-    assert _policy_head_calls(sources.test_source) == 2
+    assert _policy_head_calls(sources.test_source) == 1

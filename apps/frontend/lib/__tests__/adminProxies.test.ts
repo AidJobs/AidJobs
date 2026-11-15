@@ -44,7 +44,6 @@ const CASES: Case[] = [
   { module: 'sources/[id]/permanent', method: 'DELETE', params: { id: 'src-3' }, backendPath: '/api/admin/sources/src-3/permanent' },
   { module: 'sources/[id]/test', method: 'POST', params: { id: 'src-4' }, backendPath: '/api/admin/sources/src-4/test', okShape: true },
   { module: 'sources/[id]/simulate_extract', method: 'POST', params: { id: 'src-5' }, backendPath: '/api/admin/sources/src-5/simulate_extract', okShape: true },
-  { module: 'presets/sources', method: 'GET', backendPath: '/api/admin/presets/sources' },
   { module: 'organisations', method: 'GET', backendPath: '/api/admin/organisations' },
   { module: 'setup/status', method: 'GET', backendPath: '/api/admin/setup/status' },
   { module: 'db/status', method: 'GET', backendPath: '/api/admin/db/status' },
@@ -151,8 +150,8 @@ describe('the table', () => {
       }
     }
     expect(found.sort()).toEqual(CASES.map((c) => `${c.method} ${c.module}`).sort());
-    expect(new Set(found.map((f) => f.split(' ')[1])).size).toBe(38);
-    expect(found).toHaveLength(42);
+    expect(new Set(found.map((f) => f.split(' ')[1])).size).toBe(37);
+    expect(found).toHaveLength(41);
   });
 });
 
@@ -340,7 +339,7 @@ describe('query handling kept from the old routes', () => {
 
 describe('the backend address', () => {
   const formerlyUnstripped = CASES.filter((c) =>
-    ['presets/sources', 'search/init', 'search/reindex', 'crawl/run-migration'].includes(c.module)
+    ['search/init', 'search/reindex', 'crawl/run-migration'].includes(c.module)
   );
 
   afterEach(() => {

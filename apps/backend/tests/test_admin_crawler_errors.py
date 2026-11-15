@@ -88,8 +88,6 @@ os.environ["MEILISEARCH_KEY"] = "probe-" + "value"
 
 CONVERTED = [  # (method, path, JSON body, fixed message)
     ("GET", "/api/admin/crawl/status", None, "Failed to get crawler status"),
-    ("GET", "/api/admin/crawl/diagnostics/unesco", None, "Failed to get UNESCO diagnostics"),
-    ("GET", "/api/admin/crawl/diagnostics/undp", None, "Failed to get UNDP diagnostics"),
     ("GET", f"/api/admin/data-quality/source/{SID}", None, "Failed to get quality report"),
     ("POST", "/api/admin/crawl/delete-jobs-by-org?org_name=Probe", None, "Failed to delete jobs"),
     ("GET", "/api/admin/data-quality/global", None, "Failed to get global quality report"),
