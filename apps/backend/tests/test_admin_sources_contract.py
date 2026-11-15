@@ -1,16 +1,16 @@
-"""The sources and presets admin routes keep their contract: authentication, 4xx answers, shapes.
+"""The sources admin routes keep their contract: authentication, 4xx answers, shapes.
 
 Security stage 3, phase 2 changes only what an unexpected failure says. These checks pass on the
 code before and after that change. The database is a fake; nothing touches a network.
-"""
-import json
 
+W-35 3a: the presets routes and the v1 API schema checks are gone.
+"""
 import psycopg2
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app import presets, sources
+from app import sources
 
 SID = "00000000-0000-0000-0000-000000000000"
 ROUTES = [
@@ -25,8 +25,6 @@ ROUTES = [
     ("POST", "/api/admin/sources/import", {"careers_url": "https://example.org/jobs"}),
     ("POST", f"/api/admin/sources/{SID}/test", None),
     ("POST", f"/api/admin/sources/{SID}/simulate_extract", None),
-    ("GET", "/api/admin/presets/sources", None),
-    ("GET", "/api/admin/presets/sources/ReliefWeb Jobs", None),
 ]
 
 
@@ -73,7 +71,6 @@ class FakeConnection:
 def _app(signed_in=True):
     app = FastAPI()
     app.include_router(sources.router)
-    app.include_router(presets.router)
     if signed_in:
         app.dependency_overrides[sources.admin_required] = lambda: "test-admin"
     return TestClient(app)
@@ -143,26 +140,15 @@ def test_permanent_deletion_of_an_active_source_is_still_400(database):
     assert response.json()["detail"].startswith("Source must be deleted before permanent deletion")
 
 
-@pytest.mark.parametrize("payload, detail", [
-    # W-53: the same refusal as the create and edit routes, without repeating the value.
-    ({"careers_url": "https://example.org/x", "source_type": "xml"},
-     "source_type must be html, rss or api"),
-    ({"careers_url": "https://example.org/x", "source_type": "api", "parser_hint": "{not json"},
-     "Invalid JSON in parser_hint"),
-])
-def test_import_validation_is_still_400(database, payload, detail):
+def test_import_rejects_an_unknown_source_type(database):
     database()
-    response = _app().post("/api/admin/sources/import", json=payload)
-    assert response.status_code == 400 and response.json() == {"detail": detail}
+    response = _app().post("/api/admin/sources/import", json={
+        "careers_url": "https://example.org/x", "source_type": "xml"})
+    assert response.status_code == 400
+    assert response.json() == {"detail": "source_type must be html, rss or api"}
 
 
-def test_presets_keep_their_shape_and_404():
+def test_presets_routes_are_gone():
     client = _app()
-    listed = client.get("/api/admin/presets/sources")
-    assert listed.status_code == 200
-    body = listed.json()
-    assert body["status"] == "ok" and body["error"] is None
-    assert all(isinstance(p["parser_hint"], str) for p in body["data"])
-    json.loads(body["data"][0]["parser_hint"])
-    missing = client.get("/api/admin/presets/sources/nope")
-    assert missing.status_code == 404 and missing.json() == {"detail": "Preset 'nope' not found"}
+    assert client.get("/api/admin/presets/sources").status_code == 404
+    assert client.get("/api/admin/presets/sources/ReliefWeb%20Jobs").status_code == 404

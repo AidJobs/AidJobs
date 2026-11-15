@@ -37,16 +37,6 @@ type SourceFormData = {
   time_window: string;
 };
 
-type Preset = {
-  name: string;
-  description: string;
-  org_name: string;
-  org_type: string;
-  source_type: string;
-  crawl_frequency_days: number;
-  parser_hint: string;
-};
-
 export default function AdminSourcesPage() {
   const router = useRouter();
   const [sources, setSources] = useState<Source[]>([]);
@@ -58,9 +48,6 @@ export default function AdminSourcesPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingSource, setEditingSource] = useState<Source | null>(null);
-  const [presets, setPresets] = useState<Preset[]>([]);
-  const [loadingPresets, setLoadingPresets] = useState(false);
-  const [selectedPreset, setSelectedPreset] = useState<string>('');
   const [testResult, setTestResult] = useState<any>(null);
   const [showTestModal, setShowTestModal] = useState(false);
   const [testLoading, setTestLoading] = useState(false);
@@ -372,62 +359,6 @@ export default function AdminSourcesPage() {
     }
   }, [showCrawlDetails, selectedSourceForDetails?.id, refreshCrawlDetails]);
 
-  const fetchPresets = useCallback(async () => {
-    setLoadingPresets(true);
-    try {
-      const res = await fetch('/api/admin/presets/sources', {
-        credentials: 'include',
-      });
-
-      if (res.status === 401) {
-        router.push('/admin/login');
-        return;
-      }
-
-      if (!res.ok) {
-        throw new Error('Failed to fetch presets');
-      }
-
-      const json = await res.json();
-      if (json.status === 'ok' && json.data) {
-        setPresets(json.data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch presets:', error);
-      // Don't show error toast - presets are optional
-    } finally {
-      setLoadingPresets(false);
-    }
-  }, [router]);
-
-  useEffect(() => {
-    if (showAddModal) {
-      fetchPresets();
-    }
-  }, [showAddModal, fetchPresets]);
-
-  const handlePresetSelect = (presetName: string) => {
-    const preset = presets.find(p => p.name === presetName);
-    if (preset) {
-      setSelectedPreset(presetName);
-      setFormData({
-        org_name: preset.org_name || '',
-        careers_url: '', // Presets don't include URL, user must enter
-        source_type: preset.source_type,
-        org_type: preset.org_type || '',
-        crawl_frequency_days: preset.crawl_frequency_days || 3,
-        parser_hint: preset.parser_hint || '',
-        time_window: '',
-      });
-      toast.success(`Preset "${presetName}" loaded`);
-    }
-  };
-
-  const handleClearPreset = () => {
-    setSelectedPreset('');
-    resetForm();
-  };
-
   const [exportingSourceId, setExportingSourceId] = useState<string | null>(null);
 
   const handleExportSource = async (id: string) => {
@@ -532,24 +463,6 @@ export default function AdminSourcesPage() {
         return;
       }
 
-      // Validate JSON for API sources (required)
-      if (formData.source_type === 'api') {
-        if (!formData.parser_hint || !formData.parser_hint.trim()) {
-          toast.error('API Configuration (JSON) is required for API sources');
-          return;
-        }
-        try {
-          const parsed = JSON.parse(formData.parser_hint);
-          if (parsed.v !== 1) {
-            toast.error('API sources must use v1 schema ({"v": 1, ...})');
-            return;
-          }
-        } catch (e) {
-          toast.error('Invalid JSON in API Configuration. Please check the syntax.');
-          return;
-        }
-      }
-
       const res = await fetch('/api/admin/sources', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -601,24 +514,6 @@ export default function AdminSourcesPage() {
       if (!formData.careers_url) {
         toast.error('Source URL is required');
         return;
-      }
-
-      // Validate JSON for API sources (required)
-      if (formData.source_type === 'api') {
-        if (!formData.parser_hint || !formData.parser_hint.trim()) {
-          toast.error('API Configuration (JSON) is required for API sources');
-          return;
-        }
-        try {
-          const parsed = JSON.parse(formData.parser_hint);
-          if (parsed.v !== 1) {
-            toast.error('API sources must use v1 schema ({"v": 1, ...})');
-            return;
-          }
-        } catch (e) {
-          toast.error('Invalid JSON in API Configuration. Please check the syntax.');
-          return;
-        }
       }
 
       const updates: any = {};
@@ -901,8 +796,7 @@ export default function AdminSourcesPage() {
       time_window: source.time_window || '',
     });
     // Show advanced options if source has advanced fields
-    setShowAdvanced(!!(source.org_type || source.time_window || 
-      (source.parser_hint && source.source_type !== 'api')));
+    setShowAdvanced(!!(source.org_type || source.time_window || source.parser_hint));
     setShowEditModal(true);
     setAddEditModalPosition({ x: 0, y: 0 }); // Reset position when opening
   };
@@ -917,7 +811,6 @@ export default function AdminSourcesPage() {
       parser_hint: '',
       time_window: '',
     });
-    setSelectedPreset('');
     setShowAdvanced(false);
   };
 
@@ -1336,26 +1229,6 @@ export default function AdminSourcesPage() {
                   />
                 </div>
 
-                {/* API Configuration - Show immediately when API is selected */}
-                {formData.source_type === 'api' && (
-                  <div>
-                    <label className="block text-caption font-medium text-[#1D1D1F] mb-1">
-                      API Configuration (JSON v1 schema) <span className="text-[#FF3B30]">*</span>
-                    </label>
-                    <textarea
-                      value={formData.parser_hint}
-                      onChange={(e) => setFormData({ ...formData, parser_hint: e.target.value })}
-                      className="w-full border border-[#D2D2D7] rounded-lg px-3 py-2 bg-white text-[#1D1D1F] font-mono text-caption-sm placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
-                      placeholder='{"v": 1, "base_url": "https://api.example.com", "path": "/jobs", "auth": {...}}'
-                      rows={6}
-                      required
-                    />
-                    <p className="mt-1 text-caption-sm text-[#86868B]">
-                      Must include version field (v: 1). Use SECRET:NAME for secrets.
-                    </p>
-                  </div>
-                )}
-
                 {/* Advanced Options - Collapsible */}
                 <div className="border-t border-[#D2D2D7] pt-3">
                   <button
@@ -1401,20 +1274,18 @@ export default function AdminSourcesPage() {
                         </div>
                       </div>
 
-                      {formData.source_type !== 'api' && (
-                        <div>
-                          <label className="block text-caption-sm font-medium text-[#86868B] mb-1">
-                            Parser Hint
-                          </label>
-                          <input
-                            type="text"
-                            value={formData.parser_hint}
-                            onChange={(e) => setFormData({ ...formData, parser_hint: e.target.value })}
-                            className="w-full border border-[#D2D2D7] rounded-lg px-2.5 py-1.5 bg-white text-[#1D1D1F] text-caption placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
-                            placeholder="Optional: parser-specific hints"
-                          />
-                        </div>
-                      )}
+                      <div>
+                        <label className="block text-caption-sm font-medium text-[#86868B] mb-1">
+                          Parser Hint
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.parser_hint}
+                          onChange={(e) => setFormData({ ...formData, parser_hint: e.target.value })}
+                          className="w-full border border-[#D2D2D7] rounded-lg px-2.5 py-1.5 bg-white text-[#1D1D1F] text-caption placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
+                          placeholder="Optional: parser-specific hints"
+                        />
+                      </div>
 
                       {formData.source_type === 'rss' && (
                         <div>
@@ -1624,7 +1495,7 @@ export default function AdminSourcesPage() {
               <div className="flex items-center justify-between mb-4 modal-header cursor-grab active:cursor-grabbing select-none" onMouseDown={(e) => handleMouseDown(e, simulateModalRef, () => simulateModalPosition)}>
                 <div>
                   <h2 className="text-body-lg font-semibold text-[#1D1D1F]">Simulation Results</h2>
-                  <p className="text-caption text-[#86868B] mt-0.5">Job extraction simulation results</p>
+                  <p className="text-caption text-[#86868B] mt-0.5">First page only; admission verdict per row</p>
                 </div>
                 <button
                   onClick={() => {
@@ -1653,20 +1524,38 @@ export default function AdminSourcesPage() {
                           <span className="text-body-sm font-semibold text-[#30D158]">Simulation Successful</span>
                         </div>
                         <p className="text-caption text-[#30D158] mt-1">Found {simulateResult.count ?? 0} jobs</p>
+                        {simulateResult.reader && (
+                          <p className="text-caption-sm text-[#30D158] mt-1 opacity-90">
+                            Reader: {simulateResult.reader}
+                            {simulateResult.strategy ? ` · Strategy: ${simulateResult.strategy}` : ''}
+                          </p>
+                        )}
+                        {!simulateResult.reader && simulateResult.strategy && (
+                          <p className="text-caption-sm text-[#30D158] mt-1 opacity-90">
+                            Strategy: {simulateResult.strategy}
+                          </p>
+                        )}
+                        {(simulateResult.admitted !== undefined || simulateResult.rejected !== undefined) && (
+                          <p className="text-caption-sm text-[#30D158] mt-1 opacity-90">
+                            {simulateResult.admitted !== undefined && `Admitted: ${simulateResult.admitted}`}
+                            {simulateResult.admitted !== undefined && simulateResult.rejected !== undefined && ' · '}
+                            {simulateResult.rejected !== undefined && `Rejected: ${simulateResult.rejected}`}
+                          </p>
+                        )}
                       </div>
 
                       {simulateResult.sample && Array.isArray(simulateResult.sample) && simulateResult.sample.length > 0 && (
                         <div>
                           <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">Sample Jobs (First 3)</h3>
                           <div className="space-y-2.5">
-                            {simulateResult.sample.map((job: any, idx: number) => (
+                            {simulateResult.sample.slice(0, 3).map((job: Record<string, unknown>, idx: number) => (
                               <div key={idx} className="p-2.5 bg-[#F5F5F7] border border-[#D2D2D7] rounded-lg">
                                 <div className="grid grid-cols-1 gap-2">
                                   {Object.entries(job).map(([key, value]) => (
                                     <div key={key}>
                                       <label className="block text-caption-sm font-medium text-[#86868B] mb-0.5">{key}</label>
                                       <p className="text-body-sm text-[#1D1D1F] break-words">
-                                        {typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value ?? 'N/A')}
+                                        {typeof value === 'object' && value !== null ? JSON.stringify(value, null, 2) : String(value ?? 'N/A')}
                                       </p>
                                     </div>
                                   ))}

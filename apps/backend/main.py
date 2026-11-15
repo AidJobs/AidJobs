@@ -27,7 +27,6 @@ from app.search import search_service
 from app.sources import router as sources_router
 from app.analytics import analytics_tracker
 from app.admin_auth_routes import router as admin_auth_router
-from app.presets import router as presets_router
 from app.rate_limit import limiter, RATE_LIMIT_SEARCH, RATE_LIMIT_SUBMIT
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
@@ -155,8 +154,6 @@ app.add_exception_handler(InternalError, internal_error_handler)
 
 app.include_router(admin_auth_router)
 app.include_router(sources_router)
-app.include_router(presets_router)
-
 # Add new crawler admin routes
 try:
     from app.crawler_admin import router as crawler_admin_router, robots_router, policies_router, quality_router, link_validation_router, meilisearch_router, observability_router
