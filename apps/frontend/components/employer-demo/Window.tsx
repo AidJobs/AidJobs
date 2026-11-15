@@ -1000,6 +1000,11 @@ function JobWindow({ id }: { id: string }) {
   }
   useEffect(() => {
     if (stepNow === seenStep.current || reading) return;
+    // A hand edit, add, or remove can change the walk step (e.g. to Languages). Keep the progress line on the JD change; do not jump.
+    if (job.lastChange?.keys.length || job.undoStep?.keys?.length || job.undoStep?.removed) {
+      seenStep.current = stepNow;
+      return;
+    }
     seenStep.current = stepNow;
     const p = partOfStep(step, job);
     if (!p || s.reviewerAs) return;

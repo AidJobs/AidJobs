@@ -23,13 +23,13 @@ import { RevealBlock } from './Reveal';
 import { getState } from './store';
 import { Dialog, Field, inputStyle } from './ui';
 
-/** Hide remove/edit notes after ~2s (no X); Undo stays until then. */
-export function useNoteDismiss(id: string, token: string | undefined) {
+/** Auto-hide only the “Removed …” note after ~2s; edit/Undo notes stay until Undo. */
+export function useRemovedNoteDismiss(id: string, removedKey: string | undefined) {
   useEffect(() => {
-    if (!token) return;
+    if (!removedKey) return;
     const t = window.setTimeout(() => dismissChange(id), 2000);
     return () => clearTimeout(t);
-  }, [id, token]);
+  }, [id, removedKey]);
 }
 
 export function rich(text: string): ReactNode {
@@ -424,7 +424,7 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
           <AlertCircle size={12} strokeWidth={2} /> <span style={{ color: 'var(--text-2)' }}>{n.text.replace(`${sec.title}: `, '')}</span>
         </div>
       ))}
-      {pageKind && !reviewing && (
+      {pageKind && !reviewing && !editing && (
         <div className="mb-2 flex flex-col gap-2">
           <PageField job={job} s={s} kind={pageKind} open={openPage} compact />
         </div>
@@ -493,6 +493,17 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
             </button>
           </div>
         </div>
+      ) : pageKind ? (
+        sec.subs?.length ? (
+          <SectionText job={job} sec={sec} since={since}>
+            {sec.subs.map((sb) => (
+              <div key={sb.id} className="ej-subsection">
+                <h4>{sb.title}</h4>
+                <Lines lines={sb.lines} job={job} section={sec.key} onFlag={onFlag} />
+              </div>
+            ))}
+          </SectionText>
+        ) : null
       ) : (
         <SectionText job={job} sec={sec} since={since}>
           <Lines lines={sec.lines} job={job} section={sec.key} onFlag={onFlag} />
@@ -859,7 +870,7 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inW
   const [flag, setFlag] = useState<Flag | null>(null);
   const [since] = useState(() => Date.now());
   const [adding, setAdding] = useState<{ after: string | null; anchor: HTMLElement; end: boolean } | null>(null);
-  useNoteDismiss(job.id, job.lastChange?.text ?? (job.undoStep && !job.undoStep.writing ? `${job.undoStep.text}|${job.undoStep.removed?.key ?? ''}` : undefined));
+  useRemovedNoteDismiss(job.id, job.undoStep?.removed && !job.undoStep.writing ? job.undoStep.removed.key : undefined);
   const [dropAfter, setDropAfter] = useState<string | null | undefined>(undefined);
   const root = useRef<HTMLElement>(null);
   const live = s.jobs.filter((j) => j.id !== job.id && (j.status === 'live' || j.status === 'scheduled')).map((j) => j.facts.title);

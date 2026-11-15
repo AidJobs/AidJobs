@@ -1011,6 +1011,8 @@ export function chooseStyle(id: string, style: string[], said?: string) {
     ...s,
     jobs: s.jobs.map((j) => {
       if (j.id !== id) return j;
+      // Tone comes after About us and project (Phase 6 review revision); ignore while those stages are still open.
+      if (j.walk && j.setup && j.setup !== 'style') return j;
       if (j.walk) {
         const offer = !s.org.styleKept;
         const user = said ? [msg('user', said)] : [];
@@ -2442,7 +2444,7 @@ export function outlineOp(id: string, op: OutlineOp) {
         const sec = j.sections.length ? withTemplateSubs(s, j, built(op.key, ctxFor(s, moved), j)) : null;
         const withSec = sec ? { ...moved, sections: inOutlineOrder([...moved.sections, j.renamed?.[op.key] ? { ...sec, title: j.renamed[op.key] } : sec], moved.tags) } : moved;
         const next = sec ? { ...withSec, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Added ${sec.title}`, sections: withSec.sections }] } : withSec;
-        return stepped(j, next, opNote(next, s, op, j), 'doc', { keys: [op.key] });
+        return { ...stepped(j, next, opNote(next, s, op, j), 'doc', { keys: [op.key] }), part: `s:${op.key}` };
       }
       if (op.op === 'remove') {
         const read = j.tags;
@@ -2701,7 +2703,10 @@ export function editSection(id: string, key: string, text: string, note = false,
     const title = j.sections.find((x) => x.key === key)?.title ?? key;
     const marks = Object.fromEntries(Object.entries(j.toUpdate ?? {}).filter(([k]) => k !== key));
     const next: DemoJob = stepped(start ?? j, { ...touched(j), toUpdate: Object.keys(marks).length ? marks : undefined, sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${title}`, sections }], ...liveEdit(j) }, `Edited ${title}`, 'doc', { keys: [key] });
-    return note ? { ...next, part: `s:${key}`, chat: [...j.chat, msg('ai', `You changed **${title}** by hand. I'll keep your wording; ask me if another section should change to match.`)] } : next;
+    // Stay on this section in the progress line (do not let the walk jump to Languages or another part).
+    return note
+      ? { ...next, part: `s:${key}`, chat: [...j.chat, msg('ai', `You changed **${title}** by hand. I'll keep your wording; ask me if another section should change to match.`)] }
+      : { ...next, part: `s:${key}` };
   });
   if (note) ensureAsk(id);
 }

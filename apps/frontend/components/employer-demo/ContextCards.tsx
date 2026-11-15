@@ -1,27 +1,38 @@
 'use client';
 
 import { FileUp, Link2 } from 'lucide-react';
-import { useRef, useState } from 'react';
-import { acceptPageDraft, acceptSuggestion, addOrgSocial, canEditOrgSocial, rejectPageDraft, rejectSuggestion, removeOrgSocial, socialLabel, toggleJobSocial } from './context';
+import { useEffect, useRef, useState } from 'react';
+import { editSection } from './actions';
+import { acceptPageDraft, acceptSuggestion, addOrgSocial, canEditOrgSocial, PROJECT_SECTION, rejectPageDraft, rejectSuggestion, removeOrgSocial, socialLabel, toggleJobSocial } from './context';
 import { draftFromPage, MAX_TEXT, readPageVia } from './pages';
 import { ACCEPTED, readJobFile } from './readFile';
 import type { OpenTarget } from './aiActions';
 import type { DemoJob, State } from './types';
 import { inputStyle } from './ui';
 
+const asText = (lines: string[]) => lines.map((l) => (l.startsWith('- ') ? `• ${l.slice(2)}` : l)).join('\n');
+
 /**
  * The website field (About us) or the project field (About the project), section 19, phase 5, A: one https page, read by the demo's page
- * route; or the text pasted; or a file, read in the browser. Each is cut to 8,000 characters and drafted from, never put on the job
- * until the draft is accepted.
+ * route; or the text pasted; or a file, read in the browser. In the JD (compact), Save puts the box text on the section; Cancel clears it.
  */
 export function PageField({ job, s, kind, open, compact }: { job: DemoJob; s: State; kind: 'about' | 'project'; open: (t: OpenTarget) => void; compact?: boolean }) {
+  const secKey = kind === 'about' ? 'about' : PROJECT_SECTION;
+  const saved = asText(job.sections.find((x) => x.key === secKey)?.lines ?? []);
+  const stamp = job.versions[job.versions.length - 1]?.n ?? 0;
   const [url, setUrl] = useState(kind === 'about' ? s.org.website : '');
-  const [text, setText] = useState('');
+  const [text, setText] = useState(compact ? saved : '');
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const file = useRef<HTMLInputElement>(null);
   const ro = Boolean(s.reviewerAs);
   const what = kind === 'about' ? 'About us' : 'About the project';
+  const dirty = compact && text !== saved;
+  useEffect(() => {
+    if (compact) setText(saved);
+    // When the section is saved or drafted, refresh the box; do not depend on `saved` alone or typing is wiped.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- stamp is the section write signal
+  }, [compact, stamp]);
   const draft = async (t: string, source: 'your website' | 'the project page' | 'you told us', social: string[] = []) => {
     setBusy(true);
     setNote('');
@@ -39,6 +50,15 @@ export function PageField({ job, s, kind, open, compact }: { job: DemoJob; s: St
     setBusy(false);
     if (!r.ok) return setNote(`${r.reason.charAt(0).toUpperCase()}${r.reason.slice(1)}: paste its text below, or upload the file.`);
     await draft(r.text, kind === 'about' ? 'your website' : 'the project page', r.social);
+  };
+  const saveText = () => {
+    if (!text.trim() || ro) return;
+    editSection(job.id, secKey, text.slice(0, MAX_TEXT), Boolean(compact));
+    setNote('');
+  };
+  const cancelText = () => {
+    setText(compact ? saved : '');
+    setNote('');
   };
   return (
     <div className="flex flex-col gap-2" role="group" aria-label={kind === 'about' ? 'Draft About us from your organisation’s page' : 'The project this job is for'}>
@@ -65,11 +85,32 @@ export function PageField({ job, s, kind, open, compact }: { job: DemoJob; s: St
           {busy ? 'Reading…' : 'Read this page'}
         </button>
       </div>
-      <textarea style={{ ...inputStyle, minHeight: 64 }} value={text} onChange={(e) => setText(e.target.value)} placeholder="Or paste the text here" aria-label={`Text for ${what}`} disabled={ro} />
+      <textarea
+        style={{ ...inputStyle, minHeight: compact ? 96 : 64 }}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={compact ? `Write ${what} here` : 'Or paste the text here'}
+        aria-label={`Text for ${what}`}
+        disabled={ro}
+      />
       <div className="flex flex-wrap items-center gap-1.5">
-        <button type="button" className="aj-pill" style={{ height: 30 }} disabled={busy || ro || text.trim().length < 40} onClick={() => draft(text, 'you told us')}>
-          Draft from this text
-        </button>
+        {compact ? (
+          <>
+            <button type="button" className="aj-ink-btn" style={{ height: 30 }} disabled={busy || ro || !text.trim() || !dirty} onClick={saveText}>
+              Save
+            </button>
+            <button type="button" className="aj-pill" style={{ height: 30 }} disabled={busy || ro || !dirty} onClick={cancelText}>
+              Cancel
+            </button>
+            <button type="button" className="aj-text-btn" style={{ height: 30 }} disabled={busy || ro || text.trim().length < 40} onClick={() => draft(text, 'you told us')}>
+              Draft from this text
+            </button>
+          </>
+        ) : (
+          <button type="button" className="aj-pill" style={{ height: 30 }} disabled={busy || ro || text.trim().length < 40} onClick={() => draft(text, 'you told us')}>
+            Draft from this text
+          </button>
+        )}
         <button type="button" className="aj-text-btn ej-upload-btn" style={{ height: 30 }} disabled={busy || ro} onClick={() => file.current?.click()}>
           <FileUp size={13} strokeWidth={1.8} aria-hidden />
           <span>Upload a file</span>
@@ -87,6 +128,10 @@ export function PageField({ job, s, kind, open, compact }: { job: DemoJob; s: St
             if (!f) return;
             const r = await readJobFile(f);
             if (r.error !== undefined) return setNote(r.error);
+            if (compact) {
+              setText(r.text.slice(0, MAX_TEXT));
+              return;
+            }
             await draft(r.text, 'you told us');
           }}
         />
