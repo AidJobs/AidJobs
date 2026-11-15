@@ -1,9 +1,11 @@
-"""Security stage 3, phase 2, PR 1: the sources and presets admin routes return no exception text.
+"""Security stage 3, phase 2, PR 1: the sources admin routes return no exception text.
 
 The route walks run in a fresh process built as production builds it (the method of
-test_public_error_leaks.py), signed in through a dependency override, with a database driver and a
-preset list that fail with fake connection-string text. Every secret is assembled at runtime and
+test_public_error_leaks.py), signed in through a dependency override, with a database driver
+that fails with fake connection-string text. Every secret is assembled at runtime and
 nothing touches a network or a database.
+
+W-35 3a: the presets routes are gone; failures cover the sources routes only.
 """
 import json
 import logging
@@ -61,24 +63,13 @@ calls = [
     call("POST", "/api/admin/sources/{SID}/simulate_extract"),
 ]
 """
-PRESET_CALLS = """
-calls += [
-    call("GET", "/api/admin/presets/sources"),
-    call("GET", "/api/admin/presets/sources/ReliefWeb Jobs"),
-]
-"""
 
 FAILURES = """
 import psycopg2
-from app import presets
 def refuse(*args, **kwargs):
     raise psycopg2.OperationalError(%r)
 psycopg2.connect = refuse
-class BrokenPresets:
-    def __iter__(self):
-        raise RuntimeError(%r)
-presets.PRESETS = BrokenPresets()
-""" % (DSN_ERROR, DSN_ERROR)
+""" % (DSN_ERROR,)
 
 INTERNAL_ERRORS = {
     "GET /api/admin/sources": "Failed to list sources",
@@ -90,14 +81,12 @@ INTERNAL_ERRORS = {
     f"DELETE /api/admin/sources/{SID}/permanent": "Failed to permanently delete source",
     f"GET /api/admin/sources/{SID}/export": "Failed to export source",
     "POST /api/admin/sources/import": "Failed to import source",
-    "GET /api/admin/presets/sources": "Failed to load presets",
-    "GET /api/admin/presets/sources/ReliefWeb Jobs": "Failed to load preset",
 }
 DIAGNOSTIC_TOOLS = {
     f"POST /api/admin/sources/{SID}/test",
     f"POST /api/admin/sources/{SID}/simulate_extract",
 }
-DATABASE_ROUTES = [r for r in INTERNAL_ERRORS if "presets" not in r] + sorted(DIAGNOSTIC_TOOLS)
+DATABASE_ROUTES = list(INTERNAL_ERRORS) + sorted(DIAGNOSTIC_TOOLS)
 
 _ENV_KEPT = ("PATH", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "TEMP", "TMP", "HOME", "USERPROFILE",
              "PYTHONPATH")
@@ -126,7 +115,7 @@ def _assert_no_leak(calls, logs):
 
 
 def test_failures_return_a_fixed_message_with_a_reference_and_no_secret():
-    calls, logs = _run(WELL_FORMED_DB_URL, FAILURES + SOURCE_CALLS + PRESET_CALLS)
+    calls, logs = _run(WELL_FORMED_DB_URL, FAILURES + SOURCE_CALLS)
     _assert_no_leak(calls, logs)
     assert set(calls) == set(INTERNAL_ERRORS) | DIAGNOSTIC_TOOLS
     for route, message in INTERNAL_ERRORS.items():
@@ -149,10 +138,9 @@ def test_failures_return_a_fixed_message_with_a_reference_and_no_secret():
 
 
 def test_each_reference_leads_to_the_logged_cause():
-    calls, logs = _run(WELL_FORMED_DB_URL, FAILURES + SOURCE_CALLS + PRESET_CALLS)
-    assert len(calls) == 13
-    cause_lines = [line for line in logs.splitlines() if "OperationalError" in line
-                   or "RuntimeError" in line]
+    calls, logs = _run(WELL_FORMED_DB_URL, FAILURES + SOURCE_CALLS)
+    assert len(calls) == 11
+    cause_lines = [line for line in logs.splitlines() if "OperationalError" in line]
     for route, c in calls.items():
         assert any(line.startswith(f"[{c['request_id']}]") for line in cause_lines), route
         if SID in route:
@@ -272,34 +260,22 @@ def _api_source(parser_hint):
             "time_window": None}
 
 
-def test_source_test_names_invalid_json_in_the_api_configuration(monkeypatch):
-    client = _diagnostic_client(monkeypatch, _api_source('{"v": 1, "path": ' + FRAGMENT))
+def test_source_test_is_a_policy_head_for_every_type(monkeypatch):
+    """W-33 / W-35: connectivity is HEAD only; extraction is Simulate extraction."""
+    from contracts.outbound import FetchResult
+
+    async def fake_head(url, **kwargs):
+        assert kwargs.get("method") == "HEAD"
+        return FetchResult(status_code=200, headers={}, body=b"", url=url)
+
+    monkeypatch.setattr("contracts.outbound.fetch_url", fake_head)
+    client = _diagnostic_client(monkeypatch, _api_source(None))
     body = client.post(f"/api/admin/sources/{SOURCE_ID}/test").json()
-    assert body == {"ok": False, "status": 0, "host": "example.org",
-                    "error": "API configuration: Invalid JSON at line 1, column 18"}
-
-
-def test_source_test_lists_missing_secret_names_only(monkeypatch):
-    monkeypatch.delenv("AJ_TEST_MISSING_TOKEN", raising=False)
-    hint = json.dumps({"v": 1, "headers": {"Authorization": "{{SECRET:AJ_TEST_MISSING_TOKEN}}"}})
-    client = _diagnostic_client(monkeypatch, _api_source(hint))
-    body = client.post(f"/api/admin/sources/{SOURCE_ID}/test").json()
-    assert body["ok"] is False
-    assert body["error"] == "Missing required secrets: AJ_TEST_MISSING_TOKEN"
-    assert body["missing_secrets"] == ["AJ_TEST_MISSING_TOKEN"]
-
-
-def test_source_test_of_a_v1_api_source_fails_safely(monkeypatch, caplog):
-    """Known bug, recorded in the ledger: the test calls fetch_api with a signature it lacks."""
-    client = _diagnostic_client(monkeypatch, _api_source(json.dumps({"v": 1})))
-    with caplog.at_level(logging.ERROR, logger="app.sources"):
-        response = client.post(f"/api/admin/sources/{SOURCE_ID}/test")
-    body = response.json()
-    assert response.status_code == 200 and body["ok"] is False
-    assert body["error"] == f"Unexpected error (ref {response.headers['X-Request-ID'][:8]})"
-    assert "fetch_api" not in response.text
-    logged = [r for r in caplog.records if "Test of API source" in r.getMessage()]
-    assert logged and logged[0].exc_info and logged[0].exc_info[0] is TypeError
+    assert body["ok"] is True
+    assert body["status"] == 200
+    assert body["host"] == "example.org"
+    assert "missing_secrets" not in body
+    assert "count" not in body
 
 
 @pytest.mark.parametrize("separator", ["/", "?", "#"])
@@ -433,18 +409,29 @@ def test_simulation_keeps_its_category_and_drops_the_text(monkeypatch, raised, c
     assert FRAGMENT not in response.text
 
 
-def test_import_keeps_its_own_400_instead_of_rewrapping_it(monkeypatch):
+def test_import_no_longer_requires_a_v1_api_schema(monkeypatch):
+    """W-33: the unused v1 schema check is gone; import stores parser_hint as free text."""
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
     from app import sources
 
+    created = {
+        "id": SOURCE_ID, "org_name": "Example", "careers_url": "https://example.org/api",
+        "source_type": "api", "org_type": None, "status": "active",
+        "crawl_frequency_days": 3, "next_run_at": None, "last_crawled_at": None,
+        "last_crawl_status": None, "parser_hint": '{"v": 2}', "time_window": None,
+        "created_at": "2026-01-01", "updated_at": "2026-01-01",
+    }
     app = FastAPI()
     app.include_router(sources.router)
     app.dependency_overrides[sources.admin_required] = lambda: "test-admin"
     monkeypatch.setattr(sources.db_config, "get_connection_params", lambda: {"host": "unused"})
-    hint = json.dumps({"v": 2, "base_url": "https://example.org"})
+    monkeypatch.setattr(sources.psycopg2, "connect",
+                        lambda **kwargs: _FakeConnection(created))
     response = TestClient(app).post("/api/admin/sources/import", json={
-        "careers_url": "https://example.org/api", "source_type": "api", "parser_hint": hint})
-    assert response.status_code == 400
-    assert response.json() == {"detail": "API sources must use v1 schema (v=1)"}
+        "careers_url": "https://example.org/api", "source_type": "api",
+        "parser_hint": '{"v": 2}'})
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    assert response.json()["data"]["parser_hint"] == '{"v": 2}'

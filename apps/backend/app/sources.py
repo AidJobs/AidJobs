@@ -741,7 +741,7 @@ async def test_source(
     source_id: str,
     admin: str = Depends(admin_required)
 ):
-    """Test source connectivity. For API sources, tests the actual API endpoint."""
+    """Test source connectivity with a HEAD of the careers URL (W-35 3a; no v1 API schema)."""
     if not psycopg2:
         raise HTTPException(status_code=503, detail="Database driver not available")
     
@@ -758,7 +758,7 @@ async def test_source(
         
         logger.info(f"[sources] Testing source {source_id}")
         cursor.execute("""
-            SELECT id::text, careers_url, source_type, parser_hint FROM sources WHERE id::text = %s
+            SELECT id::text, careers_url, source_type FROM sources WHERE id::text = %s
         """, (source_id,))
         
         source = cursor.fetchone()
@@ -768,91 +768,15 @@ async def test_source(
             raise HTTPException(status_code=404, detail="Source not found")
         
         url = source['careers_url']
-        source_type = source['source_type']
-        parser_hint = source.get('parser_hint')
-        
-        # Support 'json' as an alias for 'api'
-        if source_type == 'json':
-            source_type = 'api'
         
         # Extract host for response
         from urllib.parse import urlparse
         parsed = urlparse(url)
         host = parsed.netloc
         
-        # For API sources, test with actual API call
-        if source_type == 'api' and parser_hint:
-            try:
-                import os
-                from crawler_v2.api_crawler import SimpleAPICrawler
-                from core.secrets import check_required_secrets, mask_secrets
-                
-                # Check if it's v1 schema
-                schema = json.loads(parser_hint)
-                version = schema.get("v")
-                
-                if version == 1:
-                    # Check for missing secrets
-                    missing_secrets = check_required_secrets(schema)
-                    if missing_secrets:
-                        return {
-                            "ok": False,
-                            "status": 0,
-                            "error": f"Missing required secrets: {', '.join(missing_secrets)}",
-                            "host": host,
-                            "missing_secrets": missing_secrets
-                        }
-                    
-                    # Test API call (limit to 1 page for testing)
-                    db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
-                    if not db_url:
-                        raise HTTPException(status_code=500, detail=DB_NOT_CONFIGURED)
-                    
-                    api_crawler = SimpleAPICrawler(db_url)
-                    # Temporarily limit to 1 page for testing
-                    test_schema = dict(schema)
-                    if "pagination" in test_schema:
-                        test_schema["pagination"] = {**test_schema["pagination"], "max_pages": 1}
-                    else:
-                        test_schema["pagination"] = {"max_pages": 1}
-                    
-                    # Test fetch (first page only)
-                    jobs = await api_crawler.fetch_api(url, json.dumps(test_schema), last_success_at=None)
-                    
-                    return {
-                        "ok": True,
-                        "status": 200,
-                        "host": host,
-                        "count": len(jobs),
-                        "first_ids": [job.get("id") for job in jobs[:5] if job.get("id")],
-                        "headers_sanitized": mask_secrets(schema.get("headers", {})),
-                        "message": f"Successfully fetched {len(jobs)} jobs"
-                    }
-                else:
-                    headed = await _policy_head(url)
-                    headed["host"] = host
-                    return headed
-            except HTTPException:
-                raise
-            except json.JSONDecodeError as e:
-                return {
-                    "ok": False,
-                    "status": 0,
-                    "error": f"API configuration: {describe_failure(e)}",
-                    "host": host
-                }
-            except Exception as e:
-                log_failure(logger, f"[sources] Test of API source {source_id} failed", e)
-                return {
-                    "ok": False,
-                    "status": 0,
-                    "error": describe_failure(e),
-                    "host": host
-                }
-        else:
-            headed = await _policy_head(url)
-            headed["host"] = host
-            return headed
+        headed = await _policy_head(url)
+        headed["host"] = host
+        return headed
         
     except HTTPException:
         raise
@@ -958,20 +882,6 @@ def import_source(
     
     conn_params = _connection_params()
     
-    
-    # Validate parser_hint for API sources
-    if source.source_type == "api" and source.parser_hint:
-        try:
-            parser_hint = json.loads(source.parser_hint) if isinstance(source.parser_hint, str) else source.parser_hint
-            if isinstance(parser_hint, dict) and parser_hint.get("v") != 1:
-                raise HTTPException(status_code=400, detail="API sources must use v1 schema (v=1)")
-        except HTTPException:
-            raise
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=400, detail="Invalid JSON in parser_hint")
-        except Exception:
-            raise HTTPException(status_code=400, detail="Invalid parser_hint")
-    
     conn = None
     cursor = None
     
@@ -1035,7 +945,11 @@ async def simulate_extract(
     source_id: str,
     admin: str = Depends(admin_required)
 ):
-    """Simulate job extraction without DB writes (returns first 3 normalized items)."""
+    """Simulate listing extraction without DB writes (W-35 3a).
+
+    HTML: the crawl's own readers on the first page only, with admission's verdict per row.
+    RSS and API: today's extractors until pull request 3b, with the same admission summary.
+    """
     if not psycopg2:
         raise HTTPException(status_code=503, detail="Database driver not available")
     
@@ -1062,65 +976,46 @@ async def simulate_extract(
         if not source:
             raise HTTPException(status_code=404, detail="Source not found")
         
-        # Import crawler modules
         source_type = source['source_type']
         
         # Support 'json' as an alias for 'api'
         if source_type == 'json':
             source_type = 'api'
         
+        from crawler_v2.simulate import summarise_jobs, simulate_html
+
+        db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
+        if not db_url:
+            raise HTTPException(status_code=500, detail=DB_NOT_CONFIGURED)
+
         if source_type == 'html':
             from crawler_v2.simple_crawler import SimpleCrawler
-            import os
-            db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
-            if not db_url:
-                raise HTTPException(status_code=500, detail=DB_NOT_CONFIGURED)
             html_crawler = SimpleCrawler(db_url)
-            # Fetch and extract jobs
             status, html = await html_crawler.fetch_html(source['careers_url'])
-            if status == 200:
-                jobs = html_crawler.extract_jobs_from_html(html, source['careers_url'])
-            else:
-                jobs = []
+            if status != 200 or not html:
+                return {
+                    "ok": False,
+                    "error": f"The source answered HTTP {status}",
+                    "error_category": "runtime",
+                }
+            return await simulate_html(html_crawler, html, source['careers_url'])
         elif source_type == 'rss':
             from crawler_v2.rss_crawler import SimpleRSSCrawler
-            import os
-            db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
-            if not db_url:
-                raise HTTPException(status_code=500, detail=DB_NOT_CONFIGURED)
             rss_crawler = SimpleRSSCrawler(db_url)
             feed = await rss_crawler.fetch_feed(source['careers_url'])
-            if feed:
-                jobs = rss_crawler.extract_jobs_from_feed(feed, source['careers_url'])
-            else:
-                jobs = []
+            jobs = rss_crawler.extract_jobs_from_feed(feed, source['careers_url']) if feed else []
+            return summarise_jobs(jobs, "rss", reader="rss")
         elif source_type == 'api':
             from crawler_v2.api_crawler import SimpleAPICrawler
-            import os
-            db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL")
-            if not db_url:
-                raise HTTPException(status_code=500, detail=DB_NOT_CONFIGURED)
             api_crawler = SimpleAPICrawler(db_url)
-            # For simulate, fetch API and extract jobs
             data = await api_crawler.fetch_api(source['careers_url'])
-            if data:
-                jobs = api_crawler.extract_jobs_from_json(data, source['careers_url'])
-            else:
-                jobs = []
+            jobs = api_crawler.extract_jobs_from_json(data, source['careers_url']) if data else []
+            return summarise_jobs(jobs, "api", reader="api")
         else:
             raise HTTPException(
                 status_code=400, 
                 detail=f"Unsupported source_type: {source_type}. Supported types: html, rss, api (or json as alias for api)"
             )
-        
-        # Return first 3 items
-        sample = jobs[:3] if jobs else []
-        
-        return {
-            "ok": True,
-            "count": len(jobs),
-            "sample": sample
-        }
         
     except HTTPException:
         raise
