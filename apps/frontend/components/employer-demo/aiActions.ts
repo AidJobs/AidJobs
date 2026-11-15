@@ -561,7 +561,7 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
       case 'set_style': {
         const style = Array.isArray(a.style) ? STYLES.filter((x) => (a.style as unknown[]).some((y) => typeof y === 'string' && y.toLowerCase() === x.toLowerCase())) : [];
         if (!style.length) refused.push('the writing style');
-        else if (j.setup === 'template') refused.push('the writing style, before the template');
+        else if (j.setup === 'template' || j.setup === 'about' || j.setup === 'project') refused.push('the writing style, before About us and the project');
         else if (j.setup === 'style') chooseStyle(id, style);
         else setStyle(id, style);
         break;
@@ -986,12 +986,12 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
   const before = said === null ? now.chat.slice(0, firstUser + 1) : start.chat;
   const notDone = refused.length ? `\n\nNot done: ${refused.slice(0, 3).join('; ')}.` : '';
   const asks = /\?/.test(turn.reply) || actions.some((a) => a.type === 'ask') || Boolean(card);
-  // A reply that asks a question, or shows a card, stands for the step the job is now at, so the rules do not ask it again; unless it
-  // asked about another step than the open one (section 19, phase 5), when the rules ask the open question after it.
+  // A reply that asks a question, or shows a card, stands for the step the job is now at, so the rules do not ask it again.
+  // Phase 6 review revision: never stack a second bubble when the AI asked ahead — fold into one reply only (askNext false).
   const want = now.walk ? nextStep(now, getState()) : null;
   const ahead = asks && !card && want ? asksAhead(turn.reply, ask.fact, want, want.kind === 'approve' ? headingOf(getState(), now, want.section) : '', wrote) : false;
   const step = asks && now.walk && !ahead ? stepKey(want) : undefined;
-  aiExchange(id, before, said, { text: `${turn.reply.trim() || 'Done.'}${notDone}`, quick: ahead ? undefined : ask.quick, ask: ahead ? undefined : ask.fact, by, step, card }, !asks || ahead);
+  aiExchange(id, before, said, { text: `${turn.reply.trim() || 'Done.'}${notDone}`, quick: ahead ? undefined : ask.quick, ask: ahead ? undefined : ask.fact, by, step, card }, !asks && !ahead);
   for (const t of opened) open(t);
   return { refused, opened };
 }

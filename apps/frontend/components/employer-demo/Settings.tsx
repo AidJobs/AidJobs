@@ -15,7 +15,7 @@ import CreateFormatDialog from './FormatBuilder';
 import { DemoMark, Field, inputStyle, isEmail, radioKeys, Section } from './ui';
 
 const SECTORS = ['Water, sanitation and hygiene', 'Health', 'Nutrition', 'Education', 'Child protection', 'Gender', 'Livelihoods and food security', 'Climate and environment', 'Shelter', 'Peacebuilding', 'Humanitarian response', 'ESG and environmental and social safeguards'];
-const VOICES = ['Warm', 'Formal', 'Plain English', 'Speaks as "we"', 'Uses "you"', 'Rights-based', 'Short sentences', 'Inclusive'];
+const VOICES = ['Warm', 'Formal', 'Speaks as "we"', 'Uses "you"', 'Rights-based', 'Inclusive'];
 const ORG_TYPES: Array<{ key: OrgType; label: string }> = [
   { key: 'ingo', label: 'International NGO' },
   { key: 'ngo', label: 'National or local NGO' },
@@ -89,16 +89,15 @@ function BrandStyle({ org }: { org: Org }) {
   const read = () => {
     setReading(true);
     setTimeout(() => {
-      let voice = ['Warm', 'Plain English', 'Speaks as "we"', 'Rights-based'];
+      let voice = ['Warm', 'Speaks as "we"', 'Rights-based'];
       if (mode === 'paste' && sample.trim()) {
         const t = ` ${sample.toLowerCase()} `;
-        const sentences = sample.split(/[.!?]+/).filter((x) => x.trim());
-        const avg = sentences.length ? sample.split(/\s+/).length / sentences.length : 20;
         voice = [
           ...(/\bwe\b|\bour\b/.test(t) ? ['Speaks as "we"'] : []),
           ...(/\byou\b|\byour\b/.test(t) ? ['Uses "you"'] : []),
-          ...(avg < 18 ? ['Short sentences', 'Plain English'] : ['Formal']),
+          ...(/\bformal|shall|pursuant|hereby\b/.test(t) ? ['Formal'] : ['Warm']),
           ...(/rights|dignity|inclusion|equit/.test(t) ? ['Rights-based'] : []),
+          ...(/inclusive|everyone|all genders/.test(t) ? ['Inclusive'] : []),
         ];
       }
       setOrg({ voice: Array.from(new Set(voice)), careersUrl: mode === 'link' ? url : org.careersUrl });

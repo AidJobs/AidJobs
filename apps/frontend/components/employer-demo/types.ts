@@ -472,7 +472,7 @@ export type DemoJob = {
   /** The part open in the window ("s:" and a section, or outline, details, fixed, check, publish); reopening the job returns to it. */
   part?: string;
   /** A job started in the window waits for its template, then its writing style and the pace, before anything is written. */
-  setup?: 'template' | 'style' | 'pace';
+  setup?: 'template' | 'about' | 'project' | 'style' | 'pace';
   /** A job started in the window is written step by step; jobs without it (the samples, earlier versions) are already written. */
   walk?: Walk;
   /** The writing style, as the chips of Organisation settings. */

@@ -68,8 +68,9 @@ export function PageField({ job, s, kind, open }: { job: DemoJob; s: State; kind
         <button type="button" className="aj-pill" style={{ height: 30 }} disabled={busy || ro || text.trim().length < 40} onClick={() => draft(text, 'you told us')}>
           Draft from this text
         </button>
-        <button type="button" className="aj-text-btn" style={{ height: 30 }} disabled={busy || ro} onClick={() => file.current?.click()}>
-          <FileUp size={13} strokeWidth={1.8} /> Upload a file
+        <button type="button" className="aj-text-btn ej-upload-btn" style={{ height: 30 }} disabled={busy || ro} onClick={() => file.current?.click()}>
+          <FileUp size={13} strokeWidth={1.8} aria-hidden />
+          <span>Upload a file</span>
         </button>
         <input
           ref={file}

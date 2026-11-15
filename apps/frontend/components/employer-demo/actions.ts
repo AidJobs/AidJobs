@@ -46,7 +46,7 @@ import { contentOf, describeStyle, proposedStyle, recommendation, styleFromReply
 import { profileFor, profileName, profileOf } from './profiles';
 import { aiWrites, ASKS, asksOf, checkPoints, contentPrint, essentials, ESSENTIAL_WORDS, FIXED_SECTIONS, isSettled, isWritten, nextStep, parkedIn, parkKey, stepKey, type Step } from './flow';
 import { AGAIN_DATE, AGAIN_PLACE, AGAIN_POSITIONS, INVITE, KEEP_ALL, KEEP_AS_IS, MARK_REVIEWED, NO_MORE_LANGS, NO_REVIEW, NOT_NOW, NOTHING_ELSE, REMIND, SEND_REVIEW, SHOW_FLYER, stateMessage, THIS_JOB } from './walkChat';
-import { ALL_GOOD, APPROVE_FIXED, ASK_TEXT as WALK_ASK, CHANGE_NO, DISMISS_MARK, CHANGE_YES, CHOOSE_SDGS, fixedNamed, NO_SDGS, orgGoalsAnswer, GENUINE, GOOD, KEEP_FIXED, LEAVE_IT, NO_THANKS, NONE_OF_THESE, OTHER_WORDING, overview, paceIn, PACE_QUICK, promptFor, readAnswer, readDetails, STYLE_QUICK, styleQuestion } from './walkChat';
+import { ALL_GOOD, ABOUT_QUICK, APPROVE_FIXED, ASK_TEXT as WALK_ASK, CHANGE_NO, DISMISS_MARK, CHANGE_YES, CHOOSE_SDGS, fixedNamed, NO_SDGS, orgGoalsAnswer, GENUINE, GOOD, KEEP_FIXED, LEAVE_IT, NO_THANKS, NONE_OF_THESE, OTHER_WORDING, overview, paceIn, PACE_QUICK, PROJECT_QUICK, promptFor, readAnswer, readDetails, STYLE_QUICK, styleQuestion } from './walkChat';
 import {
   addToGroup,
   applyOp,
@@ -935,8 +935,8 @@ export function setPace(id: string, pace: Pace, said?: string) {
 }
 
 /**
- * Puts the chosen template on a job that is waiting for one, and asks for the style. `tags`: the sections of a template the user built
- * or adjusted, with its `grouping` (section 19, phase 6, B); a flat order without one is read as the grouping it shows.
+ * Puts the chosen template on a job that is waiting for one, then About us (Phase 6 review revision). `tags`: the sections of a
+ * template the user built or adjusted, with its `grouping` (section 19, phase 6, B); a flat order without one is read as the grouping it shows.
  */
 export function applyTemplate(id: string, formatKey: string, said?: string, tags?: string[], grouping?: Grouping & { customGroups?: CustomGroup[] }) {
   if (!ownerOnly()) return;
@@ -958,10 +958,50 @@ export function applyTemplate(id: string, formatKey: string, said?: string, tags
       };
       const user = said ? [msg('user', said)] : [];
       if (!j.setup) return j;
-      const text = j.walk ? overview(format, keys.length, wordsFor(keys.length), contentOf(format, s.org.orgType), styleQuestion(s)) : `**${format.label}** it is: ${keys.length} sections. ${styleQuestion(s)}`;
-      return { ...next, setup: 'style', chat: [...j.chat, ...user, { ...msg('ai', text, STYLE_QUICK), step: 'setup:style' }] };
+      // Context first: About us page, then project, then early facts and tone (Phase 6 review revision).
+      const lead = j.walk
+        ? `${overview(format, keys.length, wordsFor(keys.length), contentOf(format, s.org.orgType), '').trim()} `
+        : `**${format.label}** it is: ${keys.length} sections. `;
+      const hasAbout = Boolean(s.org.about.trim());
+      const aboutMsg = {
+        ...msg(
+          'ai',
+          `${lead}${hasAbout ? "Before we write, your organisation's About us. Paste a page address below (or text / a file) and I'll draft from it, or keep what you already have." : "Before we write, your organisation's About us. Paste a page address below (or text / a file) and I'll read it and draft that section."}`,
+          hasAbout ? ABOUT_QUICK : ['Skip for now'],
+        ),
+        step: 'setup:about',
+        card: 'website' as const,
+      };
+      return { ...next, setup: 'about', chat: [...j.chat, ...user, aboutMsg] };
     }),
   }));
+}
+
+/** After About us setup: go to project context (ensureAsk asks it). */
+export function advanceFromAbout(id: string, said?: string) {
+  if (!ownerOnly()) return;
+  update((s) => ({
+    ...s,
+    org: { ...s.org, websiteAsked: true },
+    jobs: s.jobs.map((j) => {
+      if (j.id !== id || j.setup !== 'about') return j;
+      return { ...j, setup: 'project', chat: said ? [...j.chat, msg('user', said)] : j.chat };
+    }),
+  }));
+  ensureAsk(id);
+}
+
+/** After project setup: go to style (early facts are asked by nextStep while setup is style). */
+export function advanceFromProject(id: string, said?: string) {
+  if (!ownerOnly()) return;
+  update((s) => ({
+    ...s,
+    jobs: s.jobs.map((j) => {
+      if (j.id !== id || j.setup !== 'project') return j;
+      return { ...j, setup: 'style', chat: said ? [...j.chat, msg('user', said)] : j.chat };
+    }),
+  }));
+  ensureAsk(id);
 }
 
 /** The style is chosen: the first draft is written in it, and the fact questions begin. */
@@ -1177,7 +1217,17 @@ export function writeSections(id: string, writes: Array<{ key: string; lines: st
  */
 export function aiExchange(id: string, before: ChatMsg[], said: string | null, reply: { text: string; quick?: string[]; ask?: ChatMsg['ask']; by?: string; step?: string; card?: ChatMsg['card'] }, askNext = true) {
   updateJob(id, (x) => ({ ...x, chat: [...before, ...(said ? [msg('user', said)] : []), { ...msg('ai', reply.text, reply.quick, reply.ask), ai: true, ...(reply.by ? { by: reply.by } : {}), ...(reply.step ? { step: reply.step } : {}), ...(reply.card ? { card: reply.card } : {}) }] }));
-  if (askNext || getState().jobs.find((j) => j.id === id)?.walk) ensureAsk(id);
+  // One reply per turn (Phase 6 review revision): when the AI tagged the open step (or showed a card), do not append a rules prompt.
+  const j = getState().jobs.find((x) => x.id === id);
+  if (!j?.walk) {
+    if (askNext) ensureAsk(id);
+    return;
+  }
+  const want = nextStep(j, getState());
+  const key = stepKey(want);
+  if (reply.step && key && reply.step === key) return;
+  if (reply.card && want?.kind === 'setup' && (want.stage === 'about' || want.stage === 'project')) return;
+  if (askNext) ensureAsk(id);
 }
 
 /** A template matched by name in a message: "use the UN one", "INGO role profile". */
@@ -1223,10 +1273,33 @@ function returningTurn(s: State, j: DemoJob, text: string): boolean {
   return false;
 }
 
-/** A message while the job waits for its template or its style. Returns true when it was handled. */
+/** A message while the job waits for its template, context, style, or pace. Returns true when it was handled. */
 function setupTurn(s: State, j: DemoJob, text: string): boolean {
   const userMsg = msg('user', text);
   const say = (reply: string, quick?: string[]) => updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, userMsg, msg('ai', reply, quick)] }));
+  if (j.setup === 'about') {
+    const t = text.trim();
+    if (t === ABOUT_QUICK[0] || /\b(keep|use).*(about|profile)|as it is\b/i.test(t) || YES.test(t)) {
+      advanceFromAbout(j.id, text);
+      return true;
+    }
+    if (t === ABOUT_QUICK[1] || t === 'Skip for now' || SKIP.test(t) || /\bskip\b|\blater\b|\bnot now\b/i.test(t)) {
+      advanceFromAbout(j.id, text);
+      return true;
+    }
+    // A URL or long paste is handled by the page field / card; otherwise nudge.
+    say('Paste a page address in the card below, or choose one of the answers.', s.org.about.trim() ? ABOUT_QUICK : ['Skip for now']);
+    return true;
+  }
+  if (j.setup === 'project') {
+    const t = text.trim();
+    if (t === PROJECT_QUICK[0] || t === PROJECT_QUICK[1] || SKIP.test(t) || /\bskip\b|\bno project\b|\bnot a project\b|\blater\b|\bnot now\b/i.test(t) || YES.test(t)) {
+      advanceFromProject(j.id, text);
+      return true;
+    }
+    say('Paste a project page in the card below, or skip if there is none.', PROJECT_QUICK);
+    return true;
+  }
   if (j.setup === 'pace') {
     const t = text.trim();
     const pace = t === PACE_QUICK[0] ? 'step' : t === PACE_QUICK[1] ? 'all' : paceIn(t);
@@ -1284,6 +1357,9 @@ function setupTurn(s: State, j: DemoJob, text: string): boolean {
     return true;
   }
   if (j.setup === 'style') {
+    // Early listing facts are asked while setup is still style (Phase 6 review revision); leave those to the walk.
+    const open = nextStep(j, s);
+    if (open?.kind === 'ask') return false;
     const style = YES.test(text.trim()) ? proposedStyle(s) : styleFromReply(proposedStyle(s), text);
     chooseStyle(j.id, style, text);
     return true;

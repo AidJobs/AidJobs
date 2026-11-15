@@ -90,6 +90,29 @@ export function promptFor(s: State, job: DemoJob, format: Format, step: Step, ke
       return [stepMsg(text, key, [NOTHING_ELSE, AGAIN_DATE, AGAIN_PLACE, AGAIN_POSITIONS])];
     }
     case 'setup':
+      if (step.stage === 'about') {
+        const has = Boolean(s.org.about.trim());
+        const m = stepMsg(
+          has
+            ? `Before we write, your organisation's About us. Paste a page address below (or text / a file) and I'll draft from it, or keep what you already have.`
+            : `Before we write, your organisation's About us. Paste a page address below (or text / a file) and I'll read it and draft that section.`,
+          key,
+          has ? ABOUT_QUICK : ['Skip for now'],
+        );
+        return [{ ...m, card: 'website' as const }];
+      }
+      if (step.stage === 'project') {
+        return [
+          {
+            ...stepMsg(
+              `If this job is for a project, its page, pasted text, or a file below lets me write with that context. Or skip if there is no project page.`,
+              key,
+              PROJECT_QUICK,
+            ),
+            card: 'project' as const,
+          },
+        ];
+      }
       if (step.stage === 'style') return [stepMsg(overview(format, job.tags.length, wordsFor(job.tags.length), contentOf(format, s.org.orgType), styleQuestion(s)), key, STYLE_QUICK)];
       if (step.stage !== 'pace') return [];
       return [stepMsg('Shall I write it one section at a time, so you can shape each one as we go, or write it all and then go through it with you?', key, PACE_QUICK)];
@@ -130,9 +153,8 @@ export function promptFor(s: State, job: DemoJob, format: Format, step: Step, ke
       const firstWritten = job.versions.find((v) => v.sections.some((x) => x.key === step.section && x.lines.length))?.sections.find((x) => x.key === step.section)?.lines;
       const edited = Boolean(firstWritten) && JSON.stringify(firstWritten) !== JSON.stringify(job.sections.find((x) => x.key === step.section)?.lines);
       if (step.section === 'about' && !edited && !job.sections.find((x) => x.key === 'about')?.ai) {
-        // The website field is offered once, the first time a job is written (section 19, phase 5, A), as the card under this message.
-        const m = stepMsg(`${intro}**${name}** starts from your organisation's About us. Good as it is, or change it for this job?`, key, quick);
-        return [s.org.websiteAsked ? m : { ...m, card: 'website' }];
+        // About us page is offered in setup (Phase 6 review revision); approve no longer re-offers the website card.
+        return [stepMsg(`${intro}**${name}** starts from your organisation's About us. Good as it is, or change it for this job?`, key, quick)];
       }
       if (step.section === 'apply') return [stepMsg(`${intro}**${name}** is written from your application settings. Good, or change something?`, key, quick)];
       const text = edited ? `**${name}**: good now, or change something else?` : intro ? `${intro}First, **${name}**: good, or change something?` : `Here is **${name}**. Good, or change something?`;
@@ -141,7 +163,11 @@ export function promptFor(s: State, job: DemoJob, format: Format, step: Step, ke
     case 'details':
       return [
         {
-          ...stepMsg(`Anything else for the listing: the number of positions, direct reports, the start date, or the donor?${job.pack?.project ? '' : ' If this job is for a project, its page, its text, or a file (below) lets me write About the project.'}`, key, [NONE_OF_THESE]),
+          ...stepMsg(
+            `Anything else for the listing: the number of positions, direct reports, the start date, or the donor?${job.pack?.project ? '' : ' You can still add a project page below if you skipped it earlier.'}`,
+            key,
+            [NONE_OF_THESE],
+          ),
           ...(job.pack?.project ? {} : { card: 'project' as const }),
         },
       ];
@@ -464,7 +490,10 @@ export function overview(format: Format, count: number, words: number, content: 
   return `**${format.label}** it is: ${count} sections, about ${words} words, ${content}. ${question}`;
 }
 
-export const STYLE_QUICK = ['Yes, write it that way', 'More formal', 'Shorter sentences'];
+/** Tone / voice quick answers (Phase 6 review revision): confirm the proposal, or pick Warm / Formal / we / you. */
+export const STYLE_QUICK = ['Yes, write it that way', 'Warm', 'Formal', 'Speaks as "we"', 'Uses "you"'];
+export const ABOUT_QUICK = ['Use our About us as it is', 'Skip for now'];
+export const PROJECT_QUICK = ['No project page', 'Skip for now'];
 
 /** "How should it sound?", asked once the template is chosen and before anything is written. */
 export function styleQuestion(s: State): string {

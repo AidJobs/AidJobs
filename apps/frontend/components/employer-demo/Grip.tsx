@@ -8,7 +8,7 @@ import { placeFor } from './MenuButton';
 /** One entry of a grip's menu; `items` opens a short list in its place ("Move to group…"); `off`: shown, with why it cannot be used. */
 export type GripAction = { label: string; run?: () => void; items?: GripAction[]; danger?: boolean; off?: string; current?: boolean };
 
-const DRAG = 5;
+const DRAG = 3;
 
 /**
  * The grip (section 19, phase 6, B and C): one meaning in the outline and in the draft. Dragged, it moves its row or section; pressed
@@ -53,9 +53,12 @@ export default function Grip({ label, tip, actions, onKey, onDrag, onDrop, class
     };
   }, [open, sub]);
 
+  const lastY = useRef(0);
+  const raf = useRef(0);
   const pointerDown = (e: PointerEvent<HTMLButtonElement>) => {
     if (e.button !== 0) return;
     press.current = { x: e.clientX, y: e.clientY, dragging: false, id: e.pointerId };
+    lastY.current = e.clientY;
   };
   const pointerMove = (e: PointerEvent<HTMLButtonElement>) => {
     const p = press.current;
@@ -68,14 +71,25 @@ export default function Grip({ label, tip, actions, onKey, onDrag, onDrop, class
       } catch {
         // Without capture the grip still gets the moves while the pointer stays over it.
       }
+      e.currentTarget.dataset.dragging = 'true';
     }
     e.preventDefault();
-    onDrag(e.clientY);
+    lastY.current = e.clientY;
+    if (raf.current) return;
+    raf.current = requestAnimationFrame(() => {
+      raf.current = 0;
+      onDrag(lastY.current);
+    });
   };
   const dragged = useRef(false);
   const pointerUp = (e: PointerEvent<HTMLButtonElement>) => {
     const p = press.current;
     press.current = null;
+    e.currentTarget.removeAttribute('data-dragging');
+    if (raf.current) {
+      cancelAnimationFrame(raf.current);
+      raf.current = 0;
+    }
     if (p?.dragging) {
       e.preventDefault();
       dragged.current = true;
@@ -190,7 +204,10 @@ export function dropAt(root: HTMLElement | null, y: number, dragged: string): { 
   let hit: HTMLElement | null = null;
   for (const el of marks) {
     const r = el.getBoundingClientRect();
-    if (r.top + r.height / 2 <= y) hit = el;
+    // Upper third of a mark: land before it (after the previous mark); else after it once the pointer is past that band.
+    const edge = r.top + Math.min(14, r.height * 0.35);
+    if (y < edge) break;
+    hit = el;
   }
   if (!hit) return { after: null, group: marks[0]?.dataset.dropGroup ?? null };
   return { after: hit.dataset.dropKey ?? null, group: hit.dataset.dropGroup ?? null };
@@ -201,7 +218,7 @@ export function groupDropAt(root: HTMLElement | null, y: number, dragged: string
   const groups = Array.from(root?.querySelectorAll<HTMLElement>('[data-group-block]') ?? []).filter((el) => el.dataset.groupBlock !== dragged);
   for (const el of groups) {
     const r = el.getBoundingClientRect();
-    if (r.top + r.height / 2 > y) return el.dataset.groupBlock ?? null;
+    if (y < r.top + Math.min(24, r.height * 0.35)) return el.dataset.groupBlock ?? null;
   }
   return null;
 }

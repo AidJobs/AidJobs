@@ -1,6 +1,6 @@
 'use client';
 
-import { formatOf, goOn, headingOf, liveEdit, setFacts, subId, touched } from './actions';
+import { advanceFromAbout, advanceFromProject, formatOf, goOn, headingOf, liveEdit, setFacts, subId, touched } from './actions';
 import { extractFacts, inOutlineOrder, longDate, placeIn, PLACES, roleByKey, salarySuggestion, SALARY_FACTS } from './engine';
 import { ASKS } from './flow';
 import { typicalYears } from './market';
@@ -122,19 +122,26 @@ export function acceptPageDraft(id: string, lines?: string[]) {
       };
     }),
   }));
-  goOn(id);
+  const after = getState().jobs.find((x) => x.id === id);
+  if (after?.setup === 'about' && d.kind === 'about') advanceFromAbout(id);
+  else if (after?.setup === 'project' && d.kind === 'project') advanceFromProject(id);
+  else goOn(id);
 }
 
 export function rejectPageDraft(id: string) {
   const s = getState();
-  const d = s.jobs.find((x) => x.id === id)?.pageDraft;
+  const j0 = s.jobs.find((x) => x.id === id);
+  const d = j0?.pageDraft;
   if (!d || s.reviewerAs) return;
   update((st) => ({
     ...st,
     org: d.kind === 'about' ? { ...st.org, websiteAsked: true } : st.org,
     jobs: st.jobs.map((j) => (j.id === id ? { ...j, pageDraft: undefined, chat: [...j.chat, say(`Left as it was: nothing from the draft went on the job.`)] } : j)),
   }));
-  goOn(id);
+  const after = getState().jobs.find((x) => x.id === id);
+  if (after?.setup === 'about' && d.kind === 'about') advanceFromAbout(id);
+  else if (after?.setup === 'project' && d.kind === 'project') advanceFromProject(id);
+  else goOn(id);
 }
 
 /** "Keep our profile's About us": the website is not asked again; the job keeps the organisation's About us. */
@@ -144,7 +151,9 @@ export function keepProfileAbout(id: string, said?: string) {
     org: { ...s.org, websiteAsked: true },
     jobs: s.jobs.map((j) => (j.id === id && said ? { ...j, chat: [...j.chat, { id: `m${Math.random().toString(36).slice(2, 9)}`, from: 'user', text: said }, say("Fine: About us stays as your profile has it. Your website can be read later from the About us section or Organisation settings.")] } : j)),
   }));
-  goOn(id);
+  const after = getState().jobs.find((x) => x.id === id);
+  if (after?.setup === 'about') advanceFromAbout(id);
+  else goOn(id);
 }
 
 /** "Save as the organisation's About us": the job's About us becomes the one each new job starts from; jobs already written keep theirs. */

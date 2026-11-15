@@ -164,8 +164,13 @@ export default function OutlineEditor({ rows, grouping, customGroups, onOp, reco
                   tip="Drag to move the group, or press for more"
                   actions={groupActions(g)}
                   onKey={(by) => run({ op: 'groupBy', group: g, by }, `group:${g}`)}
-                  onDrag={(y) => setGroupDrop({ before: groupDropAt(root.current, y, g) })}
+                  onDrag={(y) => {
+                    root.current?.querySelectorAll('[data-dragging-group]').forEach((el) => el.removeAttribute('data-dragging-group'));
+                    root.current?.querySelector(`[data-group-block="${CSS.escape(g)}"]`)?.setAttribute('data-dragging-group', 'true');
+                    setGroupDrop({ before: groupDropAt(root.current, y, g) });
+                  }}
                   onDrop={(y) => {
+                    root.current?.querySelectorAll('[data-dragging-group]').forEach((el) => el.removeAttribute('data-dragging-group'));
                     setGroupDrop(null);
                     if (y !== null) run({ op: 'groupBefore', group: g, before: groupDropAt(root.current, y, g) as GroupKey | null });
                   }}
@@ -261,7 +266,7 @@ export default function OutlineEditor({ rows, grouping, customGroups, onOp, reco
         );
       })}
       {!ro && (
-        <div className="ej-ol-chips" style={{ marginTop: 4 }}>
+        <div className="ej-ol-add-group">
           {adding?.kind === 'group' ? (
             <NameField
               label="Name this group"
@@ -272,9 +277,9 @@ export default function OutlineEditor({ rows, grouping, customGroups, onOp, reco
               onCancel={() => setAdding(null)}
             />
           ) : (
-            <Tip label="Add a group of your own">
-              <button type="button" className="ej-add" onClick={() => setAdding({ kind: 'group' })} aria-label="Add a group">
-                <Plus size={11} strokeWidth={2} aria-hidden />
+            <Tip label="Add a top-level group of your own">
+              <button type="button" className="ej-ol-add-group-btn" onClick={() => setAdding({ kind: 'group' })} aria-label="Add a group">
+                <Plus size={13} strokeWidth={2} aria-hidden />
                 Add a group
               </button>
             </Tip>

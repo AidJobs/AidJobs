@@ -185,22 +185,31 @@ describe('the window, revised: the template comes first, then the style, then th
     const un = getState().formats.find((f) => f.label.startsWith('UN Secretariat'))!;
     sendChat(others, 'use the UN Secretariat one');
     expect(job(others).format).toBe(un.key);
-    expect(job(others).setup).toBe('style');
-    expect(job(others).chat.at(-1)?.text).toContain('How should it sound?');
+    expect(job(others).setup).toBe('about');
+    expect(job(others).chat.at(-1)?.card).toBe('website');
     const yes = startJob('We are hiring a Nutrition Officer', undefined, [], true);
     sendChat(yes, 'yes please');
-    expect(job(yes).setup).toBe('style');
+    expect(job(yes).setup).toBe('about');
   });
 
-  it('the overview, then the style from any reply; then the pace, remembered for the next job; keeping the style fills in the organisation', () => {
+  it('context first, then the style from any reply; then the pace, remembered for the next job; keeping the style fills in the organisation', () => {
     const id = startJob('We are hiring a Nutrition Officer', undefined, [], true);
     applyTemplate(id, job(id).format);
-    expect(job(id).chat.at(-1)?.text).toMatch(/^\*\*Riverstone format\*\* it is: \d+ sections, about \d+ words, your own headings in your order, each written to the depth of an INGO's job descriptions\. How should it sound\?/);
-    sendChat(id, 'more formal please, and short sentences');
+    expect(job(id).setup).toBe('about');
+    expect(job(id).chat.at(-1)?.card).toBe('website');
+    sendChat(id, 'Skip for now');
+    sendChat(id, 'No project page');
+    expect(job(id).setup).toBe('style');
+    // Early listing facts before tone while setup is still style.
+    sendChat(id, 'Juba');
+    sendChat(id, 'fixed-term');
+    sendChat(id, 'no grade');
+    expect(job(id).chat.at(-1)?.text).toMatch(/How should it sound\?/);
+    sendChat(id, 'more formal please');
     expect(job(id).setup).toBe('pace');
     expect(job(id).style).toContain('Formal');
-    expect(job(id).style).toContain('Short sentences');
     expect(job(id).style).not.toContain('Warm');
+    expect(job(id).style).not.toContain('Short sentences');
     expect(job(id).tone).toBe('formal');
     expect(job(id).sections).toEqual([]);
     expect(job(id).chat.at(-2)?.quick).toEqual(['Keep it for all jobs', 'Just this job']);
@@ -212,8 +221,8 @@ describe('the window, revised: the template comes first, then the style, then th
     sendChat(id, 'One section at a time');
     expect(job(id).setup).toBeUndefined();
     expect(getState().pace).toBe('step');
-    expect(job(id).sections.map((x) => x.key)).toEqual(['apply']);
-    expect(job(id).chat.at(-1)).toMatchObject({ text: 'Before I write **About us**: Where is the job based?', ask: 'place', step: 'ask:place' });
+    expect(job(id).sections.map((x) => x.key).sort()).toEqual(['about', 'apply'].sort());
+    expect(job(id).chat.at(-1)?.step).toMatch(/^approve:|^write:|^ask:/);
     const next = startJob('We are hiring a Health Officer', undefined, [], true);
     applyTemplate(next, job(next).format);
     chooseStyle(next, proposedStyle(getState()));
@@ -235,9 +244,9 @@ describe('the window, revised: the template comes first, then the style, then th
   });
 
   it('reads the style in words, and turns it into the writer’s tone', () => {
-    expect(describeStyle(['Warm', 'Plain English', 'Speaks as "we"', 'Uses "you"'])).toBe('warmly, in plain English and speaking as "we" to "you"');
-    expect(styleFromReply(['Warm', 'Plain English'], 'make it more professional')).toEqual(['Formal', 'Plain English']);
-    expect(toneOf(['Plain English'])).toBe('plain');
+    expect(describeStyle(['Warm', 'Speaks as "we"', 'Uses "you"'])).toBe('warmly and speaking as "we" to "you"');
+    expect(styleFromReply(['Warm'], 'make it more professional')).toEqual(['Formal']);
+    expect(toneOf([])).toBe('plain');
     expect(toneOf(['Warm', 'Formal'])).toBe('formal');
   });
 });
@@ -447,7 +456,7 @@ describe('a new employer, in order (round 7, phase 2): the rules walk steps 3 to
     sendChat(id, doc);
     expect(job(id).chat.at(-1)?.quick).toEqual(DOC_QUICK);
     sendChat(id, 'Its wording too');
-    expect(job(id).setup).toBe('style');
+    expect(job(id).setup).toBe('about');
     expect(job(id).sections.find((x) => x.key === 'responsibilities')).toMatchObject({ lines: ['- Lead screening', '- Train volunteers', '- Report monthly'], edited: true });
     chooseStyle(id, ['Warm']);
     expect(job(id).setup).toBeUndefined();

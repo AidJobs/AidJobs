@@ -27,7 +27,7 @@ export const SAMPLE_ORG: Org = {
   sectors: ['Water, sanitation and hygiene', 'Health', 'Child protection'],
   sdgs: [3, 6, 16],
   countries: ['Kenya', 'Uganda', 'Ethiopia', 'South Sudan'],
-  voice: ['Warm', 'Plain English', 'Speaks as "we"', 'Rights-based'],
+  voice: ['Warm', 'Speaks as "we"', 'Rights-based'],
   standard: [
     { key: 'safeguarding', label: 'Safeguarding', text: 'Riverstone Aid is committed to keeping children and adults at risk safe. Our selection process includes checks that reflect this commitment, and every member of staff follows our code of conduct.', locked: true },
     { key: 'psea', label: 'PSEA', text: 'Riverstone Aid has zero tolerance for sexual exploitation, abuse and harassment. All staff complete PSEA training and must report any concern.', locked: true },

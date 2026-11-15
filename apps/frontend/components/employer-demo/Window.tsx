@@ -1073,7 +1073,18 @@ function JobWindow({ id }: { id: string }) {
   const jobParts = partsOf(job, s);
   const parts = version ? [...jobParts.filter((p) => !p.section), ...version.sections.map((x): Part => ({ key: `s:${x.key}`, label: x.title, section: x.key, done: version.reviewed }))].sort((a, b) => (a.key === 'outline' ? -1 : b.key === 'outline' ? 1 : a.section && !b.section ? -1 : !a.section && b.section ? 1 : 0)) : jobParts;
   const current = currentPart(job, s, jobParts);
-  const currentLabel = job.setup === 'template' ? 'Template' : job.setup === 'style' ? 'Writing style' : job.setup === 'pace' ? 'Pace' : (parts.find((p) => p.key === current)?.label ?? 'the job');
+  const currentLabel =
+    job.setup === 'template'
+      ? 'Template'
+      : job.setup === 'about'
+        ? 'About us'
+        : job.setup === 'project'
+          ? 'Project'
+          : job.setup === 'style'
+            ? 'Writing style'
+            : job.setup === 'pace'
+              ? 'Pace'
+              : (parts.find((p) => p.key === current)?.label ?? 'the job');
   const focus = sectionOf(current);
   const langs = versionsOf(job).map((k) => langOf(k));
   const tabs: TabDef[] = [
@@ -1284,9 +1295,17 @@ function JobWindow({ id }: { id: string }) {
       const name = pick.tab === 'own' ? pick.name.trim() || 'Your template' : formatOf(s, pick.key).label;
       return <HeadingsPreview order={pickOrder} groupOrder={pick.groupOrder} title={name} note={`${pickOrder.length} sections · about ${wordsFor(pickOrder.length)} words · ${job.setup ? 'choose Use in the template panel to start writing' : 'choose Change to use it; text you edited is kept where its section stays'}`} />;
     }
-    if (job.setup === 'style' || job.setup === 'pace') {
+    if (job.setup === 'about' || job.setup === 'project' || job.setup === 'style' || job.setup === 'pace') {
       const format = formatOf(s, job.format);
-      return <HeadingsPreview order={job.tags.map((k) => ({ key: k, heading: job.sections.find((x) => x.key === k)?.title ?? headingFor(k, format), ...(job.groupOf?.[k] ? { group: job.groupOf[k] } : {}) }))} groupOrder={job.groupOrder} title={format.label} note={job.setup === 'style' ? 'Choose in the chat how it should sound; then it is written in these sections.' : 'Choose in the chat whether to write one section at a time or all of it first.'} />;
+      const note =
+        job.setup === 'about'
+          ? 'Add your About us page in the chat first; then the project, tone, and writing follow these sections.'
+          : job.setup === 'project'
+            ? 'Add a project page in the chat if this role needs one; then tone and writing follow these sections.'
+            : job.setup === 'style'
+              ? 'Choose in the chat how it should sound; then it is written in these sections.'
+              : 'Choose in the chat whether to write one section at a time or all of it first.';
+      return <HeadingsPreview order={job.tags.map((k) => ({ key: k, heading: job.sections.find((x) => x.key === k)?.title ?? headingFor(k, format), ...(job.groupOf?.[k] ? { group: job.groupOf[k] } : {}) }))} groupOrder={job.groupOrder} title={format.label} note={note} />;
     }
     return (
       <div className="aj-card flex flex-col items-center gap-3 p-8 text-center aj-muted">

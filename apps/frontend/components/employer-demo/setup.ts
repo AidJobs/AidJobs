@@ -1,21 +1,26 @@
 import { FAMILIES_ORDER, roleByKey } from './engine';
 import type { DemoJob, Format, State, Tone } from './types';
 
-/** The writing style, as the chips of Organisation settings. */
-export const STYLES = ['Warm', 'Formal', 'Plain English', 'Speaks as "we"', 'Uses "you"', 'Rights-based', 'Short sentences', 'Inclusive'];
+/**
+ * The writing style chips (Phase 6 review revision): tone, voice, optional flags.
+ * Plain English and Short sentences are no longer presented as tone.
+ */
+export const STYLES = ['Warm', 'Formal', 'Speaks as "we"', 'Uses "you"', 'Rights-based', 'Inclusive'];
 
 const BY_TYPE: Record<State['org']['orgType'], string[]> = {
-  ingo: ['Warm', 'Plain English', 'Speaks as "we"', 'Uses "you"'],
-  ngo: ['Warm', 'Plain English', 'Speaks as "we"', 'Uses "you"'],
-  charity: ['Warm', 'Plain English', 'Speaks as "we"', 'Uses "you"', 'Inclusive'],
-  un: ['Formal', 'Plain English'],
-  donor: ['Formal', 'Plain English'],
-  contractor: ['Formal', 'Short sentences'],
+  ingo: ['Warm', 'Speaks as "we"', 'Uses "you"'],
+  ngo: ['Warm', 'Speaks as "we"', 'Uses "you"'],
+  charity: ['Warm', 'Speaks as "we"', 'Uses "you"', 'Inclusive'],
+  un: ['Formal'],
+  donor: ['Formal'],
+  contractor: ['Formal'],
 };
 
 /** The style the chat proposes: the organisation's own when it has one, otherwise what organisations of its type usually write. */
 export function proposedStyle(s: State): string[] {
-  return s.org.voice.length ? s.org.voice : BY_TYPE[s.org.orgType];
+  const clean = (v: string[]) => STYLES.filter((x) => v.includes(x));
+  const own = clean(s.org.voice);
+  return own.length ? own : BY_TYPE[s.org.orgType];
 }
 
 /** The rule-based writer has three tones; the style decides which one it uses. */
@@ -28,11 +33,9 @@ export function toneOf(style: string[]): Tone {
 const SAID: Record<string, string> = {
   Warm: 'warmly',
   Formal: 'formally',
-  'Plain English': 'in plain English',
   'Speaks as "we"': 'speaking as "we"',
   'Uses "you"': 'addressing "you"',
   'Rights-based': 'rights-based',
-  'Short sentences': 'in short sentences',
   Inclusive: 'inclusively',
 };
 
@@ -54,14 +57,19 @@ export function styleFromReply(base: string[], text: string): string[] {
   };
   if (/\bformal|professional|official/.test(t)) add('Formal', 'Warm');
   if (/\bwarm|friendl|human|less formal|informal/.test(t)) add('Warm', 'Formal');
-  if (/\bplain|simple|simpler|clear\b/.test(t)) add('Plain English');
-  if (/\bshort(er)? sentences|\bconcise|\bbrief|\bshort\b|\bshorter\b/.test(t)) add('Short sentences');
   if (/\binclusive/.test(t)) add('Inclusive');
   if (/\brights/.test(t)) add('Rights-based');
+  if (/\bwe\b|first person|"?we"?/.test(t)) add('Speaks as "we"');
   if (/"?you"?\b.*\b(address|speak|talk)|\buse "?you"?|\bsecond person/.test(t)) add('Uses "you"');
   if (/\bno "?you"?\b|third person|the post holder/.test(t)) out = out.filter((y) => y !== 'Uses "you"');
+  if (/\bno "?we"?\b/.test(t)) out = out.filter((y) => y !== 'Speaks as "we"');
+  // Drop legacy chips no longer offered.
+  out = out.filter((x) => x !== 'Plain English' && x !== 'Short sentences');
   return STYLES.filter((x) => out.includes(x));
 }
+
+/** Early listing facts asked after About us / project and before tone (Phase 6 review revision). */
+export const EARLY_FACTS = ['title', 'place', 'contract', 'grade'] as const;
 
 /** About how long a job description of this many sections runs, with the organisation's fixed text. */
 export function wordsFor(sections: number): number {

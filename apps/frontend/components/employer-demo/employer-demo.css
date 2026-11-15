@@ -127,14 +127,16 @@
   --ej-ring-strong: color-mix(in srgb, var(--sage-7) 75%, transparent);
 }
 
+/* Slim focus ring (Phase 6 review revision): slightly darker than the field border, not a thick green double line. */
 .aj-root:has(.ej-app) :focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ej-ring-strong);
+  box-shadow: 0 0 0 1px var(--surface), 0 0 0 2px color-mix(in srgb, var(--sage-7) 55%, transparent);
 }
 
 .aj-root:has(.ej-app) :is(input, select, textarea):focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px var(--ej-ring-soft);
+  border-color: color-mix(in srgb, var(--sage-7) 70%, var(--hair));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sage-7) 35%, transparent);
 }
 
 .ej-composer {
@@ -146,8 +148,8 @@
 }
 
 .ej-composer:focus-within {
-  border-color: var(--sage-5);
-  box-shadow: 0 0 0 3px var(--ej-ring-soft);
+  border-color: color-mix(in srgb, var(--sage-7) 70%, var(--hair));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sage-7) 35%, transparent);
 }
 
 .aj-root .ej-composer textarea:focus-visible {
@@ -2390,6 +2392,85 @@ button.ej-step:hover {
 
 .ej-ol-group[data-drop-end='true'] {
   box-shadow: 0 2px 0 0 var(--sage-5);
+}
+
+/* Whole group moves together: dim the block being dragged; drop line spans the group. */
+.ej-ol-group[data-dragging-group='true'] {
+  opacity: 0.55;
+  outline: 1px dashed color-mix(in srgb, var(--sage-7) 50%, transparent);
+  outline-offset: 2px;
+}
+
+.ej-ol-add-group {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--hair);
+}
+
+.aj-root .ej-ol-add-group-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--hair);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.aj-root .ej-ol-add-group-btn:hover {
+  border-color: var(--sage-5);
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.ej-sec-head {
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.ej-sec-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ej-change-note {
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.ej-change-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ej-change-actions {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+.aj-root .ej-upload-btn {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.aj-root .ej-grip[data-dragging='true'] {
+  cursor: grabbing;
 }
 
 .ej-ol-gtitle {

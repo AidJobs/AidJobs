@@ -19,7 +19,7 @@ import { addDays, commitmentText, COMMITMENTS, completeText, findInclusive, GROU
 import type { ApplySettings, ChatMsg, DemoJob, Facts, GroupKey, JobLang, Section as Sec, State } from './types';
 import { RevealBlock } from './Reveal';
 import { getState } from './store';
-import { Dialog, Field, inputStyle, scrollInside } from './ui';
+import { Dialog, Field, inputStyle } from './ui';
 
 export function rich(text: string): ReactNode {
   return text.split(/(\*\*[^*]+\*\*)/g).map((p, i) => (p.startsWith('**') ? <strong key={i}>{p.slice(2, -2)}</strong> : <Fragment key={i}>{p}</Fragment>));
@@ -223,8 +223,8 @@ export function StepNote({ job, onSeeChat }: { job: DemoJob; onSeeChat?: () => v
   if (!st) return null;
   return (
     <div className="ej-change-note" role="status">
-      <Check size={12} strokeWidth={2.4} />
-      <span className="min-w-0 flex-1">
+      <Check size={12} strokeWidth={2.4} className="shrink-0" />
+      <span className="ej-change-text">
         {st.text}
         {st.settings ? '. Organisation settings changed too; Undo leaves them' : ''}
         {st.writing ? '. Writing the linked languages…' : ''}
@@ -244,21 +244,23 @@ export function StepNote({ job, onSeeChat }: { job: DemoJob; onSeeChat?: () => v
           </span>
         )}
       </span>
-      <Tip label={st.writing ? 'Waits until the linked translation is written' : 'Put it back as it was, in every language'}>
-        <button type="button" className="aj-text-btn" style={{ height: 24 }} onClick={() => undoStep(job.id)} aria-disabled={st.writing || undefined}>
-          Undo
-        </button>
-      </Tip>
-      {onSeeChat && (
-        <button type="button" className="aj-text-btn" style={{ height: 24 }} onClick={onSeeChat}>
-          See in chat
-        </button>
-      )}
-      <Tip label="Hide this note">
-        <button type="button" className="aj-icon-btn" style={{ width: 24, height: 24, border: 'none' }} onClick={() => dismissChange(job.id)} aria-label="Hide this note">
-          <X size={12} strokeWidth={2} />
-        </button>
-      </Tip>
+      <span className="ej-change-actions">
+        <Tip label={st.writing ? 'Waits until the linked translation is written' : 'Put it back as it was, in every language'}>
+          <button type="button" className="aj-text-btn" style={{ height: 24 }} onClick={() => undoStep(job.id)} aria-disabled={st.writing || undefined}>
+            Undo
+          </button>
+        </Tip>
+        {onSeeChat && (
+          <button type="button" className="aj-text-btn" style={{ height: 24 }} onClick={onSeeChat}>
+            See in chat
+          </button>
+        )}
+        <Tip label="Hide this note">
+          <button type="button" className="aj-icon-btn" style={{ width: 24, height: 24, border: 'none' }} onClick={() => dismissChange(job.id)} aria-label="Hide this note">
+            <X size={12} strokeWidth={2} />
+          </button>
+        </Tip>
+      </span>
     </div>
   );
 }
@@ -306,8 +308,8 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
   const editTip = `Edit ${sec.title}${sec.key === 'apply' ? ': its text and how people apply' : ''}${sec.edited ? ' · Edited by you' : ''}`;
   return (
     <section id={`ej-sec-${sec.key}`} className="ej-dsec rounded-2xl px-3 py-2" data-changed={changed} data-review-changed={sinceLastRound} data-current={current || undefined} data-drop-key={draft ? sec.key : undefined} data-drop-group={draft ? groupOfKey(groupingOf(job), sec.key) : undefined} data-drop={draft && draft.dropAfter === sec.key ? 'after' : undefined} aria-label={sec.title} style={{ scrollMarginTop: 12 }}>
-      <div className="flex items-center gap-2">
-        <h3 style={{ flex: 1 }}>{sec.title}</h3>
+      <div className="ej-sec-head flex items-center gap-2">
+        <h3 className="ej-sec-title">{sec.title}</h3>
         {sinceLastRound && (
           <span className="aj-chip" data-tone="amber">
             Changed since round {job.review.round - 1}
@@ -367,21 +369,23 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
       </div>
       {changed && job.lastChange && !reviewing && (
         <div className="ej-change-note" role="status">
-          <Check size={12} strokeWidth={2.4} />
-          <span className="min-w-0 flex-1">{job.lastChange.text}</span>
-          <button type="button" className="aj-text-btn" style={{ height: 24 }} onClick={() => undoLastChange(job.id)}>
-            Undo
-          </button>
-          {onSeeChat && (
-            <button type="button" className="aj-text-btn" style={{ height: 24 }} onClick={onSeeChat}>
-              See in chat
+          <Check size={12} strokeWidth={2.4} className="shrink-0" />
+          <span className="ej-change-text">{job.lastChange.text}</span>
+          <span className="ej-change-actions">
+            <button type="button" className="aj-text-btn" style={{ height: 24 }} onClick={() => undoLastChange(job.id)}>
+              Undo
             </button>
-          )}
-          <Tip label="Hide this note">
-            <button type="button" className="aj-icon-btn" style={{ width: 24, height: 24, border: 'none' }} onClick={() => dismissChange(job.id)} aria-label="Hide this note">
-              <X size={12} strokeWidth={2} />
-            </button>
-          </Tip>
+            {onSeeChat && (
+              <button type="button" className="aj-text-btn" style={{ height: 24 }} onClick={onSeeChat}>
+                See in chat
+              </button>
+            )}
+            <Tip label="Hide this note">
+              <button type="button" className="aj-icon-btn" style={{ width: 24, height: 24, border: 'none' }} onClick={() => dismissChange(job.id)} aria-label="Hide this note">
+                <X size={12} strokeWidth={2} />
+              </button>
+            </Tip>
+          </span>
         </div>
       )}
       {changed && !job.lastChange && job.undoStep && !reviewing && <StepNote job={job} onSeeChat={onSeeChat} />}
@@ -627,9 +631,9 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
     if (version) versionOp(job.id, version, op);
     else outlineOp(job.id, op);
     onClose();
+    // Keep the viewport still (Phase 6 review revision); only focus the new grip if it is already on screen.
     requestAnimationFrame(() => {
-      scrollInside(document.getElementById(`${version ? 'ej-ver-' : 'ej-sec-'}${key}`));
-      document.querySelector<HTMLElement>(`[data-grip-key="${key}"]`)?.focus({ preventScroll: true });
+      document.querySelector<HTMLElement>(`[data-grip-key="${version ? `ver:${key}` : key}"]`)?.focus({ preventScroll: true });
     });
   };
   const addOwn = (heading: string) => {

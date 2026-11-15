@@ -533,7 +533,8 @@ Each phase on `demo/employer`, with a preview for the user's look before the nex
   **The independent review of phase 6** (15 November 2026, a separate read-only agent, [the report](83d6dcbb-1ff8-4738-8baa-de79ab90e4fc); code, UX, accessibility, tests, and plan compliance; verdict: changes needed, 1 must-fix, 6 should-fix, 4 minor). The user approved fixing all of them the same day. Fixed, each with a test: typing "undo" (and the AI's undo) restores the widened undo step, not an older version; an explicit skip parks with hold so the next question waits with "Next question" (offers still decline on "not now" / "No, thanks"); the AI's move, rename, reorder, and headings-inside act on the language tab in view; linking languages is its own undo step; the flyer names Our commitments once; Publish now refuses when an essential is missing; a published starter's machine translation is cleared when safeguarding or country changes, so it is marked again; reviewers no longer see 🔗; a chat line edit clears the icon undo step; translating a fixed text in the job's own language marks a live job Updated; a locked pencil and Leave out carry the reason in their accessible name. 1,138 tests pass; type check passes. **Next:** Phase 6 amendment (add your own group, section, and sub-section), then the user's review of Phase 6, then Phase 7, then the user's assessment of the whole demo (with OpenRouter credit topped up if it is to be assessed with the AI).
 
 - [x] **Phase 6 amendment, add your own group, section, and sub-section (the user's clarification of 15 November 2026):** on top of the outline already there, free-text add (and remove) of a group, a section, or a sub-section; catalog chips stay; outline stays group → section; sub-sections in ✎ / the draft; AI accepts unknown names and writes content that fits. Built on `demo/employer` (15 November 2026) after the user approved the rewritten plan; checks and push as in G. Independent review of this amendment, then the user's Phase 6 review, then Phase 7. The merge rule does not apply: `demo/employer` is never merged.
-- [ ] **Phase 7, managing saved profiles (the user's decisions of 15 November 2026):** a side-menu **Job profiles** page (`#profiles` / `#profiles/<id>`), quiet Manage-jobs-style list, open-profile panel with light fact edit, rename, delete with restore Undo, and Use for a new job through `startJobFromProfile`; profiles also keep `groupOrder` / `groupOf` on save and restore them on start. "Phase 7 plan" below; approved by the user on 15 November 2026 with the three recommendations locked; rewritten the same day after the independent plan review (changes needed; every finding taken with the reviewer’s defaults). No code until the user approves the build. The merge rule does not apply: `demo/employer` is never merged.
+- [x] **Phase 6 review revision (the user's Phase 6 feedback of 15 November 2026):** context first after the template; fluid drag; group moves as one block; clear Add a group; tone chips cleaned; one chat reply per turn; Approve and toolbar one row; no scroll jump; slim uniform focus; upload icon+label one line. Built on `demo/employer` after the user approved the plan (15 November 2026). Then independent review, then Phase 7. The merge rule does not apply: `demo/employer` is never merged.
+- [ ] **Phase 7, managing saved profiles (the user's decisions of 15 November 2026):** a side-menu **Job profiles** page (`#profiles` / `#profiles/<id>`), quiet Manage-jobs-style list, open-profile panel with light fact edit, rename, delete with restore Undo, and Use for a new job through `startJobFromProfile`; profiles also keep `groupOrder` / `groupOf` on save and restore them on start. "Phase 7 plan" below; approved by the user on 15 November 2026 with the three recommendations locked; rewritten the same day after the independent plan review (changes needed; every finding taken with the reviewer’s defaults). No code until the user approves the build. The merge rule does not apply: `demo/employer` is never merged. Held until the Phase 6 review revision is done.
 
 ### Phase 4 plan (approved by the user, 12 November 2026)
 
@@ -981,9 +982,107 @@ Screens at 1366, 412, 390, and 360 px, light and dark. Keyboard through add, ren
 Phase 7 (profiles); auto-saving every custom structure as an org template; a projects list; sub-sections as a third row level in the outline tree; the real-AI walk (unless OpenRouter credit is topped up).
 
 
+### Phase 6 review revision (the user's Phase 6 feedback of 15 November 2026)
+
+**Status.** Built on `demo/employer` on 15 November 2026 after the user approved this plan. After the Phase 6 amendment and its review fixes (`91fd6e3`), the user reviewed the preview and found the flow and several UX points wrong; settled in chat the same day. Independent review of this revision next, then Phase 7. The merge rule does not apply: `demo/employer` is never merged.
+
+**In one sentence.** After the template, gather org and project context first; then tone and pace; then write and approve strictly in outline order — with fluid drag, clear Add a group, one chat reply per turn, and quiet chrome fixes.
+
+#### A. What the user reported (complete list)
+
+1. Drag is rough — needs several tries; must feel fluid.
+2. Moving a group looks like only the title moves; sections and sub-sections under it must move with it.
+3. "Add a group" is hard to find — looks like another section chip.
+4. About us "read this page" path is confusing / appears too late.
+5. Desired journey: after template → About us page → project → then facts / writing, aligned with the template so the JD does not jump around.
+6. Other context (role text, facts, org About us, salary/sample suggestions, accepted drafts) must not stay interleaved mid-write as the main path.
+7. Chat sequence feels illogical vs context-first.
+8. Same sequence with AI on or off (not AI-off only).
+9. Chat sometimes shows two answers at once.
+10. Style quick answers ("More formal", "Shorter sentences") feel random early; sentence length not needed.
+11. Plain English is not a tone.
+12. Keep professional tone/voice: Warm | Formal; Speaks as "we" | Uses "you"; optional Rights-based, Inclusive — same as settings; not from W-31 (that survey is employer coverage, not voice).
+13. Upload icon + "Upload a file" must be on one line.
+14. Input focus ring too thick / strange green on top of the border — slim, slightly darker than the field border; uniform across the demo.
+15. Page jumps when adding or removing from the outline / draft — keep place.
+16. Approve missing on some JD sections when it should show.
+17. Undo, X, and section icons wrapping onto two rows — one row.
+
+#### B. Walk order (locked)
+
+After the template is chosen, and before any section is written:
+
+1. **About us page** — chat card with URL / paste / upload + "Read this page" (same `PageField` as today). Offer once if not already asked (`websiteAsked` / accepted About us). Skip if the org already has About us text the user is happy to reuse, still with a quiet way to refresh from a page.
+2. **Project** — same pattern once, when the role/template needs project context (or the user has not declined). Same field as today's project card; move it here from the late details step when still needed later only as a reminder if skipped.
+3. **Title + listing facts** the early outline sections need (title, place, contract, grade — only what is still missing).
+4. **Tone** — propose Warm or Formal + we/you from org type / saved voice; chips as in C. Offer once to keep for every job (today's keep rule).
+5. **Pace** — one section at a time / write it all, then review.
+6. **Write and approve in outline order only** — facts still asked just before a later group when that group first needs them; no jumping back for About us or project mid-draft.
+
+AI on and AI off use the same `nextStep` order. Update the AI prompt so it follows this order and does not re-offer style before context.
+
+#### C. Tone chips (locked)
+
+| Chip | Role |
+| --- | --- |
+| Warm / Formal | Tone (one of the two) |
+| Speaks as "we" / Uses "you" | Voice |
+| Rights-based, Inclusive | Optional |
+
+Drop **Plain English** and **Short sentences** from the chat quick answers and from the tone row presented as "tone". Organisation settings use the same short list. Defaults by org type map only to Warm or Formal plus we/you (and Inclusive for charity where it already did). Chat quick answers become the proposed set confirmed, or those chips — not "More formal" / "Shorter sentences".
+
+#### D. Outline and drag (locked)
+
+1. **Fluid drag** — rewrite hit-testing so pointer Y maps cleanly to a drop slot; larger drop targets; continuous drop indicator while dragging; pointer capture reliable; threshold low enough to start easily but still distinguish click-for-menu. Same grip in outline and draft. Keyboard arrows still move one place.
+2. **Group move** — dragging a group reorders the whole group block (title + all its sections). Drop highlight covers the full group, not only the title row. Data already reorders `groupOrder`; fix feedback and any case where sections appear left behind.
+3. **Add a group** — one clear control at the **foot of the outline**, visually distinct from section chips (label + quiet +; not `ej-add` chip styling). Catalog "+ chips" and "Add your own" under a group stay as they are.
+
+#### E. Chat: one reply per turn (locked)
+
+One user turn → one assistant message.
+
+After an AI turn: if the reply (or its card) covers the open step, do **not** append a rules prompt. If it asked ahead, either fold the open question into that same message or replace — never stack a second bubble. Action paths that already push an AI reply must not also call `ensurePrompt` for the same step. Add a test that fails on today's double-ask path.
+
+#### F. JD chrome (locked)
+
+1. **Approve** — show on every written section that still needs approval once setup is done and the user is not a reviewer. Hide only when empty, already approved, still in setup, or reviewing. Chat "Good" / "All good" still work.
+2. **One row** — section header and change note: Approve, pencil, grip, Undo, X stay on one row (`nowrap`; title/note text truncates). Long "Save as our About us" stays in the grip menu (already the Phase 6 design) so it does not wrap the row.
+3. **No scroll jump** — add/remove/reorder does not call `scrollIntoView` / `goToTitle` / focus-scroll that moves the page away. Focus the new control only with `preventScroll` when it is already on screen; otherwise leave the viewport alone.
+4. **Focus rings** — slim ring, slightly darker than the field border, same sage family; no thick double green line. Same rule for inputs, textareas, composer, PageField, outline rename fields.
+5. **Upload** — icon and "Upload a file" on one line everywhere (`nowrap`, inline-flex, aligned).
+
+#### G. Build order
+
+1. Walk / `nextStep` / `promptFor` / AI context: context stages → tone → pace → writing; website and project cards moved early; tests for the new order.
+2. Tone chips and settings list aligned; style reply parsing updated.
+3. One-reply chat (`aiExchange` / `ensurePrompt` / ahead path); double-ask test.
+4. Fluid drag + group drop highlight + Add a group control.
+5. No scroll jump on outline/draft structure changes.
+6. Approve visibility + one-row chrome + focus rings + upload row.
+7. Type check, lint, production build, screens at 1366 / 412 / 390 / 360 light and dark; push `demo/employer` (never merge); plan and W-51 record; independent review of this revision; then Phase 7.
+
+#### H. Checks
+
+Each with a test that fails on today's code where logic changes:
+
+- After template, next step is About us / website before style
+- Project offered before writing when still needed
+- Writing follows outline order after context
+- Tone chips are Warm/Formal/we/you (+ optional); no Short sentences quick answer
+- One AI turn does not append a second rules bubble for the same step
+- Group drag reorders the whole group; Add a group control is not an `ej-add` chip
+- Approve present on a written unapproved section after setup
+- Add section does not change scrollTop of the draft/outline scroller
+- Focus token / ring and upload row covered by style or component test where practical
+
+#### I. Not in this revision
+
+Phase 7; new AI features beyond walk order and one-reply; changing what custom groups/sections can do; real-AI walk unless OpenRouter credit is available; production employer build.
+
+
 ### Phase 7 plan (managing saved profiles; approved by the user, 15 November 2026; rewritten after the independent plan review the same day)
 
-**Status.** Phase 6 and its review fixes are done. The leftover that already has data and a clear gap is managing saved job profiles: they are saved on publish, offered at the start of a new job, and forgotten from the notice, but there is no page for the list. The user asked for this next on 15 November 2026 and approved the plan the same day, locking the three recommendations: light fact editing on the profile; a side-menu item **Job profiles** beside Organisation settings; and carrying `groupOrder` / `groupOf` into the profile on save. One independent read-only review of this plan the same day ([the report](e6078bdd-e337-4018-896c-fcb84fd207f9): changes needed, 5 must-fix, 7 should-fix, 3 minor); every finding is built into this text with the reviewer's recommended defaults. The three locked decisions are unchanged. No code in this step. The build starts once the user approves it (the project's rule), on `demo/employer` in the order in section G. On 15 November 2026 the user put Phase 7 after a Phase 6 amendment (add your own group, section, and sub-section) and the user's review of Phase 6; the high-impact and enterprise role-system work stays in section J for later. The merge rule does not apply: `demo/employer` is never merged.
+**Status.** Phase 6 and its review fixes are done. The leftover that already has data and a clear gap is managing saved job profiles: they are saved on publish, offered at the start of a new job, and forgotten from the notice, but there is no page for the list. The user asked for this next on 15 November 2026 and approved the plan the same day, locking the three recommendations: light fact editing on the profile; a side-menu item **Job profiles** beside Organisation settings; and carrying `groupOrder` / `groupOf` into the profile on save. One independent read-only review of this plan the same day ([the report](e6078bdd-e337-4018-896c-fcb84fd207f9): changes needed, 5 must-fix, 7 should-fix, 3 minor); every finding is built into this text with the reviewer's recommended defaults. The three locked decisions are unchanged. No code in this step. The build starts once the user approves it (the project's rule), on `demo/employer` in the order in section G. On 15 November 2026 the user put Phase 7 after a Phase 6 amendment and the user's review of Phase 6; on the same day the Phase 6 review revision above was written from that review — Phase 7 waits until that revision is done. The merge rule does not apply: `demo/employer` is never merged.
 
 **What already exists (so this page only manages it).** On publish, a profile is saved automatically (`profileOf`): title, place, family, JD format, section keys, facts without dates and positions, style, how to apply, fixed-text keys (commitments), and language. A newer profile with the same title and place replaces the older. Undo on the notice calls `forgetProfile`. A matching profile is offered at the start of a new job ("Same as your last **Juba Finance Officer**?"). Hire again still copies the written text; a profile does not. There is no screen for the list. That is all this step adds.
 

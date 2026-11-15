@@ -92,7 +92,7 @@ export function asksOf(fields: string[]): AskKind[] {
 }
 
 export type Step =
-  | { kind: 'setup'; stage: 'template' | 'style' | 'pace' }
+  | { kind: 'setup'; stage: 'template' | 'about' | 'project' | 'style' | 'pace' }
   | { kind: 'change' }
   | { kind: 'again' }
   | { kind: 'genuine'; point: string }
@@ -293,20 +293,33 @@ export function suggestionsFor(job: DemoJob, s: State): string[] {
     .slice(0, 3);
 }
 
+/** Early listing facts asked after About us / project and before tone (Phase 6 review revision). */
+const EARLY: AskKind[] = ['title', 'place', 'contract', 'grade'];
+
 /** What comes next for a job started in the window; null for a job that is not walked through (the samples, earlier versions). */
 export function nextStep(job: DemoJob, s: State): Step | null {
   const w = job.walk;
   if (!w) return null;
   // Once published, the writing is over: editing a job in its state is phase 4's (section 19, "A returning employer").
   if (isPublished(job)) return { kind: 'live' };
+  // A question left unanswered is skipped (section 19, phase 6, A); it keeps its "to do" mark on the line.
+  const parked = (k: string) => Boolean(w.parked?.includes(k));
+  // Context and tone setup: About us → project → early facts → style → pace (Phase 6 review revision).
+  if (job.setup === 'template') return { kind: 'setup', stage: 'template' };
+  if (job.setup === 'about') return { kind: 'setup', stage: 'about' };
+  if (job.setup === 'project') return { kind: 'setup', stage: 'project' };
+  if (job.setup === 'style') {
+    const early = EARLY.find((f) => !isSettled(f, job) && !parked(f));
+    if (early) return { kind: 'ask', fact: early };
+    return { kind: 'setup', stage: 'style' };
+  }
+  if (job.setup === 'pace') return { kind: 'setup', stage: 'pace' };
   if (job.setup) return { kind: 'setup', stage: job.setup };
   if (w.pending) return { kind: 'change' };
   if (w.awaiting) return { kind: 'genuine', point: w.awaiting.point };
   // Hire again (section 19, phase 4): what changes comes first, then each section for a quick "keep as is".
   if (w.again && !w.settled.includes('again')) return { kind: 'again' };
   if (!isSettled('title', job)) return { kind: 'ask', fact: 'title' };
-  // A question left unanswered is skipped (section 19, phase 6, A); it keeps its "to do" mark on the line.
-  const parked = (k: string) => Boolean(w.parked?.includes(k));
   const unwritten = job.tags.filter((k) => !isWritten(job, k));
   const all = w.pace === 'all';
   if (all && unwritten.length && !job.tags.some((k) => !FIXED_SECTIONS.includes(k) && isWritten(job, k))) return { kind: 'write', sections: unwritten };
