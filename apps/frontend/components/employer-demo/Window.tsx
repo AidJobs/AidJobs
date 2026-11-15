@@ -4,7 +4,7 @@ import { ArrowLeft, ChevronDown, Eye, FileText, History, Link2, X } from 'lucide
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
-import { applyFormat, applyOrgSdgs, applyOutline, applyTemplate, bringDocument, canDelete, chatNote, closeJob, createFormat, downloadBlock, downloadCopy, formatOf, goOn, greetState, headingOf, hireAgain, isReviewable, LINK_REPLY, carried, carryByRules, markFlyerMade, parkingReply, remindReviewers, setLinked, sendChat, setChoice, setJobLang, setPart, setSdgs, settleAsk, unparkPart, windowSays, writeNow } from './actions';
+import { applyFormat, applyOrgSdgs, applyOutline, applyTemplate, bringDocument, canDelete, chatNote, closeJob, createFormat, downloadBlock, downloadCopy, formatOf, goOn, greetState, headingOf, hireAgain, isReviewable, LINK_REPLY, carried, carryByRules, markFlyerMade, parkingReply, remindReviewers, removeTranslation, setLinked, sendChat, setChoice, setJobLang, setPart, setSdgs, settleAsk, unparkPart, windowSays, writeNow } from './actions';
 import { FlyerPanel } from './Flyer';
 import { isPublished, STATE_LABEL, stateActionsOf, type StateAction } from './lifecycle';
 import { JobDialog, type Kind } from './Jobs';
@@ -37,7 +37,7 @@ import { currentPart, hasFields, lineFit, onLine, partsOf, sectionOf, type Part 
 import { GooglePreview, JobPageLangs, ShareCards } from './Publish';
 import { VersionsDialog } from './Review';
 import { inferSdgs, proposedStyle, SDG_NAMES, sdgsOf, toneOf, wordsFor } from './setup';
-import { getState, go, goBack, READING_KEY, useDemo } from './store';
+import { getState, go, goBack, notify, READING_KEY, useDemo } from './store';
 import { Commitments } from './Structure';
 import { HeadingsPreview, JobOutline, PhoneTemplate, pickGrouping, previewOrder, startPick, TemplatePanel, type Pick } from './TemplatePanel';
 import { ALL_LANGS, jobLang, langOf, versionsOf } from './translate';
@@ -192,7 +192,7 @@ function PartsList({ parts, current, onGo }: { parts: Part[]; current: string; o
   );
 }
 
-type TabDef = { key: string; label: string; lang?: string; linked?: boolean };
+type TabDef = { key: string; label: string; lang?: JobLang; linked?: boolean; removable?: boolean };
 
 /**
  * 🔗 Link languages (section 19, phase 6, E): one icon at the end of the panel's tabs, only when the job has versions, with a tick box
@@ -254,7 +254,7 @@ function LinkLangs({ job, disabled }: { job: DemoJob; disabled: boolean }) {
 }
 
 /** The output panel's tabs, shown only when there is a second view: a language version, or the preview. */
-function PanelTabs({ tabs, active, onPick, end }: { tabs: TabDef[]; active: string; onPick: (k: string) => void; end?: ReactNode }) {
+function PanelTabs({ tabs, active, onPick, onRemove, end }: { tabs: TabDef[]; active: string; onPick: (k: string) => void; onRemove?: (t: TabDef) => void; end?: ReactNode }) {
   const keys = (e: ReactKeyboardEvent<HTMLElement>) => {
     const at = tabs.findIndex((t) => t.key === active);
     const to = e.key === 'ArrowRight' ? at + 1 : e.key === 'ArrowLeft' ? at - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : null;
@@ -268,17 +268,34 @@ function PanelTabs({ tabs, active, onPick, end }: { tabs: TabDef[]; active: stri
     <div className="flex items-center">
       <div className="ej-w-tabs min-w-0 flex-1" role="tablist" aria-label="What the panel shows" onKeyDown={keys}>
         {tabs.map((t) => (
-          <button key={t.key} type="button" role="tab" id={`ej-wtab-${t.key}`} aria-selected={t.key === active} aria-controls="ej-w-panel" tabIndex={t.key === active ? 0 : -1} className="ej-w-tab" lang={t.lang} onClick={() => onPick(t.key)}>
-            {t.label}
-            {t.linked && (
-              <>
-                <Link2 size={11} strokeWidth={2} className="ej-tab-link" aria-hidden />
-                <span className="sr-only" lang="en">
-                  , linked
-                </span>
-              </>
+          <span key={t.key} className="ej-w-tab-wrap">
+            <button type="button" role="tab" id={`ej-wtab-${t.key}`} aria-selected={t.key === active} aria-controls="ej-w-panel" tabIndex={t.key === active ? 0 : -1} className="ej-w-tab" lang={t.lang} onClick={() => onPick(t.key)}>
+              {t.label}
+              {t.linked && (
+                <>
+                  <Link2 size={11} strokeWidth={2} className="ej-tab-link" aria-hidden />
+                  <span className="sr-only" lang="en">
+                    , linked
+                  </span>
+                </>
+              )}
+            </button>
+            {t.removable && onRemove && (
+              <Tip label={`Remove the ${t.label} version`}>
+                <button
+                  type="button"
+                  className="ej-w-tab-x"
+                  aria-label={`Remove the ${t.label} version`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemove(t);
+                  }}
+                >
+                  <X size={12} strokeWidth={2.2} />
+                </button>
+              </Tip>
             )}
-          </button>
+          </span>
         ))}
       </div>
       {end}
@@ -1079,12 +1096,22 @@ function JobWindow({ id }: { id: string }) {
               : (parts.find((p) => p.key === current)?.label ?? 'the job');
   const focus = sectionOf(current);
   const langs = versionsOf(job).map((k) => langOf(k));
+  const ownLang = langOf(jobLang(job));
   const tabs: TabDef[] = [
-    { key: 'doc', label: 'Job description', linked: (job.linked ?? []).includes(jobLang(job)) },
-    ...langs.map((l) => ({ key: `lang:${l.key}`, label: l.native, lang: l.key, linked: (job.linked ?? []).includes(l.key) })),
+    // With other languages, the original is named (e.g. English), not "Job description".
+    { key: 'doc', label: langs.length ? ownLang.label : 'Job description', lang: langs.length ? ownLang.key : undefined, linked: (job.linked ?? []).includes(jobLang(job)) },
+    ...langs.map((l) => ({ key: `lang:${l.key}`, label: l.native, lang: l.key, linked: (job.linked ?? []).includes(l.key), removable: !reviewing })),
     ...(preview ? [{ key: 'preview', label: 'Preview' }] : []),
     ...extra.map((k) => ({ key: k, label: EXTRA_TABS[k] ?? k })),
   ];
+  const removeLangTab = (t: TabDef) => {
+    if (!t.lang || t.key === 'doc') return;
+    const name = langOf(t.lang).label;
+    if (!window.confirm(`Remove the ${name} version? This deletes that language draft from this job.`)) return;
+    removeTranslation(job.id, t.lang);
+    if (tab === t.key) setTab('doc');
+    notify(`Removed the ${name} version.`);
+  };
   const active = tabs.some((t) => t.key === tab) ? tab : 'doc';
   const card = !reviewing && !job.setup && hasFields(current) && hidden !== current;
   const previewing = Boolean(job.setup) || (pick !== null && pick.tab !== 'sections');
@@ -1501,7 +1528,7 @@ function JobWindow({ id }: { id: string }) {
             </div>
             {tabs.length > 1 && (
               <div className="shrink-0 border-b aj-hair">
-                <PanelTabs tabs={tabs} active={active} onPick={setTab} end={langs.length && !reviewing ? <LinkLangs job={job} disabled={false} /> : undefined} />
+                <PanelTabs tabs={tabs} active={active} onPick={setTab} onRemove={removeLangTab} end={langs.length && !reviewing ? <LinkLangs job={job} disabled={false} /> : undefined} />
               </div>
             )}
             {panel}
@@ -1576,7 +1603,7 @@ function JobWindow({ id }: { id: string }) {
           </div>
           {tabs.length > 1 && (
             <div className="shrink-0 border-b aj-hair">
-              <PanelTabs tabs={tabs} active={active} onPick={setTab} end={langs.length && !reviewing ? <LinkLangs job={job} disabled={false} /> : undefined} />
+              <PanelTabs tabs={tabs} active={active} onPick={setTab} onRemove={removeLangTab} end={langs.length && !reviewing ? <LinkLangs job={job} disabled={false} /> : undefined} />
             </div>
           )}
           {panel}

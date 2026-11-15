@@ -29,6 +29,7 @@ import {
   inOutlineOrder,
   lengthRequest,
   outlineOrder,
+  placeIn,
   recommendSections,
   suggestTitle,
   toneRequest,
@@ -2689,21 +2690,29 @@ export function editSection(id: string, key: string, text: string, note = false,
   if (heading && was && heading !== was.title) renameSection(id, key, heading);
   updateJob(id, (j) => {
     const lines = linesOf(text);
-    const old = j.sections.find((x) => x.key === key);
+    const s0 = getState();
+    const format = formatOf(s0, j.format);
+    // About us / Project may be on the outline before a section object exists: create it on Save.
+    const tags = placeIn(j.tags, key);
+    const existing = j.sections.find((x) => x.key === key);
+    const title = heading || existing?.title || j.renamed?.[key] || headingFor(key, format);
+    const renamed = heading && heading !== (existing?.title ?? j.renamed?.[key] ?? headingFor(key, format)) ? { ...j.renamed, [key]: heading } : j.renamed;
+    const old = existing ?? { key, title, lines: [] as string[], subs: undefined as Section['subs'] };
     const subs = extra.subs
       ? extra.subs
-          .map((x) => ({ id: x.id, title: (x.title ?? old?.subs?.find((y) => y.id === x.id)?.title ?? '').trim(), lines: linesOf(x.text) }))
+          .map((x) => ({ id: x.id, title: (x.title ?? old.subs?.find((y) => y.id === x.id)?.title ?? '').trim(), lines: linesOf(x.text) }))
           .filter((x) => x.title && (x.lines.length || true))
           .filter((x) => x.title)
-      : old?.subs;
-    // Saved from the editor, a section marked "to update" is taken as brought in line, even unchanged.
+      : old.subs;
     const unmarked = j.toUpdate?.[key] ? { ...j, toUpdate: Object.keys(j.toUpdate).length > 1 ? Object.fromEntries(Object.entries(j.toUpdate).filter(([k]) => k !== key)) : undefined } : j;
-    if (JSON.stringify(lines) === JSON.stringify(old?.lines) && JSON.stringify(subs ?? []) === JSON.stringify(old?.subs ?? [])) return start && j !== start ? stepped(start, unmarked, `Renamed ${was?.title ?? key}`, 'doc', { keys: [key] }) : unmarked;
-    const sections = j.sections.map((x) => (x.key === key ? { ...x, lines, edited: true, subs: subs?.length ? subs : undefined } : x));
-    const title = j.sections.find((x) => x.key === key)?.title ?? key;
+    if (existing && JSON.stringify(lines) === JSON.stringify(old.lines) && JSON.stringify(subs ?? []) === JSON.stringify(old.subs ?? []) && tags.join() === j.tags.join()) {
+      return start && j !== start ? stepped(start, unmarked, `Renamed ${was?.title ?? key}`, 'doc', { keys: [key] }) : unmarked;
+    }
+    const nextSec = { ...old, title, lines, edited: true as const, subs: subs?.length ? subs : undefined };
+    const sections = inOutlineOrder(existing ? j.sections.map((x) => (x.key === key ? nextSec : x)) : [...j.sections, nextSec], tags);
     const marks = Object.fromEntries(Object.entries(j.toUpdate ?? {}).filter(([k]) => k !== key));
-    const next: DemoJob = stepped(start ?? j, { ...touched(j), toUpdate: Object.keys(marks).length ? marks : undefined, sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${title}`, sections }], ...liveEdit(j) }, `Edited ${title}`, 'doc', { keys: [key] });
-    // Stay on this section in the progress line (do not let the walk jump to Languages or another part).
+    const base = { ...touched(j), tags, renamed, toUpdate: Object.keys(marks).length ? marks : undefined, sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${title}`, sections }], ...liveEdit(j) };
+    const next: DemoJob = stepped(start ?? j, base, `Edited ${title}`, 'doc', { keys: [key] });
     return note
       ? { ...next, part: `s:${key}`, chat: [...j.chat, msg('ai', `You changed **${title}** by hand. I'll keep your wording; ask me if another section should change to match.`)] }
       : { ...next, part: `s:${key}` };
@@ -3089,7 +3098,8 @@ export function removeTranslation(id: string, lang: JobLang) {
     if (!j.translations?.[lang]) return j;
     const rest = { ...j.translations };
     delete rest[lang];
-    return { ...touched(j), ...liveEdit(j), translations: rest };
+    const linked = (j.linked ?? []).filter((l) => l !== lang);
+    return { ...touched(j), ...liveEdit(j), translations: Object.keys(rest).length ? rest : undefined, linked: linked.length ? linked : undefined };
   });
 }
 

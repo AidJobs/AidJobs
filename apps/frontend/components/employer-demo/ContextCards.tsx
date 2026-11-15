@@ -14,25 +14,28 @@ const asText = (lines: string[]) => lines.map((l) => (l.startsWith('- ') ? `• 
 
 /**
  * The website field (About us) or the project field (About the project), section 19, phase 5, A: one https page, read by the demo's page
- * route; or the text pasted; or a file, read in the browser. In the JD (compact), Save puts the box text on the section; Cancel clears it.
+ * route; or the text pasted; or a file, read in the browser. In the JD (compact), Save puts the box text on the section; Cancel restores it.
  */
 export function PageField({ job, s, kind, open, compact }: { job: DemoJob; s: State; kind: 'about' | 'project'; open: (t: OpenTarget) => void; compact?: boolean }) {
   const secKey = kind === 'about' ? 'about' : PROJECT_SECTION;
   const saved = asText(job.sections.find((x) => x.key === secKey)?.lines ?? []);
-  const stamp = job.versions[job.versions.length - 1]?.n ?? 0;
   const [url, setUrl] = useState(kind === 'about' ? s.org.website : '');
   const [text, setText] = useState(compact ? saved : '');
+  const [baseline, setBaseline] = useState(compact ? saved : '');
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const file = useRef<HTMLInputElement>(null);
   const ro = Boolean(s.reviewerAs);
   const what = kind === 'about' ? 'About us' : 'About the project';
-  const dirty = compact && text !== saved;
+  const dirty = text !== baseline;
+  // Sync from the job only when the box is not mid-edit (Accept draft, another editor).
   useEffect(() => {
-    if (compact) setText(saved);
-    // When the section is saved or drafted, refresh the box; do not depend on `saved` alone or typing is wiped.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- stamp is the section write signal
-  }, [compact, stamp]);
+    if (!compact) return;
+    if (text !== baseline) return;
+    if (saved === baseline) return;
+    setText(saved);
+    setBaseline(saved);
+  }, [compact, saved, text, baseline]);
   const draft = async (t: string, source: 'your website' | 'the project page' | 'you told us', social: string[] = []) => {
     setBusy(true);
     setNote('');
@@ -51,13 +54,24 @@ export function PageField({ job, s, kind, open, compact }: { job: DemoJob; s: St
     if (!r.ok) return setNote(`${r.reason.charAt(0).toUpperCase()}${r.reason.slice(1)}: paste its text below, or upload the file.`);
     await draft(r.text, kind === 'about' ? 'your website' : 'the project page', r.social);
   };
+  const roundTrip = (raw: string) =>
+    raw
+      .split('\n')
+      .map((l) => l.replace(/^[•*]\s*/, '- '))
+      .filter((l) => l.trim())
+      .map((l) => (l.startsWith('- ') ? `• ${l.slice(2)}` : l))
+      .join('\n');
   const saveText = () => {
-    if (!text.trim() || ro) return;
-    editSection(job.id, secKey, text.slice(0, MAX_TEXT), Boolean(compact));
+    if (ro || !dirty) return;
+    const next = text.slice(0, MAX_TEXT);
+    editSection(job.id, secKey, next, true, kind === 'project' ? { title: 'About the project' } : {});
+    const stored = roundTrip(next);
+    setText(stored);
+    setBaseline(stored);
     setNote('');
   };
   const cancelText = () => {
-    setText(compact ? saved : '');
+    setText(baseline);
     setNote('');
   };
   return (
@@ -96,7 +110,7 @@ export function PageField({ job, s, kind, open, compact }: { job: DemoJob; s: St
       <div className="flex flex-wrap items-center gap-1.5">
         {compact ? (
           <>
-            <button type="button" className="aj-ink-btn" style={{ height: 30 }} disabled={busy || ro || !text.trim() || !dirty} onClick={saveText}>
+            <button type="button" className="aj-ink-btn" style={{ height: 30 }} disabled={busy || ro || !dirty} onClick={saveText}>
               Save
             </button>
             <button type="button" className="aj-pill" style={{ height: 30 }} disabled={busy || ro || !dirty} onClick={cancelText}>

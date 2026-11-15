@@ -1720,7 +1720,7 @@ button.ej-step:hover {
   flex-shrink: 0;
   align-items: center;
   gap: 10px;
-  padding: 6px 14px 4px;
+  padding: 6px 14px;
   border-bottom: 1px solid var(--hair);
 }
 
@@ -1837,10 +1837,10 @@ button.ej-step:hover {
   font-size: 12px;
 }
 
-/* The progress line: original size; less space above so it sits closer to the header rule. */
+/* The progress line: original size; less space below so it sits closer to the language/Preview tab rule. */
 .ej-pline {
   flex-shrink: 0;
-  padding: 2px 14px 6px;
+  padding: 8px 14px 0;
   border-bottom: 1px solid var(--hair);
 }
 
@@ -1982,6 +1982,13 @@ button.ej-step:hover {
   scrollbar-width: none;
 }
 
+.ej-w-tab-wrap {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0;
+}
+
 .aj-root .ej-w-tab {
   flex-shrink: 0;
   height: 36px;
@@ -1994,6 +2001,25 @@ button.ej-step:hover {
   font-size: 12.5px;
   white-space: nowrap;
   cursor: pointer;
+}
+
+.aj-root .ej-w-tab-x {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.aj-root .ej-w-tab-x:hover {
+  background: var(--surface-2);
+  color: var(--red);
 }
 
 .aj-root .ej-w-tab:hover {
