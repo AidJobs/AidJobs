@@ -1,0 +1,57 @@
+{
+  "built_at": "2026-11-15T14:27:26Z",
+  "families": [
+    {
+      "deep_fields_ready": {
+        "duty_bank_phrasing": false,
+        "reference_jds": false,
+        "signature_fact_questions": false
+      },
+      "family_id": "programme_management",
+      "file": "programme_management.json",
+      "name_en": "Programme management"
+    },
+    {
+      "deep_fields_ready": {
+        "duty_bank_phrasing": false,
+        "reference_jds": false,
+        "signature_fact_questions": false
+      },
+      "family_id": "meal",
+      "file": "meal.json",
+      "name_en": "MEAL"
+    },
+    {
+      "deep_fields_ready": {
+        "duty_bank_phrasing": false,
+        "reference_jds": false,
+        "signature_fact_questions": false
+      },
+      "family_id": "communications_advocacy",
+      "file": "communications_advocacy.json",
+      "name_en": "Communications and advocacy"
+    },
+    {
+      "deep_fields_ready": {
+        "duty_bank_phrasing": false,
+        "reference_jds": false,
+        "signature_fact_questions": false
+      },
+      "family_id": "finance",
+      "file": "finance.json",
+      "name_en": "Finance"
+    }
+  ],
+  "inputs": {
+    "normative_sources": "role-survey/normative-sources.csv",
+    "wave_1a_broad_measured": "role-survey/wave-1a-broad-measured.json",
+    "wave_1a_families": [
+      "programme_management",
+      "meal",
+      "communications_advocacy",
+      "finance"
+    ]
+  },
+  "schema_version": "0.1.0",
+  "wave": "1a"
+}

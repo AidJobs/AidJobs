@@ -100,6 +100,102 @@ def test_draw_refuses_existing_draw(work):
 
 
 def test_check_requires_draw_files(work):
-  rows = [_row(0, "programme_management", "o", "en", "officer", "NGO", "archive")]
-  probs = deep.check_draw("programme_management", rows, set())
-  assert any("draw.json is missing" in p for p in probs)
+    rows = [_row(0, "programme_management", "o", "en", "officer", "NGO", "archive")]
+    probs = deep.check_draw("programme_management", rows, set())
+    assert any("draw.json is missing" in p for p in probs)
+
+
+def _answer_row(vid: str, **scores: int | None) -> dict:
+    base = {
+        "id": vid,
+        "decision_facts": 2,
+        "specificity": 2,
+        "realistic_must_haves": 2,
+        "clear_outcomes": 2,
+        "field_realism": None,
+        "fairness": 2,
+        "readability": 2,
+        "right_length": 2,
+        "findability": 2,
+    }
+    base.update(scores)
+    return base
+
+
+def _write_draw(family: str, ids: list[str]) -> None:
+    root = deep.family_dir(family)
+    root.mkdir(parents=True, exist_ok=True)
+    codes = {
+        vid: {"advert_id": f"adv-{vid}", "batch": f"batch-{(i - 1) // 5 + 1}"}
+        for i, vid in enumerate(ids, 1)
+    }
+    (root / "draw.json").write_text(
+        json.dumps({"family_id": family, "codes": codes}, indent=1),
+        encoding="utf-8",
+    )
+
+
+def _write_answers(family: str, name: str, rows: list[dict]) -> None:
+    ans = deep.answers_dir(family)
+    ans.mkdir(parents=True, exist_ok=True)
+    (ans / f"{name}.jsonl").write_text(
+        "\n".join(json.dumps(r) for r in rows) + "\n",
+        encoding="utf-8",
+    )
+
+
+class _FamArgs:
+    def __init__(self, family: str, file: str | None = None):
+        self.family = family
+        self.file = file
+
+
+def test_answers_form_check_against_draw_codes(work):
+    family = "programme_management"
+    ids = [f"PM{i:02d}" for i in range(1, 3)]
+    _write_draw(family, ids)
+    _write_answers(family, "a", [_answer_row(i) for i in ids])
+    assert deep.answers(_FamArgs(family, "a.jsonl")) == 0
+    bad = _answer_row(ids[0], decision_facts=9)
+    (deep.answers_dir(family) / "bad.jsonl").write_text(json.dumps(bad) + "\n", encoding="utf-8")
+    assert deep.answers(_FamArgs(family, "bad.jsonl")) == 1
+
+
+def test_agreement_writes_json_and_kappa(work):
+    family = "meal"
+    ids = [f"ML{i:02d}" for i in range(1, 4)]
+    _write_draw(family, ids)
+    rows = [_answer_row(i) for i in ids]
+    _write_answers(family, "a", rows)
+    _write_answers(family, "b", rows)
+    assert deep.agreement(_FamArgs(family)) == 0
+    data = json.loads((deep.family_dir(family) / "agreement.json").read_text(encoding="utf-8"))
+    assert data["targets"] == deep.TARGETS
+    assert data["adverts"] == len(ids)
+    dim = data["dimensions"]["decision_facts"]
+    assert dim["exact"] == 1.0
+    assert dim["kappa"] == 1.0
+
+
+def test_reconcile_seals_once(work):
+    family = "finance"
+    vid = "FN01"
+    _write_draw(family, [vid])
+    a = _answer_row(vid, decision_facts=1)
+    b = _answer_row(vid, decision_facts=2)
+    _write_answers(family, "a", [a])
+    _write_answers(family, "b", [b])
+    assert deep.disagreements(_FamArgs(family)) == 0
+    assert deep.reconcile(_FamArgs(family)) == 1
+    path = deep.family_dir(family) / "disagreements.csv"
+    rows = list(csv.DictReader(path.open(encoding="utf-8")))
+    rows[0]["decision"] = "2"
+    rows[0]["reason"] = "coder b"
+    with path.open("w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=rows[0].keys())
+        w.writeheader()
+        w.writerows(rows)
+    assert deep.reconcile(_FamArgs(family)) == 0
+    seal = deep.family_dir(family) / "reconciled.sha256"
+    assert seal.exists()
+    assert deep.reconcile(_FamArgs(family)) == 0

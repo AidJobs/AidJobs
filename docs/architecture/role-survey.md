@@ -1159,6 +1159,29 @@ With 18 to 21 positives, each precision carries a 95% margin of about ±0.13 (Es
 
 **Not used.** `cipd-profession-map` stays unused. The user decided on 13 November 2026 not to seek a licence (19.19 item 5).
 
-**Option A draws (this pull request).** `tools/survey/deep.py` freezes about 20 evidence adverts per family (AI test set excluded; at most three per organisation; French floors; unknown level capped at three), writes pretags and packets of five under `survey-raw-archive/.../work/stage2/{family}/`. Seeds: programme_management 20261120, meal 20261121, communications_advocacy 20261122, finance 20261123. Draw files are sealed once written.
+**Option A draws (PR #164).** `tools/survey/deep.py` freezes about 20 evidence adverts per family (AI test set excluded; at most three per organisation; French floors; unknown level capped at three), writes pretags and packets of five under `survey-raw-archive/.../work/stage2/{family}/`. Seeds: programme_management 20261120, meal 20261121, communications_advocacy 20261122, finance 20261123. Draw files are sealed once written.
 
 **Next:** dual-code the four Option A packets (Grok 4.7 and Composer 2.5), reconcile and seal; measured parts and duty banks from every advert in those families; Stage 3 `library.py` may start alongside but must not claim deep fields until coding is sealed.
+
+### 19.22 Stage 2 Option A dual-code sealed (15 November 2026)
+
+**Verified first:** PR #164 merged at approved head `16af914` as `12762b5` (15 November 2026, 11:35:16 UTC); CI green on `main` (CI backend 43709653676, Secrets 43709653707); branch `w54/stage2` gone; survey worktree on `origin/main`; stage2 draws intact (four families, `draw.json` sealed by existence, packets of five, `pretags.jsonl`); Phase 0 seals intact (`reconciled.sha256` `0e068308fdcf…`, `reconciled-v1.1.sha256` `d35e4ecf5a85…`; guide `8f9ad292…`). Open streams noted: W-35 pull request 3a merged as PR #167 / records #168; demo PRs #22 and #96 not to be merged. No redraw; `adverts.py measure` not run; no production crawl.
+
+**Dual coding (full scores on guide v1.1).** Grok 4.7 (coder A) and Composer 2.5 (coder B), packets of five, many parallel runs. Answers copied with `take_answers.py` from transcripts only (never assembled twice). Form-check clean on every family's `a.jsonl` / `b.jsonl`. Agreement targets as section 5 / Phase 0 (70% exact, quadratic weighted κ 0.6). Several dimensions stayed below target (as on the Phase 0 rescore): notably realistic must-haves, readability and right length across families. Disagreements settled with written reasons (automatic pretags preferred for decision facts / length / findability / readability where valid; otherwise the guide, taking the lower score when unsure). Sealed before any library claim:
+
+| Family | n | Disagreements settled | `reconciled.sha256` prefix |
+| --- | ---: | ---: | --- |
+| programme_management | 20 | 51 | `cfc5a6058309…` |
+| meal | 20 | 53 | `cc3f7f7e7711…` |
+| communications_advocacy | 20 | 53 | `707a745d6cd2…` |
+| finance | 20 | 50 | `ea5ecc373c70…` |
+
+Sealed sets are never edited. Packets, answers, disagreements and seals stay in `survey-raw-archive/.../work/stage2/{family}/`. Tools: `deep.py` gains `answers`, `agreement`, `disagreements` and `reconcile` (tests in CI).
+
+**Measured parts and duty banks (every evidence advert in the four families).** Broad-layer counts only in `role-survey/wave-1a-broad-measured.json` (programme management 108, MEAL 67, communications and advocacy 88, finance 85; held-out excluded). Duty-line groupings (heuristic names; still need human review before library phrasing) under the archive `work/stage2/measured/`. No validated measure from rounds 2 or 3 was changed.
+
+**Stage 3 start.** `tools/survey/library.py` builds wave-1a stubs under `role-survey/library/` (`schema_version` 0.1.0): each family cites `chcf`, `chs-2024` and `un-generic-job-profiles` (UN behaviours as a variant note only); measured broad parts included; deep scores marked sealed in the archive; duty-bank phrasing, signature-fact questions and reference job descriptions stay `deep_fields_ready: false`.
+
+**Out of scope (unchanged):** the generator, the fairness-check product, nationality leftover wordings, headings / contract lengths / years re-rounds, re-measuring AidJobs crawled jobs, Option B, the US$5 model round (deferred until Stage 3 outputs are ready).
+
+**Next:** signature-fact questions and duty-bank naming from the sealed scores and groupings; fill library deep fields; reference job descriptions; then the deferred Phase 5 stop for the vault key.
