@@ -438,9 +438,29 @@ def test_a_new_employer_on_a_known_system_is_read_with_no_code(monkeypatch):
 def test_the_general_readers_crawl_records_its_strategy(monkeypatch):
     html, record = _fixture("general_reader", "icrc-listing")
     result, _run, fields = _crawl(monkeypatch, html, record["url"])
-    assert result["message"] == "Found 32 jobs"
+    # Thin listing rows are not admitted without job pages, so the canary notes that
+    # (W-35); status and the found count stay as before.
+    assert result["status"] == "ok"
+    assert result["message"].startswith("Found 32 jobs")
+    assert "canary: rows read but none admitted or observed" in result["message"]
     assert (fields["reader"], fields["strategy"]) == ("general", "selector-links")
+    assert fields.get("canary") == ["rows read but none admitted or observed"]
     assert "listing_complete" not in fields
+
+
+def test_canary_warnings_do_not_change_status_or_valid(monkeypatch):
+    # A canary note must not flip status or zero the admitted count (review mutation E/F).
+    monkeypatch.setattr(
+        simple_crawler, "canary_evaluate", lambda **_kwargs: ["probe warning"]
+    )
+    url = "https://careers.example.org/jobs/search"
+    html = _sites_page("https://careers.example.org", [1, 2, 3], 3)
+    result, _run, fields = _crawl(monkeypatch, html, url)
+    assert result["status"] == "ok"
+    assert result["valid"] == 3
+    assert result["counts"]["found"] == 3
+    assert "canary: probe warning" in result["message"]
+    assert fields.get("canary") == ["probe warning"]
 
 
 def test_a_replaced_listing_step_is_recorded_as_unknown(monkeypatch):

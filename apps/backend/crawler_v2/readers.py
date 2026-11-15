@@ -59,11 +59,32 @@ class PageUpReader(_WalkReader):
     walk = "_pageup_listing_jobs"
     label = "PageUp career-site reader"
 
+    def marks(self, page: str) -> bool:
+        # Weaker than reading cards with exactly one a.job-link: any list-view card, or
+        # PageUp's career-site files / "Powered by PageUp" (canary, W-35).
+        if not page:
+            return False
+        lower = page.lower()
+        return (
+            "list-view--item" in lower
+            or "careers-static.pageuppeople.com" in lower
+            or "powered by pageup" in lower
+        )
+
 
 class SitesReader(_WalkReader):
     name = "sites-engine"
     walk = "_sites_listing_jobs"
     label = "Sites career-site reader"
+
+    def marks(self, page: str) -> bool:
+        # Weaker than acceptance (pager + cards): the Sites pager attribute alone.
+        if not page:
+            return False
+        return (
+            'engine="Sites::Engine"' in page
+            or "engine='Sites::Engine'" in page
+        )
 
 
 class GeneralReader(Reader):
@@ -74,6 +95,12 @@ class GeneralReader(Reader):
 
     def __init__(self, crawler):
         self._crawler = crawler
+
+    def marks(self, page: str) -> bool:
+        # No weaker system mark: the general reader is the fall-through, not a recruitment
+        # system. Its "none admitted" and half-drop checks still run (canary, W-35).
+        del page
+        return False
 
     async def read(self, first: Response, source: Dict, fetch: Optional[Fetch] = None):
         del fetch
