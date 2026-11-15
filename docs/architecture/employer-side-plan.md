@@ -530,8 +530,9 @@ Each phase on `demo/employer`, with a preview for the user's look before the nex
   **The AI:** new checked actions to move a section into a group and to move a group, only when the user asked to move something (reordering stays within groups); removing How to apply refused; `fixed_text` acts on the language in view and the linked ones, refuses a locked text, words a text for the job only with the user's own words, and translates only where the organisation has no wording; told what is parked and whether the next question waits, the group of each section, the fixed texts in view, and a linked change to carry; its changes follow the links, and it has no action for the link itself; its instructions name the four icons and the outline's controls. The context of a full job with versions and per-language data stays under 80,000 characters (tested).
   **Found while building, fixed and tested:** a template change dropped How to apply (a template without it) and the sections the user had added; the rules' chat removed How to apply when asked; the link list's words ran together; the Also-in note lacked its sentence break.
   **Checks:** 1,131 tests pass (1,070 before; 61 new). On the earlier code (`3cf77a5`) the two new test files cannot load, their modules not existing; with only the new pure modules left in place, every rule test fails there except four guards of what must not change (a job in the group order left as it was, what waits not parked, a change by the rules still marking a version behind, reviewers seeing no icons) and the new modules' own tests. Tests changed with this plan, none removed: the chat's look test; phase 5's five outline and order tests, now moves into a group, always grouped; the fixed-text tests (confirmed once per language, now the organisation's wording or a mark; a locked text left out, now refused; the Fixed text part's tick box); the walk tests' "Leave it", now "Leave it as it is"; the template panel's and the phone's outline tests (a heading renamed by clicking it); the reviewers' window test (the outline read only); and about 40 test jobs given a contract or a closing date, which publishing now needs. Type check, lint (no errors; no warnings in the demo), and a production build pass. Screens checked at 1366, 412, 390, and 360 px, light and dark (72), by a headless browser driven outside the repository: the chat's bubble, the draft's icons, a grip's menu, the outline panel and the phone's sheet, the fixed texts with the offer, the Also-in note, a linked version, the link list, and Organisation settings; no sideways scroll. Keyboard and screen reader: every icon labelled; Enter on a grip opens its menu with the focus inside, the arrow keys move through it, Escape gives the focus back; the arrow keys on a grip move its section and the move is announced; the + panel takes the focus and gives it back. **Not run:** the real-AI walk, as the AI is off in this working copy and the preview's OpenRouter account answers 402 (payment required); the AI's rules here are covered by tests.
-  **The independent review of phase 6** (15 November 2026, a separate read-only agent, [the report](83d6dcbb-1ff8-4738-8baa-de79ab90e4fc); code, UX, accessibility, tests, and plan compliance; verdict: changes needed, 1 must-fix, 6 should-fix, 4 minor). The user approved fixing all of them the same day. Fixed, each with a test: typing "undo" (and the AI's undo) restores the widened undo step, not an older version; an explicit skip parks with hold so the next question waits with "Next question" (offers still decline on "not now" / "No, thanks"); the AI's move, rename, reorder, and headings-inside act on the language tab in view; linking languages is its own undo step; the flyer names Our commitments once; Publish now refuses when an essential is missing; a published starter's machine translation is cleared when safeguarding or country changes, so it is marked again; reviewers no longer see 🔗; a chat line edit clears the icon undo step; translating a fixed text in the job's own language marks a live job Updated; a locked pencil and Leave out carry the reason in their accessible name. 1,138 tests pass; type check passes. **Next:** Phase 7 (managing saved profiles), then the user's assessment of the whole demo (with OpenRouter credit topped up if it is to be assessed with the AI).
+  **The independent review of phase 6** (15 November 2026, a separate read-only agent, [the report](83d6dcbb-1ff8-4738-8baa-de79ab90e4fc); code, UX, accessibility, tests, and plan compliance; verdict: changes needed, 1 must-fix, 6 should-fix, 4 minor). The user approved fixing all of them the same day. Fixed, each with a test: typing "undo" (and the AI's undo) restores the widened undo step, not an older version; an explicit skip parks with hold so the next question waits with "Next question" (offers still decline on "not now" / "No, thanks"); the AI's move, rename, reorder, and headings-inside act on the language tab in view; linking languages is its own undo step; the flyer names Our commitments once; Publish now refuses when an essential is missing; a published starter's machine translation is cleared when safeguarding or country changes, so it is marked again; reviewers no longer see 🔗; a chat line edit clears the icon undo step; translating a fixed text in the job's own language marks a live job Updated; a locked pencil and Leave out carry the reason in their accessible name. 1,138 tests pass; type check passes. **Next:** Phase 6 amendment (add your own group, section, and sub-section), then the user's review of Phase 6, then Phase 7, then the user's assessment of the whole demo (with OpenRouter credit topped up if it is to be assessed with the AI).
 
+- [ ] **Phase 6 amendment, add your own group, section, and sub-section (the user's clarification of 15 November 2026):** on top of the outline already there, free-text add (and remove) of a group, a section, or a sub-section; catalog chips stay; outline stays group → section; sub-sections in ✎ / the draft; AI accepts unknown names and writes content that fits. "Phase 6 amendment" below. Reverses the earlier "not wanted" line (a misunderstanding). No code until the independent plan review's findings are taken and the user approves the build. The merge rule does not apply: `demo/employer` is never merged.
 - [ ] **Phase 7, managing saved profiles (the user's decisions of 15 November 2026):** a side-menu **Job profiles** page (`#profiles` / `#profiles/<id>`), quiet Manage-jobs-style list, open-profile panel with light fact edit, rename, delete with restore Undo, and Use for a new job through `startJobFromProfile`; profiles also keep `groupOrder` / `groupOf` on save and restore them on start. "Phase 7 plan" below; approved by the user on 15 November 2026 with the three recommendations locked; rewritten the same day after the independent plan review (changes needed; every finding taken with the reviewer’s defaults). No code until the user approves the build. The merge rule does not apply: `demo/employer` is never merged.
 
 ### Phase 4 plan (approved by the user, 12 November 2026)
@@ -906,11 +907,76 @@ Tests that change with this plan, each listed when changed: the chat's look test
 
 #### I. Not in this phase
 
-Sections with names of the user's own beyond the available ones (not wanted: the user, 14 November 2026); managing saved profiles (Phase 7); a projects list in Organisation settings; the user's assessment of the whole demo, which follows Phase 7 and its review.
+Managing saved profiles (Phase 7); a projects list in Organisation settings; the user's assessment of the whole demo, which follows Phase 7 and its review.
+
+**Reversal (15 November 2026):** the earlier line "sections with names of the user's own beyond the available ones (not wanted)" was a misunderstanding. The user wants to add their own groups, sections, and sub-sections. That is the Phase 6 amendment below; it is built before Phase 7.
+
+### Phase 6 amendment (add your own group, section, and sub-section; the user's clarification of 15 November 2026)
+
+**Status.** Phase 6 as built is not finished for the user: the outline only adds from a fixed catalog. On 15 November 2026 the user clarified they had misunderstood the earlier "not wanted" line, and asked to complete Phase 6 first with this capability, review Phase 6, then do Phase 7. No code in this step until the independent plan review's findings are taken and the user approves the build. The merge rule does not apply: `demo/employer` is never merged.
+
+**In one sentence.** On top of the outline already there, the user can add a **group**, a **section**, or a **sub-section** with a free-text name, and remove ones they do not want — so the total can go up or down. Templates and catalog chips stay as the starting set.
+
+#### A. What you can add
+
+1. **Group** — a new top-level bucket in the outline (beside About the employer, The job, and the rest), named by the user.
+2. **Section** — a new row under a group (an existing group or a custom one), named by the user.
+3. **Sub-section** — a free heading **inside** a section (in the draft / ✎), not a third row type in the outline tree. Make the existing "Add a heading inside this section" obvious and reliable; the AI must write for it.
+
+The outline tree stays **group → section**. Sub-sections stay under the section in ✎ and in the draft.
+
+#### B. How it feels
+
+- Catalog **+ chips** stay (recommended ones marked). Beside them: a quiet way to **add your own** (group, section, or sub-section).
+- When adding, ask what it is: **group** (default), **section** (which group), or **sub-section** (which section). Then the free-text name.
+- Blank names refused. Two sections both called "Notes" are allowed.
+- Remove a custom group, section, or sub-section the same way as today (× / grip menu / ✎), with Undo.
+- Rename in place as today.
+- Create your own / save as org template stays the path to keep a structure for every job — this amendment does not auto-save custom structure as a format.
+
+#### C. How to apply and fixed texts
+
+Keep the flexible Phase 6 approach: rename freely; leave a section out if the user wants. Publishing still needs a working way to apply (the essentials already checked). Fixed texts stay their own block after the sections; leave individual ones out as today.
+
+#### D. Languages
+
+Minimal and the same as catalog sections: a new custom section starts empty in other languages; when languages are linked, structure follows as today. No special machinery only for custom names.
+
+#### E. The AI
+
+Must accept unknown group, section, and sub-section names (today it refuses anything not in the catalog). When asked to write one, it writes content that fits that name. Add / remove / rename custom ones when the user asks; do not invent them unasked.
+
+#### F. Build order
+
+1. Data: custom groups and custom sections on the job (and versions); bring-forward leaves old jobs as they are.
+2. Outline: add your own (group / section), remove, rename; chips unchanged.
+3. Sub-sections: ✎ path clear; add / remove / rename; shown in the draft.
+4. Draft + panel: + menu offers add your own; Undo notes.
+5. AI: accept unknown names; write relevant content; refusals only when unsafe or unasked.
+6. Checks, push to `demo/employer` (never merge), plan record and W-51.
+
+#### G. Checks
+
+Each new behaviour has a test that fails on today's code:
+
+- Add a custom group; it shows in the outline and can be removed with Undo
+- Add a custom section under a group (catalog or custom); remove; rename; duplicates allowed; blank refused
+- Add a sub-section inside a section via ✎; AI or rules can write for it
+- Catalog chips still add the known sections
+- Linked languages: custom section structure follows as for catalog sections
+- AI accepts and writes a custom section / sub-section by name; does not invent one unasked
+- Reviewers still read-only
+- No AidJobs backend fetch
+
+Screens at 1366, 412, 390, and 360 px, light and dark. Keyboard through add, rename, remove. Type check, lint, production build. Preview on `demo/employer`, never merged; then one independent review of this amendment; then the user's review of Phase 6 as a whole.
+
+#### H. Not in this amendment
+
+Phase 7 (profiles); auto-saving every custom structure as an org template; a projects list; showing sub-sections as a third row level in the outline tree; the real-AI walk (unless OpenRouter credit is topped up).
 
 ### Phase 7 plan (managing saved profiles; approved by the user, 15 November 2026; rewritten after the independent plan review the same day)
 
-**Status.** Phase 6 and its review fixes are done. The leftover that already has data and a clear gap is managing saved job profiles: they are saved on publish, offered at the start of a new job, and forgotten from the notice, but there is no page for the list. The user asked for this next on 15 November 2026 and approved the plan the same day, locking the three recommendations: light fact editing on the profile; a side-menu item **Job profiles** beside Organisation settings; and carrying `groupOrder` / `groupOf` into the profile on save. One independent read-only review of this plan the same day ([the report](e6078bdd-e337-4018-896c-fcb84fd207f9): changes needed, 5 must-fix, 7 should-fix, 3 minor); every finding is built into this text with the reviewer's recommended defaults. The three locked decisions are unchanged. No code in this step. The build starts once the user approves it (the project's rule), on `demo/employer` in the order in section G. The user confirmed on 15 November 2026: build Phase 7 as planned; the high-impact and enterprise role-system work stays in section J for later. The merge rule does not apply: `demo/employer` is never merged.
+**Status.** Phase 6 and its review fixes are done. The leftover that already has data and a clear gap is managing saved job profiles: they are saved on publish, offered at the start of a new job, and forgotten from the notice, but there is no page for the list. The user asked for this next on 15 November 2026 and approved the plan the same day, locking the three recommendations: light fact editing on the profile; a side-menu item **Job profiles** beside Organisation settings; and carrying `groupOrder` / `groupOf` into the profile on save. One independent read-only review of this plan the same day ([the report](e6078bdd-e337-4018-896c-fcb84fd207f9): changes needed, 5 must-fix, 7 should-fix, 3 minor); every finding is built into this text with the reviewer's recommended defaults. The three locked decisions are unchanged. No code in this step. The build starts once the user approves it (the project's rule), on `demo/employer` in the order in section G. On 15 November 2026 the user put Phase 7 after a Phase 6 amendment (add your own group, section, and sub-section) and the user's review of Phase 6; the high-impact and enterprise role-system work stays in section J for later. The merge rule does not apply: `demo/employer` is never merged.
 
 **What already exists (so this page only manages it).** On publish, a profile is saved automatically (`profileOf`): title, place, family, JD format, section keys, facts without dates and positions, style, how to apply, fixed-text keys (commitments), and language. A newer profile with the same title and place replaces the older. Undo on the notice calls `forgetProfile`. A matching profile is offered at the start of a new job ("Same as your last **Juba Finance Officer**?"). Hire again still copies the written text; a profile does not. There is no screen for the list. That is all this step adds.
 
