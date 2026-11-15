@@ -290,8 +290,8 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         working-directory: .
         run: |
-          ruff check tools/survey/roles.py tools/survey/test_roles.py tools/survey/adverts.py tools/survey/advert_set.py tools/survey/test_adverts.py tools/survey/test_rules.py tools/survey/test_restrictions.py tools/survey/validation.py tools/survey/test_validation.py tools/survey/phase0.py tools/survey/test_phase0.py
-          python -m pytest tools/survey/test_roles.py tools/survey/test_adverts.py tools/survey/test_rules.py tools/survey/test_restrictions.py tools/survey/test_validation.py tools/survey/test_phase0.py -q -p no:cacheprovider
+          ruff check tools/survey/roles.py tools/survey/test_roles.py tools/survey/adverts.py tools/survey/advert_set.py tools/survey/test_adverts.py tools/survey/test_rules.py tools/survey/test_restrictions.py tools/survey/validation.py tools/survey/test_validation.py tools/survey/phase0.py tools/survey/test_phase0.py tools/survey/deep.py tools/survey/test_deep.py
+          python -m pytest tools/survey/test_roles.py tools/survey/test_adverts.py tools/survey/test_rules.py tools/survey/test_restrictions.py tools/survey/test_validation.py tools/survey/test_phase0.py tools/survey/test_deep.py -q -p no:cacheprovider
           python tools/survey/roles.py build
           git diff --exit-code -- docs/architecture/role-survey/role-map.csv
           python tools/survey/adverts.py check
