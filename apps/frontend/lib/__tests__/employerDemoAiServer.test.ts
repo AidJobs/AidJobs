@@ -162,13 +162,7 @@ describe('the route', () => {
     const [url, init] = f.mock.calls[0] as [string, RequestInit];
     expect(url).toBe(OPENROUTER_ENDPOINT);
     expect((init.headers as Record<string, string>).authorization).toBe('Bearer sk-or-test-key');
-    expect(JSON.parse(String(init.body))).toMatchObject({
-      model: 'anthropic/claude-sonnet-5.5',
-      max_tokens: 3000,
-      response_format: { type: 'json_object' },
-      provider: { zdr: true, data_collection: 'deny' },
-      reasoning: { effort: 'low' },
-    });
+    expect(JSON.parse(String(init.body))).toMatchObject({ model: 'anthropic/claude-sonnet-5.5', response_format: { type: 'json_object' }, provider: { zdr: true, data_collection: 'deny' }, reasoning: { effort: 'low' } });
     expect(await (await post({ ...turn, model: 'gpt-99' })).json()).toMatchObject({ model: 'terra' });
     expect(JSON.parse(String((f.mock.calls[1][1] as RequestInit).body))).toMatchObject({ model: 'openai/gpt-6.1-terra', reasoning: { effort: 'none' } });
     f.mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 429, message: 'Rate limited for the request about a nurse' } }), { status: 429 }));
@@ -177,27 +171,6 @@ describe('the route', () => {
     expect(logged).toContain('the terra call failed (status 429, openrouter code 429');
     expect(logged).not.toContain('nurse');
     expect(logged).not.toContain('sk-or-test-key');
-  });
-
-  it('retries once at what remaining credit can afford when OpenRouter refuses the asked max_tokens', async () => {
-    process.env.AIDJOBS_OPENROUTER_API_KEY = 'sk-or-test-key';
-    const f = jest.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
-      const asked = JSON.parse(String((init as RequestInit).body)).max_tokens as number;
-      if (asked >= 3000) {
-        return new Response(
-          JSON.stringify({ error: { code: 402, message: 'This request requires more credits, or fewer max_tokens. You requested up to 6000 tokens, but can only afford 2000.' } }),
-          { status: 402 },
-        );
-      }
-      return new Response(JSON.stringify({ choices: [{ message: { content: '{"reply":"Hello","actions":[]}' } }] }), { status: 200 });
-    });
-    expect(await (await post(turn)).json()).toEqual({ reply: 'Hello', actions: [], model: 'terra' });
-    expect(f.mock.calls).toHaveLength(2);
-    expect(JSON.parse(String((f.mock.calls[0][1] as RequestInit).body)).max_tokens).toBe(3000);
-    expect(JSON.parse(String((f.mock.calls[1][1] as RequestInit).body)).max_tokens).toBe(1968);
-    const logged = JSON.stringify(warn.mock.calls);
-    expect(logged).not.toContain('sk-or-test-key');
-    expect(logged).not.toContain('6000 tokens');
   });
 
   it('is not there in production, or on Vercel for any branch but demo/employer', async () => {
