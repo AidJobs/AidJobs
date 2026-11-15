@@ -19,26 +19,39 @@ export function modelKeyOf(value: unknown): AiModelKey {
   return typeof value === 'string' && value in AI_MODELS ? (value as AiModelKey) : DEFAULT_MODEL;
 }
 
-const MAX_TOKENS = 6000;
+/**
+ * Output cap. Drafts are about 900 to 1,400 words; OpenRouter refuses the call when remaining credit cannot cover the asked
+ * max_tokens (402 even with a positive balance). Keep this below a few dollars of headroom, and retry lower on that 402.
+ */
+const MAX_TOKENS = 3000;
 const TIMEOUT_MS = 50_000;
 
-/** OpenRouter's numeric error code only; its message could quote the request. */
-async function errorCode(res: Response): Promise<string | undefined> {
+/** OpenRouter's numeric error code and, for a credit-vs-max_tokens 402, how many tokens the balance can still afford. */
+async function errorInfo(res: Response): Promise<{ code?: string; afford?: number }> {
   try {
-    const data = (await res.json()) as { error?: { code?: unknown } };
-    return typeof data.error?.code === 'number' || typeof data.error?.code === 'string' ? `code ${String(data.error.code).slice(0, 12)}` : undefined;
+    const data = (await res.json()) as { error?: { code?: unknown; message?: unknown } };
+    const code = typeof data.error?.code === 'number' || typeof data.error?.code === 'string' ? `code ${String(data.error.code).slice(0, 12)}` : undefined;
+    const msg = typeof data.error?.message === 'string' ? data.error.message : '';
+    const m = msg.match(/can only afford (\d+)/i);
+    const afford = m ? Number(m[1]) : undefined;
+    return { code, afford: Number.isFinite(afford) && (afford as number) > 0 ? afford : undefined };
   } catch {
-    return undefined;
+    return {};
   }
 }
 
-/** One call to the chosen model. Returns its text, or the HTTP status (0 for a network error or a timeout). */
-export async function callOpenRouter(messages: ChatMessage[], apiKey: string, model: AiModelKey, fetchImpl: typeof fetch = fetch): Promise<ModelResult> {
+async function requestOnce(
+  messages: ChatMessage[],
+  apiKey: string,
+  model: AiModelKey,
+  maxTokens: number,
+  fetchImpl: typeof fetch,
+): Promise<ModelResult & { afford?: number }> {
   const m = AI_MODELS[model];
   const body = JSON.stringify({
     model: m.id,
     messages,
-    max_tokens: MAX_TOKENS,
+    max_tokens: maxTokens,
     temperature: 0.3,
     reasoning: m.reasoning,
     response_format: { type: 'json_object' },
@@ -52,7 +65,10 @@ export async function callOpenRouter(messages: ChatMessage[], apiKey: string, mo
       signal: AbortSignal.timeout(TIMEOUT_MS),
       cache: 'no-store',
     });
-    if (!res.ok) return { ok: false, status: res.status, code: await errorCode(res) };
+    if (!res.ok) {
+      const info = await errorInfo(res);
+      return { ok: false, status: res.status, code: info.code, afford: info.afford };
+    }
     const data = (await res.json()) as { error?: { code?: unknown }; choices?: Array<{ finish_reason?: unknown; error?: { code?: unknown }; message?: { content?: unknown } }> };
     const choice = data.choices?.[0];
     const content = choice?.message?.content;
@@ -64,4 +80,13 @@ export async function callOpenRouter(messages: ChatMessage[], apiKey: string, mo
   } catch {
     return { ok: false, status: 0 };
   }
+}
+
+/** One call to the chosen model. Returns its text, or the HTTP status (0 for a network error or a timeout). */
+export async function callOpenRouter(messages: ChatMessage[], apiKey: string, model: AiModelKey, fetchImpl: typeof fetch = fetch): Promise<ModelResult> {
+  const first = await requestOnce(messages, apiKey, model, MAX_TOKENS, fetchImpl);
+  if (first.ok || first.status !== 402 || !first.afford || first.afford >= MAX_TOKENS) return first;
+  // Remaining credit cannot cover the asked max_tokens; retry once at what the balance can afford (leave a small margin).
+  const retryAt = Math.max(512, Math.min(MAX_TOKENS - 1, first.afford - 32));
+  return requestOnce(messages, apiKey, model, retryAt, fetchImpl);
 }
