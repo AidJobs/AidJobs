@@ -150,7 +150,11 @@ class RssFeedReader(Reader):
 
 
 class JsonApiReader(Reader):
-    """A generic JSON listing. Reports completeness only when the body states a total."""
+    """A generic JSON listing. Reports completeness only when the body states a total.
+
+    Raises ValueError when the body is not JSON, so the crawl fails instead of treating
+    HTML or plain text as an empty listing.
+    """
 
     name = "json-api"
     source_types = frozenset({"api", "json"})
@@ -164,8 +168,7 @@ class JsonApiReader(Reader):
         try:
             data = json.loads(first.body)
         except (TypeError, ValueError) as exc:
-            logger.warning("JSON API reader: body is not JSON: %s", exc)
-            return ListingResult(self.name)
+            raise ValueError("API body is not JSON") from exc
         base = source.get("careers_url") or ""
         jobs = []
         for item in jobs_array(data):

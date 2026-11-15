@@ -5,6 +5,8 @@ import asyncio
 import json
 from pathlib import Path
 
+import pytest
+
 from contracts.admission import admit_batch
 from contracts.reader import CANDIDATE_FIELDS, UNSAVED_FIELDS, Response
 from crawler_v2.api_crawler import SimpleAPICrawler
@@ -242,12 +244,20 @@ def test_rss_reader_empty_when_fetch_stopped():
     assert result.jobs == []
 
 
-def test_json_reader_empty_on_invalid_json():
-    result = asyncio.run(
-        JsonApiReader().read(
-            Response(200, "{not-json"),
-            {"careers_url": "https://boards.example.org/api/jobs"},
+def test_json_reader_rejects_non_json_body():
+    with pytest.raises(ValueError, match="not JSON"):
+        asyncio.run(
+            JsonApiReader().read(
+                Response(200, "<html>not json</html>"),
+                {"careers_url": "https://boards.example.org/api/jobs"},
+            )
         )
-    )
-    assert result.reader == "json-api"
-    assert result.jobs == []
+
+
+def test_bare_count_is_not_a_listing_total():
+    from crawler_v2.feed_fields import json_listing_report, stated_total
+
+    data = {"count": 2, "jobs": [{"title": "A"}, {"title": "B"}]}
+    assert stated_total(data) is None
+    assert json_listing_report([], data) is None
+    assert stated_total({"total": 10, "jobs": []}) == 10

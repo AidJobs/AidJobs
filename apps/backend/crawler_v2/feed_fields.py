@@ -40,7 +40,9 @@ _LOCATION_KEYS = ("location", "location_raw", "duty_station", "city", "country",
 _DEADLINE_KEYS = ("deadline", "closing_date", "application_deadline", "due_date", "validThrough")
 _DESCRIPTION_KEYS = ("description", "summary", "content", "body")
 _EMPLOYMENT_KEYS = ("employment_type", "employmentType", "contract_type", "job_type")
-_TOTAL_KEYS = ("total", "totalCount", "total_count", "count", "jobCount", "job_count")
+# Bare "count" is often a page size, not the catalogue total — omit it so a short page
+# cannot become a counting crawl (contract §6).
+_TOTAL_KEYS = ("total", "totalCount", "total_count", "jobCount", "job_count")
 
 
 def iso_day(value: Any) -> Optional[str]:
