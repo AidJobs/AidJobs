@@ -419,7 +419,8 @@ def test_simulate_refuses_a_challenge_page_like_the_crawl(monkeypatch):
     from crawler_v2 import simulate as simulate_mod
 
     async def challenge(self, url):
-        return 200, "<html><title>Just a moment...</title></html>", "HTTP 200 (Cloudflare challenge)"
+        body = "<html><title>Just a moment...</title></html>"
+        return 200, body, "HTTP 200 (Cloudflare challenge)"
 
     async def readers_must_not_run(*args, **kwargs):
         raise AssertionError("simulate_html must not run on a refused first page")
