@@ -1017,14 +1017,22 @@ function JobWindow({ id }: { id: string }) {
   }
   useEffect(() => {
     if (stepNow === seenStep.current || reading) return;
-    // A hand edit, add, or remove can change the walk step (e.g. to Languages). Keep the progress line on the JD change; do not jump.
+    // A hand edit, add, remove, or its Undo can change the walk step (e.g. to Market check). Stay on the JD; do not open that part card.
     if (job.lastChange?.keys.length || job.undoStep?.keys?.length || job.undoStep?.removed) {
       seenStep.current = stepNow;
       return;
     }
-    seenStep.current = stepNow;
     const p = partOfStep(step, job);
-    if (!p || s.reviewerAs) return;
+    if (!p || s.reviewerAs) {
+      seenStep.current = stepNow;
+      return;
+    }
+    // While the user is in a JD section, only follow writing/approve/ask steps — not Market, Languages, etc.
+    if (job.part?.startsWith('s:') && step && !['write', 'approve', 'ask'].includes(step.kind)) {
+      seenStep.current = stepNow;
+      return;
+    }
+    seenStep.current = stepNow;
     setPart(job.id, p);
     const sec = sectionOf(p);
     scrollToId(sec && p !== 's:apply' ? `ej-sec-${sec}` : 'ej-part-card');

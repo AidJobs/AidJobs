@@ -2264,7 +2264,13 @@ function fromUndoStep(x: DemoJob): DemoJob | null {
  */
 export function undoStep(id: string) {
   if (!ownerOnly()) return;
-  updateJob(id, (x) => fromUndoStep(x) ?? x);
+  updateJob(id, (x) => {
+    const back = fromUndoStep(x);
+    if (!back) return x;
+    // Keep the panel on a JD section after undoing an outline/edit change (do not open Market check etc.).
+    const keep = x.part?.startsWith('s:') && (back.tags.includes(x.part.slice(2)) || x.undoStep?.removed) ? x.part : back.tags[0] ? `s:${back.tags[0]}` : x.part;
+    return { ...back, part: keep };
+  });
 }
 
 export function setFacts(id: string, patch: Partial<Facts>) {
