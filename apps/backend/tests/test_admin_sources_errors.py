@@ -260,8 +260,12 @@ def _api_source(parser_hint):
             "time_window": None}
 
 
-def test_source_test_is_a_policy_head_for_every_type(monkeypatch):
-    """W-33 / W-35: connectivity is HEAD only; extraction is Simulate extraction."""
+@pytest.mark.parametrize("parser_hint", [None, '{"v": 1}'])
+def test_source_test_is_a_policy_head_for_every_type(monkeypatch, parser_hint):
+    """W-33 / W-35: connectivity is HEAD only; extraction is Simulate extraction.
+
+    A leftover v1 parser_hint must not revive the old API schema branch.
+    """
     from contracts.outbound import FetchResult
 
     async def fake_head(url, **kwargs):
@@ -269,7 +273,7 @@ def test_source_test_is_a_policy_head_for_every_type(monkeypatch):
         return FetchResult(status_code=200, headers={}, body=b"", url=url)
 
     monkeypatch.setattr("contracts.outbound.fetch_url", fake_head)
-    client = _diagnostic_client(monkeypatch, _api_source(None))
+    client = _diagnostic_client(monkeypatch, _api_source(parser_hint))
     body = client.post(f"/api/admin/sources/{SOURCE_ID}/test").json()
     assert body["ok"] is True
     assert body["status"] == 200
@@ -396,7 +400,7 @@ def test_simulation_keeps_its_category_and_drops_the_text(monkeypatch, raised, c
     async def fail(self, url, *args, **kwargs):
         raise raised
 
-    monkeypatch.setattr(simple_crawler.SimpleCrawler, "fetch_html", fail)
+    monkeypatch.setattr(simple_crawler.SimpleCrawler, "_fetch_page", fail)
     html_source = {"id": SOURCE_ID, "careers_url": "https://example.org/jobs",
                    "source_type": "html", "parser_hint": None, "org_name": "Example",
                    "org_type": None, "time_window": None}
@@ -407,6 +411,32 @@ def test_simulation_keeps_its_category_and_drops_the_text(monkeypatch, raised, c
     assert response.status_code == 200
     assert body == {"ok": False, "error": expected, "error_category": category}
     assert FRAGMENT not in response.text
+
+
+def test_simulate_refuses_a_challenge_page_like_the_crawl(monkeypatch):
+    """A 200 with a challenge stop is not read; same fixed words as crawl_source."""
+    from crawler_v2 import simple_crawler
+    from crawler_v2 import simulate as simulate_mod
+
+    async def challenge(self, url):
+        return 200, "<html><title>Just a moment...</title></html>", "HTTP 200 (Cloudflare challenge)"
+
+    async def readers_must_not_run(*args, **kwargs):
+        raise AssertionError("simulate_html must not run on a refused first page")
+
+    monkeypatch.setattr(simple_crawler.SimpleCrawler, "_fetch_page", challenge)
+    monkeypatch.setattr(simulate_mod, "simulate_html", readers_must_not_run)
+    html_source = {"id": SOURCE_ID, "careers_url": "https://example.org/jobs",
+                   "source_type": "html", "parser_hint": None, "org_name": "Example",
+                   "org_type": None, "time_window": None}
+    client = _diagnostic_client(monkeypatch, html_source)
+    response = client.post(f"/api/admin/sources/{SOURCE_ID}/simulate_extract")
+    assert response.status_code == 200
+    assert response.json() == {
+        "ok": False,
+        "error": "Refused: HTTP 200 (Cloudflare challenge)",
+        "error_category": "runtime",
+    }
 
 
 def test_import_no_longer_requires_a_v1_api_schema(monkeypatch):

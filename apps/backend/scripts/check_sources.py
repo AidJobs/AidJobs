@@ -73,7 +73,7 @@ def check_sources():
             print("To test extraction:")
             print("  1. Use admin UI: Go to Sources page and click 'Run Crawl'")
             print("  2. Use API: POST /api/admin/crawl/run with {'source_id': '<id>'}")
-            print("  3. Check diagnostics: GET /api/admin/crawl/diagnostics/unesco or /undp")
+            print("  3. Simulate extraction: Sources page → Simulate, or POST …/simulate_extract")
             print("=" * 80)
             
     finally:

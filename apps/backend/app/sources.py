@@ -991,11 +991,19 @@ async def simulate_extract(
         if source_type == 'html':
             from crawler_v2.simple_crawler import SimpleCrawler
             html_crawler = SimpleCrawler(db_url)
-            status, html = await html_crawler.fetch_html(source['careers_url'])
-            if status != 200 or not html:
+            # Same first-page gate as crawl_source: a refusal or non-200 is not read.
+            # No raw-page write; Simulate never persists.
+            status, html, stop = await html_crawler._fetch_page(source['careers_url'])
+            if stop or status != 200 or not html:
+                if stop.startswith('HTTP '):
+                    error = f'Refused: {stop}'
+                elif stop:
+                    error = f'Not fetched: {stop}'
+                else:
+                    error = f'HTTP {status}'
                 return {
                     "ok": False,
-                    "error": f"The source answered HTTP {status}",
+                    "error": error,
                     "error_category": "runtime",
                 }
             return await simulate_html(html_crawler, html, source['careers_url'])
