@@ -747,7 +747,11 @@ def test_a_refusal_ends_the_job_pages(monkeypatch, caplog):
     assert "Job pages stopped (stopped after a refusal); 3 rows keep their listing fields" \
         in caplog.text
     assert result["status"] == "warn"
-    assert result["message"] == "Found 4 jobs; job pages stopped: refused: HTTP 403"
+    # Canary notes only (W-35): save returns zeros, so the empty-kept note is appended.
+    assert result["message"] == (
+        "Found 4 jobs; job pages stopped: refused: HTTP 403; "
+        "canary: rows read but none admitted or observed"
+    )
 
 
 def test_a_refusal_on_the_last_job_page_is_reported_too(monkeypatch):
@@ -771,7 +775,9 @@ def test_a_refusal_on_the_last_job_page_is_reported_too(monkeypatch):
 
     result = asyncio.run(crawl())
     assert (result["status"], result["message"]) == (
-        "warn", "Found 1 jobs; job pages stopped: refused: HTTP 429"
+        "warn",
+        "Found 1 jobs; job pages stopped: refused: HTTP 429; "
+        "canary: rows read but none admitted or observed",
     )
 
 
