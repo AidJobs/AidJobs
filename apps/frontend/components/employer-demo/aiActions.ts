@@ -58,7 +58,7 @@ import {
   editVersionSection,
   subId,
 } from './actions';
-import { GROUP_KEYS, groupOfKey, KEPT } from './outline';
+import { groupOfKey, groupOrderOf, isCustomGroup, isCustomSection, KEPT } from './outline';
 import { viewOf } from './langs';
 import { canWord, fixedLabel, isLocked, ORG_LANG, orgWording } from './fixed';
 import { approvalRequired } from './approval';
@@ -144,6 +144,8 @@ const ORDER = [
   'keep_style',
   'set_pace',
   'add_section',
+  'add_group',
+  'remove_group',
   'remove_section',
   'reorder_sections',
   'move_section',
@@ -263,6 +265,25 @@ export type AiTurn = { reply: string; actions: unknown[] };
 type Raw = Record<string, unknown>;
 const str = (v: unknown, max: number): string | null => (typeof v === 'string' && v.trim() && v.length <= max && !/[\n\r]/.test(v) ? v.trim() : null);
 const oneOf = <T extends string>(v: unknown, list: readonly T[]): T | null => (typeof v === 'string' && (list as readonly string[]).includes(v) ? (v as T) : null);
+
+/** A section named by key or by its heading on the job (or version) in view. */
+function sectionOf(keys: string[], headings: (k: string) => string, raw: string): string {
+  if (!raw) return '';
+  if (keys.includes(raw)) return raw;
+  const want = raw.trim().toLowerCase();
+  return keys.find((k) => headings(k).toLowerCase() === want) ?? '';
+}
+
+/** Groups the outline may move into: catalog plus any the job (or version) added. */
+function groupsOf(grouping: ReturnType<typeof groupingOf> & { customGroups?: DemoJob['customGroups'] }): string[] {
+  return groupOrderOf(grouping);
+}
+
+/** The user named this label in their message (phase 6 amendment: the AI must not invent a group or section). */
+function namedIn(said: string | null | undefined, label: string): boolean {
+  const want = label.trim().toLowerCase();
+  return Boolean(want && said && said.toLowerCase().includes(want));
+}
 
 /** Facts from a set_facts action, each checked; what does not pass is named in `refused`. */
 export function checkFacts(raw: unknown, job: DemoJob, today: number): { patch: Partial<Facts>; refused: string[] } {
@@ -493,9 +514,19 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
     const s = getState();
     const j = job();
     if (!j) break;
-    const section = typeof a.section === 'string' ? a.section : '';
     const format = s.formats.find((f) => f.key === j.format) ?? s.formats[0];
-    const name = j.sections.find((x) => x.key === section)?.title ?? j.renamed?.[section] ?? (SECTION_BY_KEY[section] ? headingFor(section, format) : section);
+    const view = inVersion ? viewOf(j, inVersion) : null;
+    const viewKeys = view?.keys ?? j.tags;
+    const viewGrouping = view ? { ...view.grouping, customGroups: view.customGroups } : groupingOf(j);
+    const headingOfKey = (k: string) =>
+      (view ? view.sections.find((x) => x.key === k)?.title : undefined) ??
+      j.sections.find((x) => x.key === k)?.title ??
+      j.renamed?.[k] ??
+      (SECTION_BY_KEY[k] ? headingFor(k, format) : k);
+    const rawSection = typeof a.section === 'string' ? a.section : '';
+    // Resolve by key or heading already on the job; catalog keys also resolve when not yet added (add / write_version).
+    const section = sectionOf(viewKeys, headingOfKey, rawSection) || (SECTION_BY_KEY[rawSection] ? rawSection : '');
+    const name = section ? headingOfKey(section) : rawSection;
     switch (a.type) {
       case 'undo':
         if (j.undoStep && !j.undoStep.writing) undoStep(id);
@@ -539,36 +570,67 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         if (a.all === true && s.org.styleKept) refused.push('keeping the style for every job: it is kept already, and changed only in Organisation settings');
         else if (a.all === true && j.style) keepStyleForAll(id);
         break;
-      case 'add_section':
-        if (!SECTION_BY_KEY[section]) refused.push(`a section the demo does not have ("${section.slice(0, 30)}")`);
-        else if (inVersion) addVersionSection(id, inVersion, section);
-        else if (section === 'languages' && ['langs', 'version'].includes(nextStep(j, s)?.kind ?? '')) refused.push('the Languages section: a language version is added by naming the language');
-        else if (!j.tags.includes(section)) toggleSection(id, section);
+      case 'add_section': {
+        // Catalog by key (may not be on the job yet), or a free-text heading the user named (phase 6 amendment).
+        const ownHeading = str(a.heading, 60);
+        const catalogKey = typeof a.section === 'string' && SECTION_BY_KEY[a.section] ? a.section : '';
+        const groupWant = typeof a.group === 'string' ? a.group : '';
+        const group = groupWant && groupsOf(viewGrouping).includes(groupWant) ? groupWant : undefined;
+        if (ownHeading) {
+          if (!namedIn(said, ownHeading)) refused.push(`adding "${ownHeading.slice(0, 30)}": only when you name it`);
+          else if (!group) refused.push(`adding "${ownHeading.slice(0, 30)}": name a group already on this job`);
+          else if (inVersion) versionOp(id, inVersion, { op: 'addCustom', heading: ownHeading, group });
+          else outlineOp(id, { op: 'addCustom', heading: ownHeading, group });
+        } else if (!catalogKey) refused.push(`a section the demo does not have ("${(typeof a.section === 'string' ? a.section : '').slice(0, 30)}")`);
+        else if (inVersion) addVersionSection(id, inVersion, catalogKey);
+        else if (catalogKey === 'languages' && ['langs', 'version'].includes(nextStep(j, s)?.kind ?? '')) refused.push('the Languages section: a language version is added by naming the language');
+        else if (!j.tags.includes(catalogKey)) toggleSection(id, catalogKey);
         break;
+      }
+      case 'add_group': {
+        const label = str(a.label ?? a.heading, 60);
+        if (!label) refused.push('a group without a name');
+        else if (!namedIn(said, label)) refused.push(`adding a group "${label.slice(0, 30)}": only when you name it`);
+        else if (inVersion) versionOp(id, inVersion, { op: 'addGroup', label });
+        else outlineOp(id, { op: 'addGroup', label });
+        break;
+      }
+      case 'remove_group': {
+        const group = typeof a.group === 'string' ? a.group : '';
+        const groupLabel = view?.customGroups?.find((g) => g.id === group)?.label ?? j.customGroups?.find((g) => g.id === group)?.label ?? '';
+        if (!isCustomGroup(group) || !groupsOf(viewGrouping).includes(group)) refused.push('removing a group: only one you added');
+        else if (!namedIn(said, groupLabel) && !namedIn(said, 'group')) refused.push('removing a group: only when you ask for it');
+        else if (inVersion) versionOp(id, inVersion, { op: 'removeGroup', group });
+        else outlineOp(id, { op: 'removeGroup', group });
+        break;
+      }
       case 'remove_section':
         // How to apply is part of every job, by every route (section 19, phase 6, D).
         if (KEPT.includes(section)) refused.push(`removing ${name}: every job has it; change its text or method with the pencil`);
+        else if (!section || !viewKeys.includes(section)) refused.push(`removing ${name || 'a section'}`);
         else if (inVersion) removeVersionSection(id, inVersion, section);
-        else if (!j.tags.includes(section) || j.tags.length < 2) refused.push(`removing ${name || 'a section'}`);
+        else if (j.tags.length < 2) refused.push(`removing ${name || 'a section'}`);
+        else if (isCustomSection(section)) outlineOp(id, { op: 'remove', key: section });
         else toggleSection(id, section);
         break;
       case 'reorder_sections': {
         // Within their groups only; a section goes into another group with move_section (section 19, phase 6, B).
         // On a version tab, the version's own order (section 19, phase 6, F).
         const order = Array.isArray(a.order) ? a.order.filter((k): k is string => typeof k === 'string') : [];
-        const keys = inVersion ? viewOf(j, inVersion)?.keys ?? [] : j.tags;
-        if (order.length < 2 || new Set(order).size !== order.length || !order.every((k) => keys.includes(k))) refused.push('the new order');
+        if (order.length < 2 || new Set(order).size !== order.length || !order.every((k) => viewKeys.includes(k))) refused.push('the new order');
         else if (inVersion) reorderVersionSections(id, inVersion, order);
         else reorderSections(id, order);
         break;
       }
       case 'move_section': {
-        const v = inVersion ? viewOf(j, inVersion) : null;
-        const keys = v?.keys ?? j.tags;
-        const grouping = v?.grouping ?? groupingOf(j);
-        const group = oneOf(a.group, GROUP_KEYS);
-        const after = a.after === null || a.after === undefined ? null : typeof a.after === 'string' && keys.includes(a.after) ? a.after : undefined;
-        if (!keys.includes(section) || !group || after === undefined || (after && groupOfKey(grouping, after) !== group)) refused.push(`moving ${name || 'a section'}`);
+        const group = typeof a.group === 'string' && groupsOf(viewGrouping).includes(a.group) ? a.group : null;
+        const after =
+          a.after === null || a.after === undefined
+            ? null
+            : typeof a.after === 'string'
+              ? sectionOf(viewKeys, headingOfKey, a.after) || undefined
+              : undefined;
+        if (!section || !viewKeys.includes(section) || !group || after === undefined || (after && groupOfKey(viewGrouping, after) !== group)) refused.push(`moving ${name || 'a section'}`);
         else if (!MOVE_ASKED.test(said ?? '')) refused.push('moving a section into another group: only when you ask for it');
         else if (inVersion) {
           if (after) versionOp(id, inVersion, { op: 'drop', key: section, after, group });
@@ -578,8 +640,9 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         break;
       }
       case 'move_group': {
-        const group = oneOf(a.group, GROUP_KEYS);
-        const before = a.before === null || a.before === undefined ? null : oneOf(a.before, GROUP_KEYS);
+        const allowed = groupsOf(viewGrouping);
+        const group = typeof a.group === 'string' && allowed.includes(a.group) ? a.group : null;
+        const before = a.before === null || a.before === undefined ? null : typeof a.before === 'string' && allowed.includes(a.before) ? a.before : undefined;
         if (!group || before === undefined || (a.before !== null && a.before !== undefined && !before)) refused.push('moving a group');
         else if (!MOVE_ASKED.test(said ?? '')) refused.push('moving a group: only when you ask for it');
         else if (inVersion) versionOp(id, inVersion, { op: 'groupBefore', group, before });
@@ -591,20 +654,22 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         const sec = inVersion ? j.translations?.[inVersion]?.sections.find((x) => x.key === section) : j.sections.find((x) => x.key === section);
         const want = typeof a.sub === 'string' ? a.sub.toLowerCase() : '';
         const sub = sec?.subs?.find((x) => x.id === a.sub || x.title.toLowerCase() === want);
-        const written = inVersion ? Boolean(sec) : isWritten(j, section);
-        if (!op || !sec || !written) refused.push(`a sub-section of ${name || 'a section'}: it is not written yet`);
+        // Phase 6 amendment: a sub-section may be added or written even while the section's body is still empty.
+        if (!op || !sec || !section) refused.push(`a sub-section of ${name || 'a section'}: it is not on this job yet`);
         else if (inVersion) {
           const asText = (lines: string[]) => lines.join('\n');
           const asSubs = (list: NonNullable<typeof sec.subs>) => list.map((x) => ({ id: x.id, title: x.title, text: asText(x.lines) }));
           if (op === 'add') {
             const heading = str(a.heading, 60);
             if (!heading) refused.push('a sub-section without a heading');
+            else if (!namedIn(said, heading)) refused.push(`a sub-section "${heading.slice(0, 30)}": only when you name it`);
             else editVersionSection(id, inVersion, section, asText(sec.lines), { title: sec.title, subs: [...asSubs(sec.subs ?? []), { id: subId(), title: heading, text: `[${heading}]` }] });
           } else if (!sub) refused.push(`a sub-section ${name} does not have`);
           else if (op === 'remove') editVersionSection(id, inVersion, section, asText(sec.lines), { title: sec.title, subs: asSubs((sec.subs ?? []).filter((x) => x.id !== sub.id)) });
           else if (op === 'rename') {
             const heading = str(a.heading, 60);
             if (!heading) refused.push('renaming a sub-section');
+            else if (!namedIn(said, heading)) refused.push(`renaming a sub-section: only when you name it`);
             else editVersionSection(id, inVersion, section, asText(sec.lines), { title: sec.title, subs: asSubs((sec.subs ?? []).map((x) => (x.id === sub.id ? { ...x, title: heading } : x))) });
           } else {
             const out = checkLines(a.lines, section, s, j, said ?? '');
@@ -614,12 +679,14 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         } else if (op === 'add') {
           const heading = str(a.heading, 60);
           if (!heading) refused.push('a sub-section without a heading');
+          else if (!namedIn(said, heading)) refused.push(`a sub-section "${heading.slice(0, 30)}": only when you name it`);
           else changeSub(id, section, { add: heading });
         } else if (!sub) refused.push(`a sub-section ${name} does not have`);
         else if (op === 'remove') changeSub(id, section, { remove: sub.id });
         else if (op === 'rename') {
           const heading = str(a.heading, 60);
           if (!heading) refused.push('renaming a sub-section');
+          else if (!namedIn(said, heading)) refused.push(`renaming a sub-section: only when you name it`);
           else changeSub(id, section, { rename: sub.id, title: heading });
         } else {
           const out = checkLines(a.lines, section, s, j, said ?? '');
@@ -630,8 +697,7 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
       }
       case 'rename_section': {
         const heading = str(a.heading, 60);
-        const keys = inVersion ? viewOf(j, inVersion)?.keys ?? [] : j.tags;
-        if (!heading || !keys.includes(section) || (!inVersion && j.setup)) refused.push(`renaming ${name || 'a section'}`);
+        if (!heading || !section || !viewKeys.includes(section) || (!inVersion && j.setup)) refused.push(`renaming ${name || 'a section'}`);
         else if (inVersion) versionOp(id, inVersion, { op: 'rename', key: section, heading });
         else renameSection(id, section, heading);
         break;
@@ -640,16 +706,18 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         if (inVersion) {
           // With a language version's tab open, the discussion is about that version (section 19): its own sections are written.
           // A version's About us and How to apply are translations of the organisation's own text, checked like any other line.
-          const out = checkLines(a.lines, section, s, j, said ?? '');
-          if (!SECTION_BY_KEY[section]) refused.push(`${name || 'a section'}: not one the version can have written`);
+          const out = checkLines(a.lines, section || name, s, j, said ?? '');
+          const canWrite = Boolean(section && (SECTION_BY_KEY[section] || (isCustomSection(section) && viewKeys.includes(section))));
+          if (!canWrite) refused.push(`${name || 'a section'}: not one the version can have written`);
+          else if (section === 'apply') refused.push(`${name}: written from your settings`);
           else if ('refused' in out) refused.push(out.refused);
           else {
-            if (!getState().jobs.find((x) => x.id === id)?.translations?.[inVersion]?.sections.some((x) => x.key === section)) addVersionSection(id, inVersion, section);
+            if (!getState().jobs.find((x) => x.id === id)?.translations?.[inVersion]?.sections.some((x) => x.key === section) && SECTION_BY_KEY[section]) addVersionSection(id, inVersion, section);
             writeVersionSection(id, inVersion, section, out.lines);
           }
         } else if (j.setup) refused.push(`${name}: written before the template and style are chosen`);
-        else if (!j.tags.includes(section)) refused.push(`${name || 'a section'}: not in this job`);
-        else if (FIXED_SECTIONS.includes(section)) refused.push(`${name}: written from your settings`);
+        else if (!section || !j.tags.includes(section)) refused.push(`${name || 'a section'}: not in this job`);
+        else if (FIXED_SECTIONS.includes(section) || section === 'apply') refused.push(`${name}: written from your settings`);
         // "Good" approves the section and adds nothing (section 19, phase 5): no text goes into the section being approved.
         else if (said && isApprovalReply(said) && (() => { const on = nextStep(j, s); return on?.kind === 'approve' && on.section === section; })()) refused.push(`${name}: you approved it as it is, so nothing was added`);
         else {

@@ -47,19 +47,38 @@ import { profileFor, profileName, profileOf } from './profiles';
 import { aiWrites, ASKS, asksOf, checkPoints, contentPrint, essentials, ESSENTIAL_WORDS, FIXED_SECTIONS, isSettled, isWritten, nextStep, parkedIn, parkKey, stepKey, type Step } from './flow';
 import { AGAIN_DATE, AGAIN_PLACE, AGAIN_POSITIONS, INVITE, KEEP_ALL, KEEP_AS_IS, MARK_REVIEWED, NO_MORE_LANGS, NO_REVIEW, NOT_NOW, NOTHING_ELSE, REMIND, SEND_REVIEW, SHOW_FLYER, stateMessage, THIS_JOB } from './walkChat';
 import { ALL_GOOD, APPROVE_FIXED, ASK_TEXT as WALK_ASK, CHANGE_NO, DISMISS_MARK, CHANGE_YES, CHOOSE_SDGS, fixedNamed, NO_SDGS, orgGoalsAnswer, GENUINE, GOOD, KEEP_FIXED, LEAVE_IT, NO_THANKS, NONE_OF_THESE, OTHER_WORDING, overview, paceIn, PACE_QUICK, promptFor, readAnswer, readDetails, STYLE_QUICK, styleQuestion } from './walkChat';
-import { addToGroup, applyOp, formatGrouping, grouped, groupingFrom, groupOfKey, isGrouped, KEPT, type OutlineOp } from './outline';
+import {
+  addToGroup,
+  applyOp,
+  formatGrouping,
+  grouped,
+  groupingFrom,
+  groupLabelOf,
+  groupOfKey,
+  groupOrderOf,
+  isCatalogGroup,
+  isCustomGroup,
+  isCustomSection,
+  isGrouped,
+  KEPT,
+  mintCustomGroupId,
+  mintCustomSectionId,
+  type GroupingFull,
+  type OutlineOp,
+} from './outline';
 import { canWord, fixedLabel, fixedList, fixedMarked, fixedShown, fixedStore, fixedWordingNow, isLocked, offeredFixed, ORG_LANG, orgWording } from './fixed';
 import { diffViews, isEmpty, langsOf, linkedTo, mirror, viewOf, withView, type Diff, type LangView } from './langs';
-import type { ApplySettings, AskKind, ChatMsg, Content, DeletedJob, Delivery, DemoJob, Facts, FixedOwn, Format, Grouping, JobLang, Pace, PayRequest, Person, Plan, ReachPlan, Recipient, Review, Section, State, Tone, Translation, UndoStep } from './types';
+import type { ApplySettings, AskKind, ChatMsg, Content, CustomGroup, DeletedJob, Delivery, DemoJob, Facts, FixedOwn, Format, Grouping, JobLang, Pace, PayRequest, Person, Plan, ReachPlan, Recipient, Review, Section, State, Tone, Translation, UndoStep } from './types';
 
-/** A job's or a version's grouping (section 19, phase 6, B). */
-export function groupingOf(x: Grouping): Grouping {
-  return { groupOrder: x.groupOrder, groupOf: x.groupOf };
+/** A job's or a version's grouping (section 19, phase 6, B), with any added groups. */
+export function groupingOf(x: Grouping & { customGroups?: CustomGroup[] }): GroupingFull {
+  return { groupOrder: x.groupOrder, groupOf: x.groupOf, customGroups: x.customGroups };
 }
 
 /** A job or a version with a new grouping, its sections read group by group. */
 export function regrouped<T extends DemoJob>(j: T, g: Grouping, tags = j.tags): T {
-  const keys = grouped(tags, g);
+  const full = { ...g, customGroups: j.customGroups };
+  const keys = grouped(tags, full);
   return { ...j, tags: keys, groupOrder: g.groupOrder, groupOf: g.groupOf, sections: inOutlineOrder(j.sections, keys) };
 }
 
@@ -74,7 +93,12 @@ export function versionGrouped(t: Translation): Translation {
 
 /** The job's content, as one Undo step keeps it (section 19, phase 6, C). */
 export function contentSnap(j: DemoJob): Content {
-  return { tags: j.tags, sections: j.sections, groupOrder: j.groupOrder, groupOf: j.groupOf, renamed: j.renamed, subsPlan: j.subsPlan, commitments: j.commitments, fixed: j.fixed, translations: j.translations, linked: j.linked, toUpdate: j.toUpdate };
+  return { tags: j.tags, sections: j.sections, groupOrder: j.groupOrder, groupOf: j.groupOf, customGroups: j.customGroups, renamed: j.renamed, subsPlan: j.subsPlan, commitments: j.commitments, fixed: j.fixed, translations: j.translations, linked: j.linked, toUpdate: j.toUpdate };
+}
+
+/** An empty custom section until the user or the AI writes it. */
+function emptyCustomSection(key: string, title: string): Section {
+  return { key, title, lines: [], edited: false };
 }
 
 /**
@@ -270,14 +294,58 @@ export function versionOp(id: string, lang: JobLang, op: OutlineOp) {
         const next = withView({ ...touched(j), ...liveEdit(j) }, lang, { ...v, sections: v.sections.map((x) => (x.key === op.key ? { ...x, title: heading } : x)) });
         return next === j ? j : stepped(j, next, `Renamed ${t.sections.find((x) => x.key === op.key)?.title ?? op.key}`, lang, { keys: [op.key] });
       }
+      if (op.op === 'addCustom') {
+        const heading = op.heading.trim();
+        if (!heading) return j;
+        const key = mintCustomSectionId();
+        const placed = applyOp(v.keys, { ...v.grouping, customGroups: t.customGroups }, { op: 'add', key, group: op.group, after: op.after });
+        const sec = emptyCustomSection(key, heading);
+        const next = withView({ ...touched(j), ...liveEdit(j) }, lang, { ...v, keys: placed.keys, grouping: placed.grouping, sections: [...v.sections, sec] });
+        return stepped(j, next, `Added ${heading}`, lang, { keys: [key] });
+      }
+      if (op.op === 'addGroup') {
+        const label = op.label.trim();
+        if (!label) return j;
+        const gid = mintCustomGroupId();
+        const customGroups = [...(t.customGroups ?? []), { id: gid, label }];
+        const groupOrder = [...groupOrderOf({ ...v.grouping, customGroups: t.customGroups }), gid];
+        const next = withView({ ...touched(j), ...liveEdit(j) }, lang, { ...v, grouping: { ...v.grouping, groupOrder }, customGroups });
+        return stepped(j, next, `Added the group ${label}`, lang);
+      }
+      if (op.op === 'removeGroup') {
+        if (!isCustomGroup(op.group) || !(t.customGroups ?? []).some((g) => g.id === op.group)) return j;
+        const inG = v.keys.filter((k) => groupOfKey({ ...v.grouping, customGroups: t.customGroups }, k) === op.group);
+        const drop = inG.filter((k) => !KEPT.includes(k));
+        const keys = v.keys.filter((k) => !drop.includes(k));
+        const groupOf = { ...(v.grouping.groupOf ?? {}) };
+        for (const k of drop) delete groupOf[k];
+        for (const k of inG.filter((k) => KEPT.includes(k))) groupOf[k] = 'apply';
+        const customGroups = (t.customGroups ?? []).filter((g) => g.id !== op.group);
+        const groupOrder = groupOrderOf({ ...v.grouping, customGroups: t.customGroups }).filter((g) => g !== op.group);
+        const next = withView({ ...touched(j), ...liveEdit(j) }, lang, {
+          ...v,
+          keys,
+          grouping: { groupOrder, groupOf: Object.keys(groupOf).length ? groupOf : undefined },
+          customGroups: customGroups.length ? customGroups : undefined,
+          sections: v.sections.filter((x) => !drop.includes(x.key)),
+        });
+        return stepped(j, next, `Removed the group ${groupName(op.group, { ...j, customGroups: t.customGroups })}`, lang);
+      }
+      if (op.op === 'renameGroup') {
+        const label = op.label.trim();
+        if (!label || !isCustomGroup(op.group)) return j;
+        const customGroups = (t.customGroups ?? []).map((g) => (g.id === op.group ? { ...g, label } : g));
+        const next = withView({ ...touched(j), ...liveEdit(j) }, lang, { ...v, customGroups });
+        return stepped(j, next, `Renamed the group to ${label}`, lang);
+      }
       if (op.op === 'remove' && (KEPT.includes(op.key) || !v.keys.includes(op.key) || v.keys.length < 2)) return j;
       if (op.op === 'add' && (v.keys.includes(op.key) || !SECTION_BY_KEY[op.key])) return j;
-      const placed = applyOp(v.keys, v.grouping, op);
+      const placed = applyOp(v.keys, { ...v.grouping, customGroups: t.customGroups }, op);
       const sections = op.op === 'add' ? [...v.sections, draftIn(s, j, op.key, lang)] : v.sections.filter((x) => placed.keys.includes(x.key));
       const next = withView({ ...touched(j), ...liveEdit(j) }, lang, { ...v, keys: placed.keys, grouping: placed.grouping, sections });
       if (next === j) return j;
       const title = 'key' in op ? (t.sections.find((x) => x.key === op.key)?.title ?? sections.find((x) => x.key === op.key)?.title ?? op.key) : '';
-      const text = op.op === 'add' ? `Added ${title}` : op.op === 'remove' ? `Removed ${title}` : 'key' in op ? `Moved ${title}` : `Moved the group ${groupName(op.group)}`;
+      const text = op.op === 'add' ? `Added ${title}` : op.op === 'remove' ? `Removed ${title}` : 'key' in op ? `Moved ${title}` : `Moved the group ${groupName(op.group, { ...j, customGroups: t.customGroups })}`;
       const at = v.keys.indexOf('key' in op ? op.key : '');
       return stepped(j, next, text, lang, op.op === 'remove' ? { removed: { key: op.key, title, after: at > 0 ? v.keys[at - 1] : null } } : { keys: 'key' in op ? [op.key] : [] });
     }),
@@ -296,7 +364,11 @@ export function editVersionSection(id: string, lang: JobLang, key: string, text:
       const t = j.translations?.[lang];
       const sec = t?.sections.find((x) => x.key === key);
       if (j.id !== id || !t || !sec) return j;
-      const subs = extra.subs ? extra.subs.map((x) => ({ id: x.id, title: (x.title ?? sec.subs?.find((y) => y.id === x.id)?.title ?? '').trim() || 'More', lines: linesOf(x.text) })).filter((x) => x.lines.length || x.title !== 'More') : sec.subs;
+      const subs = extra.subs
+        ? extra.subs
+            .map((x) => ({ id: x.id, title: (x.title ?? sec.subs?.find((y) => y.id === x.id)?.title ?? '').trim(), lines: linesOf(x.text) }))
+            .filter((x) => x.title)
+        : sec.subs;
       const nextSec: Section = { ...sec, title: extra.title?.trim() || sec.title, lines: linesOf(text), edited: true, subs: subs?.length ? subs : undefined };
       const v = viewOf(j, lang)!;
       const changed = JSON.stringify([nextSec.title, nextSec.lines, nextSec.subs ?? []]) !== JSON.stringify([sec.title, sec.lines, sec.subs ?? []]);
@@ -874,8 +946,15 @@ export function applyTemplate(id: string, formatKey: string, said?: string, tags
       if (j.id !== id) return j;
       const format = formatOf(s, formatKey);
       const keys = tags ?? orderSections(recommendSections(format, j.facts), format);
-      const g = grouping ?? (tags && !isGrouped(tags, formatGrouping(format)) ? groupingFrom(tags) : formatGrouping(format));
-      const next: DemoJob = { ...regrouped({ ...j, ordered: undefined }, g, keys), format: format.key, tone: format.tone, commitments: fixedFor(s, format), part: undefined };
+      const g = grouping ?? (tags && !isGrouped(tags, { ...formatGrouping(format), customGroups: format.customGroups }) ? groupingFrom(tags) : formatGrouping(format));
+      const next: DemoJob = {
+        ...regrouped({ ...j, ordered: undefined, customGroups: format.customGroups }, g, keys),
+        format: format.key,
+        tone: format.tone,
+        commitments: fixedFor(s, format),
+        customGroups: format.customGroups?.length ? format.customGroups : undefined,
+        part: undefined,
+      };
       const user = said ? [msg('user', said)] : [];
       if (!j.setup) return j;
       const text = j.walk ? overview(format, keys.length, wordsFor(keys.length), contentOf(format, s.org.orgType), styleQuestion(s)) : `**${format.label}** it is: ${keys.length} sections. ${styleQuestion(s)}`;
@@ -2171,7 +2250,7 @@ export function reorderVersionSections(id: string, lang: JobLang, keys: string[]
   });
 }
 
-const groupName = (g: string) => GROUPS.find((x) => x.key === g)?.label ?? g;
+const groupName = (g: string, j?: DemoJob) => groupLabelOf(g, j?.customGroups);
 
 /** The note an outline change leaves, with its Undo. */
 function opNote(j: DemoJob, s: State, op: OutlineOp, before: DemoJob): string {
@@ -2179,25 +2258,33 @@ function opNote(j: DemoJob, s: State, op: OutlineOp, before: DemoJob): string {
   switch (op.op) {
     case 'add':
       return `Added ${headingOf(s, j, op.key)}`;
+    case 'addCustom':
+      return `Added ${op.heading.trim()}`;
     case 'remove':
       return `Removed ${name}`;
     case 'rename':
       return `Renamed ${name} to ${op.heading}`;
+    case 'addGroup':
+      return `Added the group ${op.label.trim()}`;
+    case 'removeGroup':
+      return `Removed the group ${groupName(op.group, before)}`;
+    case 'renameGroup':
+      return `Renamed the group to ${op.label.trim()}`;
     case 'groupBy':
     case 'groupBefore':
-      return `Moved the group ${groupName(op.group)}`;
+      return `Moved the group ${groupName(op.group, j)}`;
     default: {
+      if (!('key' in op)) return 'Updated the outline';
       const was = groupOfKey(groupingOf(before), op.key);
       const now = groupOfKey(groupingOf(j), op.key);
-      return was === now ? `Moved ${name}` : `Moved ${name} to ${groupName(now)}`;
+      return was === now ? `Moved ${name}` : `Moved ${name} to ${groupName(now, j)}`;
     }
   }
 }
 
 /**
- * One change from the outline or the draft's icons (section 19, phase 6, B and C), on the job's own language: a section added (written
- * in place when the job has text), removed (never How to apply), renamed, or moved within or into a group, or a group moved. It is
- * one Undo step, and the outline and the job description show it at once; an approval reopens and a live page says Updated, as today.
+ * One change from the outline or the draft's icons (section 19, phase 6, B and C, and the amendment): a catalog or custom section,
+ * an added group, rename, remove, or move. How to apply stays. One Undo step.
  */
 export function outlineOp(id: string, op: OutlineOp) {
   if (!ownerOnly()) return;
@@ -2205,14 +2292,63 @@ export function outlineOp(id: string, op: OutlineOp) {
     ...s,
     jobs: s.jobs.map((j) => {
       if (j.id !== id) return j;
+
       if (op.op === 'rename') {
         const heading = op.heading.trim();
         if (!heading || !j.tags.includes(op.key) || heading === headingOf(s, j, op.key)) return j;
         const next = { ...touched(j), ...liveEdit(j), renamed: { ...j.renamed, [op.key]: heading }, sections: j.sections.map((x) => (x.key === op.key ? { ...x, title: heading } : x)) };
         return stepped(j, next, opNote(next, s, op, j), 'doc', { keys: [op.key] });
       }
+
+      if (op.op === 'renameGroup') {
+        const label = op.label.trim();
+        if (!label || !isCustomGroup(op.group) || !(j.customGroups ?? []).some((g) => g.id === op.group)) return j;
+        const customGroups = (j.customGroups ?? []).map((g) => (g.id === op.group ? { ...g, label } : g));
+        return stepped(j, { ...touched(j), ...liveEdit(j), customGroups }, opNote({ ...j, customGroups }, s, op, j), 'doc');
+      }
+
+      if (op.op === 'addGroup') {
+        const label = op.label.trim();
+        if (!label) return j;
+        const gid = mintCustomGroupId();
+        const customGroups = [...(j.customGroups ?? []), { id: gid, label }];
+        const order = [...groupOrderOf(groupingOf(j)), gid];
+        const next = { ...touched(j), ...liveEdit(j), customGroups, groupOrder: order };
+        return stepped(j, next, opNote(next, s, op, j), 'doc');
+      }
+
+      if (op.op === 'removeGroup') {
+        if (!isCustomGroup(op.group) || !(j.customGroups ?? []).some((g) => g.id === op.group)) return j;
+        const inGroupKeys = j.tags.filter((k) => groupOfKey(groupingOf(j), k) === op.group);
+        const drop = inGroupKeys.filter((k) => !KEPT.includes(k));
+        const keepApply = inGroupKeys.filter((k) => KEPT.includes(k));
+        const tags = j.tags.filter((k) => !drop.includes(k));
+        const groupOf = { ...(j.groupOf ?? {}) };
+        for (const k of drop) delete groupOf[k];
+        for (const k of keepApply) groupOf[k] = 'apply';
+        const customGroups = (j.customGroups ?? []).filter((g) => g.id !== op.group);
+        const groupOrder = (j.groupOrder ?? groupOrderOf(groupingOf(j))).filter((g) => g !== op.group);
+        const sections = j.sections.filter((x) => !drop.includes(x.key));
+        const base = { ...touched(j), ...liveEdit(j), customGroups: customGroups.length ? customGroups : undefined, groupOrder: groupOrder.length ? groupOrder : undefined, groupOf: Object.keys(groupOf).length ? groupOf : undefined };
+        const next = regrouped(base, groupingOf({ ...base, customGroups }), tags);
+        return stepped(j, { ...next, sections: inOutlineOrder(sections, next.tags) }, opNote(next, s, op, j), 'doc');
+      }
+
+      if (op.op === 'addCustom') {
+        const heading = op.heading.trim();
+        if (!heading) return j;
+        const key = mintCustomSectionId();
+        const placed = applyOp(j.tags, groupingOf(j), { op: 'add', key, group: op.group, after: op.after });
+        const moved = regrouped({ ...touched(j), ...liveEdit(j), renamed: { ...j.renamed, [key]: heading } }, placed.grouping, placed.keys);
+        const sec = emptyCustomSection(key, heading);
+        const withSec = { ...moved, sections: inOutlineOrder([...moved.sections.filter((x) => x.key !== key), sec], moved.tags) };
+        const next = j.sections.length ? { ...withSec, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Added ${heading}`, sections: withSec.sections }] } : withSec;
+        return stepped(j, next, opNote(next, s, op, j), 'doc', { keys: [key] });
+      }
+
       if (op.op === 'remove' && (KEPT.includes(op.key) || !j.tags.includes(op.key) || j.tags.length < 2)) return j;
       if (op.op === 'add' && (j.tags.includes(op.key) || !SECTION_BY_KEY[op.key])) return j;
+
       const placed = applyOp(j.tags, groupingOf(j), op);
       const moved = regrouped({ ...touched(j), ...liveEdit(j) }, placed.grouping, placed.keys);
       if (op.op === 'add') {
@@ -2226,7 +2362,9 @@ export function outlineOp(id: string, op: OutlineOp) {
         const at = read.indexOf(op.key);
         const title = headingOf(s, j, op.key);
         const sections = moved.sections.filter((x) => x.key !== op.key);
-        const next = { ...moved, sections, versions: j.sections.some((x) => x.key === op.key) ? [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Removed ${title}`, sections }] : j.versions };
+        const { [op.key]: _r, ...renamed } = moved.renamed ?? {};
+        void _r;
+        const next = { ...moved, renamed: Object.keys(renamed).length ? renamed : undefined, sections, versions: j.sections.some((x) => x.key === op.key) ? [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Removed ${title}`, sections }] : j.versions };
         return stepped(j, next, opNote(next, s, op, j), 'doc', { removed: { key: op.key, title, after: at > 0 ? read[at - 1] : null } });
       }
       if (moved.tags.join() === j.tags.join() && JSON.stringify(groupingOf(moved)) === JSON.stringify(groupingOf(j))) return j;
@@ -2248,11 +2386,21 @@ export function applyFormat(id: string, formatKey: string) {
       const extras = j.tags.filter((t) => !format.order.some((o) => o.key === t) && (['deliverables', 'learning', 'deployment', 'funding', 'conditions', 'languages', ...KEPT].includes(t) || !was.order.some((o) => o.key === t) || j.sections.some((x) => x.key === t && (x.edited || x.ai))));
       const wanted = orderSections([...format.order.map((o) => o.key), ...extras], format);
       // A job the user has grouped in their own way keeps it: its sections stay where they are, and the new template's join their groups.
-      const own = Boolean(j.groupOrder || j.groupOf);
+      const own = Boolean(j.groupOrder || j.groupOf || j.customGroups?.length);
+      const formatG = { ...formatGrouping(format), customGroups: format.customGroups };
       const placed = own
         ? wanted.filter((k) => !j.tags.includes(k)).reduce((acc, k) => addToGroup(acc.keys, acc.grouping, k), { keys: j.tags.filter((k) => wanted.includes(k)), grouping: groupingOf(j) })
-        : { keys: grouped(wanted, formatGrouping(format)), grouping: formatGrouping(format) };
-      const next = { ...regrouped(touched(j), placed.grouping, placed.keys), renamed: undefined, ordered: undefined, format: format.key, tone: format.tone, commitments: fixedFor(s, format), chat: [...j.chat, msg('ai', `Applied ${format.label}: its headings, order, and tone. Sections you edited by hand keep your text.`)] };
+        : { keys: grouped(wanted, formatG), grouping: formatGrouping(format) };
+      const next = {
+        ...regrouped({ ...touched(j), customGroups: format.customGroups }, placed.grouping, placed.keys),
+        renamed: undefined,
+        ordered: undefined,
+        format: format.key,
+        tone: format.tone,
+        commitments: fixedFor(s, format),
+        customGroups: format.customGroups?.length ? format.customGroups : undefined,
+        chat: [...j.chat, msg('ai', `Applied ${format.label}: its headings, order, and tone. Sections you edited by hand keep your text.`)],
+      };
       const after = rebuilt(s, { ...next, sections: j.sections.length ? j.sections.map((x) => ({ ...x, title: headingFor(x.key, format) })) : [] });
       // The template is shared (section 19, phase 6, B): its sections and grouping reach every language; each keeps its own text.
       const a = viewOf(j);
@@ -2435,8 +2583,8 @@ export function editSection(id: string, key: string, text: string, note = false,
     const subs = extra.subs
       ? extra.subs
           .map((x) => ({ id: x.id, title: (x.title ?? old?.subs?.find((y) => y.id === x.id)?.title ?? '').trim(), lines: linesOf(x.text) }))
-          .filter((x) => x.title || x.lines.length)
-          .map((x) => ({ ...x, title: x.title || 'More' }))
+          .filter((x) => x.title && (x.lines.length || true))
+          .filter((x) => x.title)
       : old?.subs;
     // Saved from the editor, a section marked "to update" is taken as brought in line, even unchanged.
     const unmarked = j.toUpdate?.[key] ? { ...j, toUpdate: Object.keys(j.toUpdate).length > 1 ? Object.fromEntries(Object.entries(j.toUpdate).filter(([k]) => k !== key)) : undefined } : j;
@@ -2580,11 +2728,24 @@ export function importJobDescription(text: string, opts: { host?: string; saveAs
 }
 
 /** Saves a format the organisation built itself, for reuse, with its grouping. Returns its key. */
-export function createFormat(label: string, order: Format['order'], tone: Tone, groupOrder?: Format['groupOrder']): string {
+export function createFormat(label: string, order: Format['order'], tone: Tone, groupOrder?: Format['groupOrder'], customGroups?: Format['customGroups']): string {
   const key = nextId('format');
   update((s) => ({
     ...s,
-    formats: [...s.formats, { key, label, family: 'Your organisation', usedBy: `Created by ${s.me.name}`, tone, order, commitments: formatOf(s, 'house').commitments, ...(groupOrder ? { groupOrder } : {}) }],
+    formats: [
+      ...s.formats,
+      {
+        key,
+        label,
+        family: 'Your organisation',
+        usedBy: `Created by ${s.me.name}`,
+        tone,
+        order,
+        commitments: formatOf(s, 'house').commitments,
+        ...(groupOrder ? { groupOrder } : {}),
+        ...(customGroups?.length ? { customGroups } : {}),
+      },
+    ],
     notice: { text: `Saved ${label}. It is under Your organisation in the template panel and on the JD formats page.` },
   }));
   return key;

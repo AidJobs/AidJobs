@@ -313,7 +313,9 @@ export function nextStep(job: DemoJob, s: State): Step | null {
   // The reading order, group by group; the facts asked before a section follow the section's own kind, wherever it is shown.
   for (const k of job.tags) {
     if (w.approved.includes(k) && isWritten(job, k)) continue;
-    const ask = FACTS_BEFORE[SECTION_BY_KEY[k]?.group ?? 'job'].find((f) => !isSettled(f, job) && !parked(f));
+    // Custom sections add no fact questions (section 19, phase 6 amendment).
+    const catalog = SECTION_BY_KEY[k];
+    const ask = catalog ? FACTS_BEFORE[catalog.group].find((f) => !isSettled(f, job) && !parked(f)) : undefined;
     if (ask) return { kind: 'ask', fact: ask, section: k };
     if (!isWritten(job, k)) return { kind: 'write', sections: all ? unwritten : [k] };
     if (parked(`approve:${k}`)) continue;

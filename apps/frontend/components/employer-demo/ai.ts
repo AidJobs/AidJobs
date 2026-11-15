@@ -1,7 +1,7 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
-import { downloadBlock, formatOf, missingFacts } from './actions';
+import { downloadBlock, formatOf, groupingOf, missingFacts } from './actions';
 import { approvalRequired, approvedFor } from './approval';
 import { planCount, planFor } from './invites';
 import { isPublished, STATE_LABEL, stateActionsOf, type StateAction } from './lifecycle';
@@ -264,13 +264,14 @@ export function contextFor(s: State, j: DemoJob, focus: string | undefined, firs
       inView: focus ?? null,
       versionInView: version && j.translations?.[version] ? { key: version, label: langOf(version).label } : null,
       canUndo: Boolean(j.lastChange),
-      groupOrder: groupOrderOf(j),
+      groupOrder: groupOrderOf(groupingOf(j)),
+      customGroups: j.customGroups ?? [],
       sections: j.tags.map((k) => {
         const sec = j.sections.find((x) => x.key === k);
         return {
           key: k,
           heading: sec?.title ?? j.renamed?.[k] ?? headingFor(k, format),
-          group: groupOfKey(j, k),
+          group: groupOfKey(groupingOf(j), k),
           fixed: FIXED_SECTIONS.includes(k),
           by: sec ? (sec.edited ? 'user' : sec.ai ? 'ai' : 'rules') : null,
           approved: j.walk ? j.walk.approved.includes(k) : null,

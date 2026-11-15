@@ -8,15 +8,22 @@ import { inOutlineOrder } from './engine';
 import { fixedList, fixedStore } from './fixed';
 import { grouped, groupOfKey, ownGroup } from './outline';
 import { jobLang } from './translate';
-import type { DemoJob, FixedOwn, GroupKey, Grouping, JobLang, Section, Translation } from './types';
+import type { CustomGroup, DemoJob, FixedOwn, GroupKey, Grouping, JobLang, Section, Translation } from './types';
 
-export type LangView = { keys: string[]; grouping: Grouping; sections: Section[]; commitments: string[]; fixed: Record<string, FixedOwn> };
+export type LangView = {
+  keys: string[];
+  grouping: Grouping;
+  sections: Section[];
+  commitments: string[];
+  fixed: Record<string, FixedOwn>;
+  customGroups?: CustomGroup[];
+};
 
 export function viewOf(j: DemoJob, lang: JobLang = jobLang(j)): LangView | null {
-  if (lang === jobLang(j)) return { keys: j.tags, grouping: { groupOrder: j.groupOrder, groupOf: j.groupOf }, sections: j.sections, commitments: j.commitments, fixed: j.fixed ?? {} };
+  if (lang === jobLang(j)) return { keys: j.tags, grouping: { groupOrder: j.groupOrder, groupOf: j.groupOf }, sections: j.sections, commitments: j.commitments, fixed: j.fixed ?? {}, customGroups: j.customGroups };
   const t = j.translations?.[lang];
   if (!t) return null;
-  return { keys: t.sections.map((x) => x.key), grouping: { groupOrder: t.groupOrder, groupOf: t.groupOf }, sections: t.sections, commitments: fixedList(j, lang), fixed: fixedStore(j, lang) };
+  return { keys: t.sections.map((x) => x.key), grouping: { groupOrder: t.groupOrder, groupOf: t.groupOf }, sections: t.sections, commitments: fixedList(j, lang), fixed: fixedStore(j, lang), customGroups: t.customGroups };
 }
 
 /** The languages a job has: its own first, then its versions. */
@@ -39,7 +46,9 @@ export function diffViews(a: LangView, b: LangView): Diff {
   const removed = a.keys.filter((k) => !b.keys.includes(k));
   const added = b.keys.filter((k) => !a.keys.includes(k));
   const text = b.keys.filter((k) => a.keys.includes(k) && textOf(a.sections.find((x) => x.key === k)) !== textOf(b.sections.find((x) => x.key === k)));
-  const structure = JSON.stringify([b.keys, b.grouping.groupOrder ?? null, b.keys.map((k) => groupOfKey(b.grouping, k))]) !== JSON.stringify([a.keys, a.grouping.groupOrder ?? null, a.keys.map((k) => groupOfKey(a.grouping, k))]);
+  const structure =
+    JSON.stringify([b.keys, b.grouping.groupOrder ?? null, b.keys.map((k) => groupOfKey({ ...b.grouping, customGroups: b.customGroups }, k)), b.customGroups ?? []]) !==
+    JSON.stringify([a.keys, a.grouping.groupOrder ?? null, a.keys.map((k) => groupOfKey({ ...a.grouping, customGroups: a.customGroups }, k)), a.customGroups ?? []]);
   const fixedListChanged = a.commitments.join() !== b.commitments.join();
   const fixedText = Array.from(new Set([...Object.keys(a.fixed), ...Object.keys(b.fixed)])).filter((k) => JSON.stringify(a.fixed[k] ?? null) !== JSON.stringify(b.fixed[k] ?? null) && !b.fixed[k]?.machine);
   return { removed, added, text, structure, fixedList: fixedListChanged, fixedText };
@@ -68,23 +77,25 @@ export function mirror(target: LangView, src: LangView, d: Diff, draft: (key: st
   }
   const groupOf: Record<string, GroupKey> = {};
   for (const k of order) {
-    const g = src.keys.includes(k) ? groupOfKey(src.grouping, k) : groupOfKey(target.grouping, k);
+    const g = src.keys.includes(k) ? groupOfKey({ ...src.grouping, customGroups: src.customGroups }, k) : groupOfKey({ ...target.grouping, customGroups: target.customGroups }, k);
     if (g !== ownGroup(k)) groupOf[k] = g;
   }
   const grouping: Grouping = { groupOrder: src.grouping.groupOrder, groupOf: Object.keys(groupOf).length ? groupOf : undefined };
-  const keys = grouped(order, grouping);
+  const customGroups = src.customGroups;
+  const keys = grouped(order, { ...grouping, customGroups });
   const sections = inOutlineOrder([...target.sections.filter((x) => keys.includes(x.key)), ...add.map(draft)], keys);
-  return { ...target, keys, grouping, sections, commitments };
+  return { ...target, keys, grouping, sections, commitments, customGroups };
 }
 
 /** A view written back into the job: the job's own language, or a version (a version changed needs a new review). */
 export function withView(j: DemoJob, lang: JobLang, v: LangView): DemoJob {
   const sections = inOutlineOrder(v.sections, v.keys);
   const fixed = Object.keys(v.fixed).length ? v.fixed : undefined;
-  if (lang === jobLang(j)) return { ...j, tags: v.keys, sections, groupOrder: v.grouping.groupOrder, groupOf: v.grouping.groupOf, commitments: v.commitments, fixed };
+  const customGroups = v.customGroups?.length ? v.customGroups : undefined;
+  if (lang === jobLang(j)) return { ...j, tags: v.keys, sections, groupOrder: v.grouping.groupOrder, groupOf: v.grouping.groupOf, customGroups, commitments: v.commitments, fixed };
   const t = j.translations?.[lang];
   if (!t) return j;
-  const next: Translation = { ...t, sections, groupOrder: v.grouping.groupOrder, groupOf: v.grouping.groupOf, commitments: v.commitments, fixed };
+  const next: Translation = { ...t, sections, groupOrder: v.grouping.groupOrder, groupOf: v.grouping.groupOf, customGroups, commitments: v.commitments, fixed };
   return JSON.stringify(next) === JSON.stringify(t) ? j : { ...j, translations: { ...j.translations, [lang]: { ...next, reviewed: false } } };
 }
 

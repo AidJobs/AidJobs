@@ -435,7 +435,7 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
               <textarea style={{ ...inputStyle, minHeight: 80, lineHeight: 1.6 }} value={sb.text} onChange={(e) => setSubs(subs.map((x) => (x.id === sb.id ? { ...x, text: e.target.value } : x)))} aria-label={`${sb.title || 'Heading'} text`} />
             </div>
           ))}
-          <button type="button" className="aj-text-btn self-start" style={{ height: 28, paddingInline: 0 }} onClick={() => setSubs([...subs, { id: subId(), title: '', text: '' }])}>
+          <button type="button" className="aj-text-btn self-start" style={{ height: 28, paddingInline: 0 }} onClick={() => setSubs([...subs, { id: subId(), title: '', text: '' }])} aria-label="Add a sub-section heading inside this section">
             <Plus size={12} strokeWidth={2} aria-hidden /> Add a heading inside this section
           </button>
           <div className="flex gap-1.5">
@@ -604,8 +604,9 @@ export function TitleEditor({ job, disabled }: { job: DemoJob; disabled?: boolea
 export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State; at: { after: string | null; anchor: HTMLElement; end: boolean }; onClose: () => void; lang?: JobLang }) {
   const box = useRef<HTMLDivElement>(null);
   const [place] = useState(() => placeFor(at.anchor, 'left', at.end));
+  const [ownName, setOwnName] = useState<string | null>(null);
   const view = viewOf(job, lang);
-  const g = view?.grouping ?? groupingOf(job);
+  const g = { ...(view?.grouping ?? groupingOf(job)), customGroups: view?.customGroups ?? job.customGroups };
   const keys = view?.keys ?? job.tags;
   const here = at.after ? groupOfKey(g, at.after) : groupOrderOf(g)[0];
   const groups = [here, ...groupOrderOf(g).filter((x) => x !== here)];
@@ -613,7 +614,7 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
   const left = offeredFixed(s.org).filter((k) => !fixedList(job, lang).includes(k));
   const version = lang && lang !== jobLang(job) ? lang : undefined;
   useEffect(() => {
-    requestAnimationFrame(() => box.current?.querySelector<HTMLElement>('button')?.focus({ preventScroll: true }));
+    requestAnimationFrame(() => box.current?.querySelector<HTMLElement>('button, input')?.focus({ preventScroll: true }));
     const down = (e: PointerEvent) => {
       if (!box.current?.contains(e.target as Node)) onClose();
     };
@@ -629,6 +630,14 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
       scrollInside(document.getElementById(`${version ? 'ej-ver-' : 'ej-sec-'}${key}`));
       document.querySelector<HTMLElement>(`[data-grip-key="${key}"]`)?.focus({ preventScroll: true });
     });
+  };
+  const addOwn = (heading: string) => {
+    const name = heading.trim();
+    if (!name) return;
+    const op = { op: 'addCustom' as const, heading: name, group: here, ...(at.end ? {} : { after: at.after }) };
+    if (version) versionOp(job.id, version, op);
+    else outlineOp(job.id, op);
+    onClose();
   };
   return (
     <div
@@ -647,10 +656,11 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
     >
       {groups.map((gk) => {
         const missing = SECTIONS.filter((d) => d.group === gk && !keys.includes(d.key));
-        if (!missing.length) return null;
+        const label = GROUPS.find((x) => x.key === gk)?.label ?? (view?.customGroups ?? job.customGroups)?.find((x) => x.id === gk)?.label ?? gk;
+        if (!missing.length && gk !== here) return null;
         return (
-          <div key={gk} className="flex flex-col gap-1" role="group" aria-label={GROUPS.find((x) => x.key === gk)?.label}>
-            <span className="ej-menu-label">{GROUPS.find((x) => x.key === gk)?.label}</span>
+          <div key={gk} className="flex flex-col gap-1" role="group" aria-label={label}>
+            <span className="ej-menu-label">{label}</span>
             <div className="flex flex-wrap gap-1 px-1.5">
               {missing.map((d) => (
                 <Tip key={d.key} label={`${d.hint}${rec.includes(d.key) ? ' · recommended for this job' : ''}`}>
@@ -661,6 +671,35 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
                   </button>
                 </Tip>
               ))}
+              {gk === here &&
+                (ownName !== null ? (
+                  <input
+                    className="ej-ol-input"
+                    style={{ minWidth: 140 }}
+                    value={ownName}
+                    autoFocus
+                    placeholder="Name this section"
+                    aria-label="Name this section"
+                    onChange={(e) => setOwnName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addOwn(ownName);
+                      }
+                    }}
+                    onBlur={() => {
+                      if (ownName.trim()) addOwn(ownName);
+                      else setOwnName(null);
+                    }}
+                  />
+                ) : (
+                  <Tip label="Add a section of your own here">
+                    <button type="button" className="ej-add" onClick={() => setOwnName('')} aria-label="Add your own section">
+                      <Plus size={11} strokeWidth={2} aria-hidden />
+                      Add your own
+                    </button>
+                  </Tip>
+                ))}
             </div>
           </div>
         );

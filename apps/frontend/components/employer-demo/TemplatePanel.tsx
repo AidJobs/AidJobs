@@ -19,7 +19,7 @@ import { inputStyle } from './ui';
  * What the template panel shows: this job's sections (once written), a template with its sections as adjusted, or one being created.
  * `from`: the template Create your own started from, or blank.
  */
-export type Pick = { tab: 'sections' | 'templates' | 'own'; key: string; name: string; order: Format['order']; groupOrder?: Format['groupOrder']; from?: string };
+export type Pick = { tab: 'sections' | 'templates' | 'own'; key: string; name: string; order: Format['order']; groupOrder?: Format['groupOrder']; customGroups?: Format['customGroups']; from?: string };
 
 /** A template's headings for this job, in its grouping: its own sections and those the job type calls for, each joining its group. */
 export function orderFor(s: State, job: DemoJob, key: string): Format['order'] {
@@ -30,8 +30,9 @@ export function orderFor(s: State, job: DemoJob, key: string): Format['order'] {
 }
 
 /** A template chosen in the panel: its sections for this job and its group order. */
-function pickOf(s: State, job: DemoJob, key: string): { key: string; order: Format['order']; groupOrder?: Format['groupOrder'] } {
-  return { key, order: orderFor(s, job, key), groupOrder: formatOf(s, key).groupOrder };
+function pickOf(s: State, job: DemoJob, key: string): { key: string; order: Format['order']; groupOrder?: Format['groupOrder']; customGroups?: Format['customGroups'] } {
+  const f = formatOf(s, key);
+  return { key, order: orderFor(s, job, key), groupOrder: f.groupOrder, customGroups: f.customGroups };
 }
 
 export function startPick(s: State, job: DemoJob, tab: Pick['tab']): Pick {
@@ -166,9 +167,10 @@ function PickOutline({ pick, setPick, recommended, nameOf }: { pick: Pick; setPi
     <OutlineEditor
       rows={pick.order.map((o) => ({ key: o.key, heading: o.heading }))}
       grouping={pickGrouping(pick)}
+      customGroups={pick.customGroups}
       recommended={recommended}
       label="Sections of the template, by group"
-      onOp={(op) => setPick({ ...pick, ...applyToEntries(pick.order, pick.groupOrder, op, nameOf) })}
+      onOp={(op) => setPick({ ...pick, ...applyToEntries(pick.order, pick.groupOrder, op, nameOf, pick.customGroups) })}
     />
   );
 }
@@ -285,6 +287,7 @@ export function JobOutline({ s, job, lang }: { s: State; job: DemoJob; lang?: Jo
       <OutlineEditor
         rows={rows}
         grouping={version ? groupingOf(version) : groupingOf(job)}
+        customGroups={version ? version.customGroups : job.customGroups}
         recommended={recommendSections(formatOf(s, job.format), job.facts)}
         marks={differences(job, version && lang ? lang : jobLang(job))}
         label={version && lang ? `${langOf(lang).label} version's sections, by group` : "This job's sections, by group"}
@@ -506,7 +509,7 @@ function SaveAsOurs({ s, pick }: { s: State; pick: Pick }) {
         className="aj-pill shrink-0"
         disabled={!name.trim() || taken || pick.order.length < 3}
         onClick={() => {
-          createFormat(name.trim(), pick.order, formatOf(s, pick.key).tone, pick.groupOrder);
+          createFormat(name.trim(), pick.order, formatOf(s, pick.key).tone, pick.groupOrder, pick.customGroups);
           setOpen(false);
           setName('');
         }}

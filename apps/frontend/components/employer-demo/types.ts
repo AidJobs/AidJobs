@@ -2,8 +2,14 @@ export type Role = 'owner' | 'member' | 'reviewer';
 
 export type Person = { id: string; name: string; email: string; role: Role };
 
-/** The five groups of a job description (employer-side plan, section 14). */
-export type GroupKey = 'employer' | 'job' | 'person' | 'offer' | 'apply';
+/**
+ * A group in the outline: one of the five catalog groups (employer-side plan, section 14), or an added group id (`g-…`,
+ * section 19, phase 6 amendment).
+ */
+export type GroupKey = string;
+
+/** A group the user added (section 19, phase 6 amendment): its id and free-text label. */
+export type CustomGroup = { id: string; label: string };
 
 export type SectionDef = { key: string; label: string; group: GroupKey; hint: string };
 
@@ -20,8 +26,10 @@ export type Format = {
   tone: Tone;
   order: OutlineEntry[];
   commitments: string[];
-  /** The order of the five groups, when the user changed it (section 19, phase 6, B); unset, the usual order. */
+  /** The order of the groups, when the user changed it (section 19, phase 6, B); unset, the usual order. */
   groupOrder?: GroupKey[];
+  /** Groups the user added on this template (section 19, phase 6 amendment). */
+  customGroups?: CustomGroup[];
 };
 
 export type OrgType = 'ingo' | 'ngo' | 'un' | 'charity' | 'donor' | 'contractor';
@@ -354,6 +362,8 @@ export type Translation = {
   /** Each language independent (section 19, phase 6, E): its own grouping, its fixed texts in their order, and their wording. */
   groupOrder?: GroupKey[];
   groupOf?: Record<string, GroupKey>;
+  /** Groups the user added in this language (section 19, phase 6 amendment). */
+  customGroups?: CustomGroup[];
   commitments?: string[];
   fixed?: Record<string, FixedOwn>;
   toUpdate?: ToUpdate;
@@ -372,7 +382,7 @@ export type Snapshot = { facts: Facts; sections: Section[]; at: number };
  * A job's content, as one Undo step keeps it (section 19, phase 6, C): the sections and their grouping, the fixed texts and their
  * wording, the versions, and the links; not the facts, the review, or the chat.
  */
-export type Content = Pick<DemoJob, 'tags' | 'sections' | 'groupOrder' | 'groupOf' | 'renamed' | 'subsPlan' | 'commitments' | 'fixed' | 'translations' | 'linked' | 'toUpdate'>;
+export type Content = Pick<DemoJob, 'tags' | 'sections' | 'groupOrder' | 'groupOf' | 'customGroups' | 'renamed' | 'subsPlan' | 'commitments' | 'fixed' | 'translations' | 'linked' | 'toUpdate'>;
 
 /**
  * The last change made with the icons, the outline, or a version's editor: its note, where it was made (`tab`), the content before it,
@@ -478,6 +488,8 @@ export type DemoJob = {
   /** The grouping of the job's own language (section 19, phase 6, B): the group order, and the sections moved into another group. */
   groupOrder?: GroupKey[];
   groupOf?: Record<string, GroupKey>;
+  /** Groups the user added on this job (section 19, phase 6 amendment). */
+  customGroups?: CustomGroup[];
   /** The fixed texts in the job's own language: a wording for this job, a machine translation, approved or not (phase 6, D and E). */
   fixed?: Record<string, FixedOwn>;
   /** The languages linked to each other, the job's own included: a change in one follows into the others (phase 6, E). */

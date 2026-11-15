@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { addTranslation, alsoIn, applyFormat, applyTemplate, approveFixed, approveSection, bringBackFixed, chooseStyle, editFixed, editSection, editVersionSection, goOn, hireAgain, keepForAll, keepWordingForAll, leaveOutFixed, leavePoint, moveFixed, NEXT_QUESTION, outlineOp, publish, publishBlock, publishNow, removeVersionSection, resetFixed, restoreVersion, reviewTranslation, sendChat, setApply, setFacts, setJobLang, setLinked, setPace, settleQuestion, startJob, toggleCommitment, toggleSection, translateFixed, undoStep, unparkPart, USE_WORDINGS, versionOp } from '../../components/employer-demo/actions';
+import { addTranslation, alsoIn, applyFormat, applyTemplate, approveFixed, approveSection, bringBackFixed, chooseStyle, createFormat, editFixed, editSection, editVersionSection, goOn, hireAgain, keepForAll, keepWordingForAll, leaveOutFixed, leavePoint, moveFixed, NEXT_QUESTION, outlineOp, publish, publishBlock, publishNow, removeVersionSection, resetFixed, restoreVersion, reviewTranslation, sendChat, setApply, setFacts, setJobLang, setLinked, setPace, settleQuestion, startJob, toggleCommitment, toggleSection, translateFixed, undoStep, unparkPart, USE_WORDINGS, versionOp } from '../../components/employer-demo/actions';
 import { fixedShown, fixedWordingNow } from '../../components/employer-demo/fixed';
 import { FlyerNotice } from '../../components/employer-demo/Flyer';
 import { createElement } from 'react';
@@ -723,5 +723,123 @@ describe('moving within and across groups, always read grouped (section 19, phas
   it('a group moves as a whole', () => {
     const g = moveGroupBy({}, 'offer', -1);
     expect(grouped(keys, g)).toEqual(['about', 'team', 'purpose', 'responsibilities', 'offer', 'requirements', 'apply']);
+  });
+});
+
+describe('add your own group, section, and sub-section (section 19, phase 6 amendment)', () => {
+  it('adds a custom group that survives load and Undo; rename; remove with Undo; How to apply returns under Applying', () => {
+    outlineOp('job-comms', { op: 'addGroup', label: 'Field notes' });
+    const gid = job('job-comms').customGroups![0].id;
+    expect(gid.startsWith('g-')).toBe(true);
+    expect(groupOrderOf(job('job-comms'))).toContain(gid);
+    outlineOp('job-comms', { op: 'addCustom', heading: 'Week one', group: gid });
+    outlineOp('job-comms', { op: 'toGroup', key: 'apply', group: gid });
+    expect(job('job-comms').groupOf?.apply).toBe(gid);
+    const beforeRemove = job('job-comms');
+    outlineOp('job-comms', { op: 'renameGroup', group: gid, label: 'Onboarding' });
+    expect(job('job-comms').customGroups![0].label).toBe('Onboarding');
+    const back = normalise({ ...getState() }).jobs.find((j) => j.id === 'job-comms')!;
+    expect(back.customGroups?.[0]).toEqual({ id: gid, label: 'Onboarding' });
+    outlineOp('job-comms', { op: 'removeGroup', group: gid });
+    expect(job('job-comms').customGroups).toBeUndefined();
+    expect(job('job-comms').tags.some((k) => k.startsWith('c-'))).toBe(false);
+    expect(job('job-comms').groupOf?.apply ?? 'apply').toBe('apply');
+    undoStep('job-comms');
+    expect(job('job-comms').customGroups?.[0].id).toBe(gid);
+    expect(job('job-comms').tags.some((k) => k.startsWith('c-'))).toBe(true);
+    expect(beforeRemove.customGroups?.[0].id).toBe(gid);
+  });
+
+  it('keeps the five catalog groups even when empty; only an added group can be removed; an empty added group stays', () => {
+    outlineOp('job-comms', { op: 'addGroup', label: 'Extra' });
+    const gid = job('job-comms').customGroups![0].id;
+    const catalog = ['employer', 'job', 'person', 'offer', 'apply'];
+    expect(groupOrderOf(job('job-comms'))).toEqual(expect.arrayContaining(catalog));
+    outlineOp('job-comms', { op: 'removeGroup', group: 'employer' });
+    expect(groupOrderOf(job('job-comms'))).toContain('employer');
+    outlineOp('job-comms', { op: 'addCustom', heading: 'Temp', group: gid });
+    const custom = job('job-comms').tags.find((k) => k.startsWith('c-'))!;
+    outlineOp('job-comms', { op: 'remove', key: custom });
+    expect(job('job-comms').customGroups?.some((g) => g.id === gid)).toBe(true);
+    expect(groupOrderOf(job('job-comms'))).toContain(gid);
+    expect(job('job-comms').tags.filter((k) => (job('job-comms').groupOf?.[k] ?? '') === gid)).toEqual([]);
+  });
+
+  it('adds a custom section; blank refused; two with the same name; chips still add catalog sections', () => {
+    const n = job('job-comms').tags.length;
+    outlineOp('job-comms', { op: 'addCustom', heading: '  ', group: 'job' });
+    expect(job('job-comms').tags.length).toBe(n);
+    outlineOp('job-comms', { op: 'addCustom', heading: 'Day one', group: 'job' });
+    outlineOp('job-comms', { op: 'addCustom', heading: 'Day one', group: 'job' });
+    const customs = job('job-comms').tags.filter((k) => k.startsWith('c-'));
+    expect(customs).toHaveLength(2);
+    expect(customs.every((k) => job('job-comms').renamed?.[k] === 'Day one' || job('job-comms').sections.find((x) => x.key === k)?.title === 'Day one')).toBe(true);
+    outlineOp('job-comms', { op: 'add', key: 'firstweeks', group: 'job' });
+    expect(job('job-comms').tags).toContain('firstweeks');
+  });
+
+  it('a blank sub-section heading is not saved as More', () => {
+    const r = job('job-comms').sections.find((x) => x.key === 'responsibilities')!;
+    editSection('job-comms', 'responsibilities', r.lines.join('\n'), false, { subs: [{ id: 'sub-blank', title: '  ', text: '- Keep this' }, { id: 'sub-ok', title: 'Field', text: '- Visit sites' }] });
+    const subs = job('job-comms').sections.find((x) => x.key === 'responsibilities')?.subs ?? [];
+    expect(subs.map((x) => x.title)).toEqual(['Field']);
+    expect(subs.some((x) => x.title === 'More')).toBe(false);
+  });
+
+  it('unlinked language unchanged when adding; linked structure follows', () => {
+    addTranslation('job-comms', 'fr');
+    outlineOp('job-comms', { op: 'addCustom', heading: 'Only English', group: 'job' });
+    const custom = job('job-comms').tags.find((k) => k.startsWith('c-'))!;
+    expect(job('job-comms').translations?.fr?.sections.some((x) => x.key === custom)).toBe(false);
+    setLinked('job-comms', ['en', 'fr']);
+    outlineOp('job-comms', { op: 'addCustom', heading: 'Shared', group: 'person' });
+    const shared = job('job-comms').tags.find((k) => k.startsWith('c-') && k !== custom)!;
+    expect(job('job-comms').translations?.fr?.sections.some((x) => x.key === shared)).toBe(true);
+  });
+
+  it('a custom section asks no extra facts', () => {
+    const id = started();
+    outlineOp(id, { op: 'addCustom', heading: 'Our twist', group: 'job' });
+    const custom = job(id).tags.find((k) => k.startsWith('c-'))!;
+    expect(SECTION_BY_KEY[custom]).toBeUndefined();
+    const before = job(id).tags.slice(0, job(id).tags.indexOf(custom));
+    update((s) => ({
+      ...s,
+      jobs: s.jobs.map((j) => {
+        if (j.id !== id) return j;
+        return {
+          ...j,
+          walk: { approved: before, settled: ['title', 'place', 'contract', 'grade', 'eligibility', 'languages', 'safeguarding', 'salary', 'deadline', 'method'], pace: 'step' },
+          sections: before.map((k) => j.sections.find((x) => x.key === k) ?? { key: k, title: k, lines: ['Done.'] }),
+        };
+      }),
+    }));
+    expect(step(id)).toEqual({ kind: 'write', sections: [custom] });
+  });
+
+  it('the AI accepts and writes a custom section and sub-section by name; does not invent one unasked; add_group and remove_group', () => {
+    applyAiTurn('job-comms', 'add a group called Field pack', { reply: 'Added.', actions: [{ type: 'add_group', label: 'Field pack' }] }, open);
+    const gid = job('job-comms').customGroups![0].id;
+    applyAiTurn('job-comms', 'add a section called Kit list in Field pack', { reply: 'Added.', actions: [{ type: 'add_section', heading: 'Kit list', group: gid }] }, open);
+    const key = job('job-comms').tags.find((k) => k.startsWith('c-'))!;
+    expect(job('job-comms').sections.find((x) => x.key === key)?.title).toBe('Kit list');
+    applyAiTurn('job-comms', 'write Kit list', { reply: 'Done.', actions: [{ type: 'write_section', section: 'Kit list', lines: ['- Pack a first-aid kit'] }] }, open);
+    expect(job('job-comms').sections.find((x) => x.key === key)?.lines).toEqual(['- Pack a first-aid kit']);
+    applyAiTurn('job-comms', 'add a heading Inside week one under Kit list', { reply: 'Done.', actions: [{ type: 'sub', section: key, op: 'add', heading: 'Inside week one' }] }, open);
+    expect(job('job-comms').sections.find((x) => x.key === key)?.subs?.[0].title).toBe('Inside week one');
+    const before = job('job-comms').tags.length;
+    applyAiTurn('job-comms', 'hello', { reply: 'Hi.', actions: [{ type: 'add_section', heading: 'Invented', group: 'job' }] }, open);
+    expect(job('job-comms').chat.filter((m) => m.ai).at(-1)?.text).toMatch(/only when you name it|Invented/i);
+    expect(job('job-comms').tags.length).toBe(before);
+    applyAiTurn('job-comms', 'remove the Field pack group', { reply: 'Removed.', actions: [{ type: 'remove_group', group: gid }] }, open);
+    expect(job('job-comms').customGroups).toBeUndefined();
+  });
+
+  it('saving a template keeps the added group', () => {
+    outlineOp('job-comms', { op: 'addGroup', label: 'Annex' });
+    const gid = job('job-comms').customGroups![0].id;
+    const order = job('job-comms').tags.map((k) => ({ key: k, heading: job('job-comms').sections.find((x) => x.key === k)?.title ?? k }));
+    const key = createFormat('With annex', order, 'warm', job('job-comms').groupOrder, job('job-comms').customGroups);
+    expect(getState().formats.find((f) => f.key === key)?.customGroups?.[0]).toEqual({ id: gid, label: 'Annex' });
   });
 });
