@@ -419,23 +419,10 @@ function PartFields({ part, job, s, onClose, onFact, open, act }: { part: string
     review: ['Review', 'Comments, suggestions, and approval'],
     publish: ['Publish', statusLine(s, job)],
     's:apply': ['How to apply', 'The section below is written from these'],
-    's:about': ['About us', 'Part of this job: edit it below, or draft it from your organisation’s page'],
   };
   const [title, hint] = head[part] ?? ['', ''];
   let body: ReactNode = null;
-  const aiOpen = (t: OpenTarget) => open.part(t.startsWith('section:') ? `s:${t.slice(8)}` : t);
-  if (part === 'details')
-    body = (
-      <div className="flex flex-col gap-3">
-        <FactRows job={job} s={s} onFact={onFact} />
-        <div className="flex flex-col gap-1.5 border-t pt-3 aj-hair">
-          <span className="ej-panel-label">The project</span>
-          {job.pack?.project && <span className="aj-muted">In the job, from {job.pack.project.source}: About the project.</span>}
-          <PageField job={job} s={s} kind="project" open={aiOpen} />
-        </div>
-      </div>
-    );
-  else if (part === 's:about') body = <PageField job={job} s={s} kind="about" open={aiOpen} />;
+  if (part === 'details') body = <FactRows job={job} s={s} onFact={onFact} />;
   else if (part === 'fixed')
     body = (
       <div className="flex flex-col gap-3">
@@ -1120,6 +1107,7 @@ function JobWindow({ id }: { id: string }) {
     setHidden(null);
     if (phone) setView('job');
     const sec = sectionOf(key);
+    // About us and Project live in the JD: the progress line scrolls to that section. Apply still opens its fields card.
     scrollToId(sec && key !== 's:apply' ? `ej-sec-${sec}` : 'ej-part-card');
   };
   const applyPick = () => {
@@ -1336,7 +1324,15 @@ function JobWindow({ id }: { id: string }) {
         </div>
       )}
       {job.sections.length ? (
-        <DocumentView job={job} s={s} current={focus} noteEdits draft onSeeChat={phone ? () => setView('chat') : undefined} />
+        <DocumentView
+          job={job}
+          s={s}
+          current={focus}
+          noteEdits
+          draft
+          onSeeChat={phone ? () => setView('chat') : undefined}
+          open={(t) => goPart(t.startsWith('section:') ? `s:${t.slice(8)}` : t)}
+        />
       ) : (
         <div className="aj-card flex flex-col gap-2 p-5">
           <TitleEditor job={job} disabled={reviewing} />

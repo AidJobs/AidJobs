@@ -91,7 +91,7 @@ export function onLine(parts: Part[], fit: number, current: string): { shown: Pa
   return { shown, more: parts.filter((p) => !shown.includes(p)) };
 }
 
-/** Parts that open their own fields in the panel, so they can be set without the chat; the template opens its own panel. */
+/** Parts that open their own fields in the panel, so they can be set without the chat; the template opens its own panel. About us and Project live in the JD section itself. */
 export function hasFields(part: string): boolean {
-  return ['details', 'fixed', 'check', 'plan', 'market', 'full', 'langs', 'flyer', 'reach', 'review', 'publish', 's:apply', 's:about'].includes(part);
+  return ['details', 'fixed', 'check', 'plan', 'market', 'full', 'langs', 'flyer', 'reach', 'review', 'publish', 's:apply'].includes(part);
 }

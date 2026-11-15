@@ -3,23 +3,34 @@
 import { AlertCircle, Check, CheckCircle2, ChevronUp, Info, Lock, MessageSquare, Pencil, Plus, Settings2, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import Tip from '@/components/site/Tip';
-import { addRemark, alsoIn, answerFact, approveSection, bringBackFixed, changedSinceLastRound, dismissChange, editSection, formatOf, groupingOf, markGenuine, outlineOp, sendChat, setApply, setFacts, setMethod, settleRemark, subId, undoLastChange, undoStep, versionOp } from './actions';
+import { addRemark, alsoIn, answerFact, approveSection, bringBackFixed, changedSinceLastRound, dismissChange, editSection, formatOf, groupingOf, markGenuine, outlineOp, renameSection, sendChat, setApply, setFacts, setMethod, settleRemark, subId, undoLastChange, undoStep, versionOp } from './actions';
+import type { OpenTarget } from './aiActions';
 import Grip, { dropAt, type GripAction } from './Grip';
 import FixedBlock from './FixedBlock';
 import { fixedLabel, fixedList, offeredFixed } from './fixed';
+import { PageField } from './ContextCards';
 import { viewOf } from './langs';
 import { jobLang, langOf } from './translate';
 import { placeFor } from './MenuButton';
 import { groupLabelOf, groupOfKey, groupOrderOf, KEPT, placeSaid } from './outline';
 import { contractPicks, deadlinePicks, eligibilityPicks, gradePicks, languagePicks, methodPicks, placePatch, placePicks, salaryPicks, safeguardingPicks, type Pick } from './answers';
 import { DOCUMENTS } from './apply';
-import { saveAboutForOrg } from './context';
+import { PROJECT_SECTION, saveAboutForOrg } from './context';
 import Composer, { type ComposerHandle } from './Composer';
 import { addDays, commitmentText, COMMITMENTS, completeText, findInclusive, GROUPS, headingFor, inOutlineOrder, longDate, looseLocation, PLACES, quality, recommendSections, SECTIONS, suggestTitle, titleSuggestions, type QualityItem } from './engine';
 import type { ApplySettings, ChatMsg, DemoJob, Facts, GroupKey, JobLang, Section as Sec, State } from './types';
 import { RevealBlock } from './Reveal';
 import { getState } from './store';
 import { Dialog, Field, inputStyle } from './ui';
+
+/** Hide remove/edit notes after ~2s (no X); Undo stays until then. */
+export function useNoteDismiss(id: string, token: string | undefined) {
+  useEffect(() => {
+    if (!token) return;
+    const t = window.setTimeout(() => dismissChange(id), 2000);
+    return () => clearTimeout(t);
+  }, [id, token]);
+}
 
 export function rich(text: string): ReactNode {
   return text.split(/(\*\*[^*]+\*\*)/g).map((p, i) => (p.startsWith('**') ? <strong key={i}>{p.slice(2, -2)}</strong> : <Fragment key={i}>{p}</Fragment>));
@@ -209,10 +220,15 @@ export function ApplyFields({ job }: { job: DemoJob }) {
   );
 }
 
-type SectionProps = { job: DemoJob; sec: Sec; s: State; notes: QualityItem[]; onFlag: (f: Flag) => void; onSeeChat?: () => void; current?: boolean; noteEdits?: boolean; since?: number; draft?: DraftTools };
+type SectionProps = { job: DemoJob; sec: Sec; s: State; notes: QualityItem[]; onFlag: (f: Flag) => void; onSeeChat?: () => void; current?: boolean; noteEdits?: boolean; since?: number; draft?: DraftTools; open?: (t: OpenTarget) => void };
 
 /** What the window's draft gives each section (section 19, phase 6, C): its grip's moves and the + panel opened from it. */
 type DraftTools = { grip: (sec: Sec) => GripAction[]; onKey: (key: string, by: -1 | 1) => void; onDrag: (key: string, y: number | null, done: boolean) => void; dropAfter: string | null | undefined };
+
+const pageOpen = (t: OpenTarget) => {
+  if (!t.startsWith('section:')) return;
+  document.getElementById(`ej-sec-${t.slice(8)}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
 
 /**
  * The change note for the last change made with the icons, with its Undo; while a linked translation is written, Undo waits. After a
@@ -255,11 +271,6 @@ export function StepNote({ job, onSeeChat }: { job: DemoJob; onSeeChat?: () => v
             See in chat
           </button>
         )}
-        <Tip label="Hide this note">
-          <button type="button" className="aj-icon-btn" style={{ width: 24, height: 24, border: 'none' }} onClick={() => dismissChange(job.id)} aria-label="Hide this note">
-            <X size={12} strokeWidth={2} />
-          </button>
-        </Tip>
       </span>
     </div>
   );
@@ -283,7 +294,7 @@ function SectionText({ job, sec, since, children }: { job: DemoJob; sec: Sec; si
 
 const asText = (lines: string[]) => lines.map((l) => (l.startsWith('- ') ? `• ${l.slice(2)}` : l)).join('\n');
 
-function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits, since, draft }: SectionProps) {
+function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits, since, draft, open }: SectionProps) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState('');
   const [title, setTitle] = useState('');
@@ -303,9 +314,12 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
   const remarks = job.review.remarks.filter((r) => r.section === sec.key && r.state === 'open');
   const changed = Boolean(job.lastChange?.keys.includes(sec.key)) || Boolean(job.undoStep?.tab === 'doc' && job.undoStep.keys?.[0] === sec.key);
   const sinceLastRound = reviewing && changedSinceLastRound(job).includes(sec.key);
-  // The window's quiet header (section 19, phase 6, C): the heading, Approve while the walk asks for it, the pencil, and the grip.
+  // One header row: heading, Approve, Undo, pencil, grip. About us / Project page fields live in the section body.
   const icons = Boolean(draft) && !reviewing;
   const editTip = `Edit ${sec.title}${sec.key === 'apply' ? ': its text and how people apply' : ''}${sec.edited ? ' · Edited by you' : ''}`;
+  const noteText = changed && !reviewing ? (job.lastChange?.text ?? (job.undoStep && !job.undoStep.removed ? job.undoStep.text : undefined)) : undefined;
+  const pageKind = sec.key === 'about' ? 'about' : sec.key === PROJECT_SECTION ? 'project' : null;
+  const openPage = open ?? pageOpen;
   return (
     <section id={`ej-sec-${sec.key}`} className="ej-dsec rounded-2xl px-3 py-2" data-changed={changed} data-review-changed={sinceLastRound} data-current={current || undefined} data-drop-key={draft ? sec.key : undefined} data-drop-group={draft ? groupOfKey(groupingOf(job), sec.key) : undefined} data-drop={draft && draft.dropAfter === sec.key ? 'after' : undefined} aria-label={sec.title} style={{ scrollMarginTop: 12 }}>
       <div className="ej-sec-head flex items-center gap-2">
@@ -320,6 +334,44 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
           <button type="button" className="aj-pill" style={{ height: 28 }} onClick={() => approveSection(job.id, sec.key)} aria-label={`Approve ${sec.title}`}>
             <Check size={12} strokeWidth={2} aria-hidden /> Approve
           </button>
+        )}
+        {noteText && (
+          <>
+            <span className="ej-change-text" title={noteText}>
+              {noteText}
+              {job.undoStep?.also && !job.lastChange && (
+                <span className="ej-also">
+                  . Also in{' '}
+                  {job.undoStep.also.langs.map((l, i) => (
+                    <Fragment key={l}>
+                      {i > 0 && <span aria-hidden> · </span>}
+                      <Tip label={`Make the same change in ${langOf(l).label}`}>
+                        <button type="button" className="aj-text-btn ej-also-btn" onClick={() => alsoIn(job.id, [l])}>
+                          {langOf(l).label}
+                        </button>
+                      </Tip>
+                    </Fragment>
+                  ))}
+                </span>
+              )}
+            </span>
+            <Tip label={job.undoStep?.writing ? 'Waits until the linked translation is written' : 'Put it back as it was'}>
+              <button
+                type="button"
+                className="aj-text-btn"
+                style={{ height: 28 }}
+                onClick={() => (job.lastChange ? undoLastChange(job.id) : undoStep(job.id))}
+                aria-disabled={job.undoStep?.writing || undefined}
+              >
+                Undo
+              </button>
+            </Tip>
+            {onSeeChat && (
+              <button type="button" className="aj-text-btn" style={{ height: 28 }} onClick={onSeeChat}>
+                See in chat
+              </button>
+            )}
+          </>
         )}
         {!draft && !reviewing && sec.key === 'about' && s.me.role === 'owner' && sec.lines.length > 0 && sec.lines.join('\n').trim() !== s.org.about.trim() && (
           <Tip label="Each new job's About us starts from it; jobs already written keep theirs">
@@ -367,33 +419,16 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
           </>
         )}
       </div>
-      {changed && job.lastChange && !reviewing && (
-        <div className="ej-change-note" role="status">
-          <Check size={12} strokeWidth={2.4} className="shrink-0" />
-          <span className="ej-change-text">{job.lastChange.text}</span>
-          <span className="ej-change-actions">
-            <button type="button" className="aj-text-btn" style={{ height: 24 }} onClick={() => undoLastChange(job.id)}>
-              Undo
-            </button>
-            {onSeeChat && (
-              <button type="button" className="aj-text-btn" style={{ height: 24 }} onClick={onSeeChat}>
-                See in chat
-              </button>
-            )}
-            <Tip label="Hide this note">
-              <button type="button" className="aj-icon-btn" style={{ width: 24, height: 24, border: 'none' }} onClick={() => dismissChange(job.id)} aria-label="Hide this note">
-                <X size={12} strokeWidth={2} />
-              </button>
-            </Tip>
-          </span>
-        </div>
-      )}
-      {changed && !job.lastChange && job.undoStep && !reviewing && <StepNote job={job} onSeeChat={onSeeChat} />}
       {notes.map((n) => (
         <div key={n.key} className="ej-check mb-1" style={{ color: 'var(--amber)' }}>
           <AlertCircle size={12} strokeWidth={2} /> <span style={{ color: 'var(--text-2)' }}>{n.text.replace(`${sec.title}: `, '')}</span>
         </div>
       ))}
+      {pageKind && !reviewing && (
+        <div className="mb-2 flex flex-col gap-2">
+          <PageField job={job} s={s} kind={pageKind} open={openPage} compact />
+        </div>
+      )}
       {editing ? (
         <div className="flex flex-col gap-2">
           {draft && sec.key === 'apply' && (
@@ -609,7 +644,9 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
   const box = useRef<HTMLDivElement>(null);
   const [place] = useState(() => placeFor(at.anchor, 'left', at.end));
   const [ownName, setOwnName] = useState<string | null>(null);
+  const [groupName, setGroupName] = useState<string | null>(null);
   const ownDone = useRef(false);
+  const groupDone = useRef(false);
   const view = viewOf(job, lang);
   const g = { ...(view?.grouping ?? groupingOf(job)), customGroups: view?.customGroups ?? job.customGroups };
   const keys = view?.keys ?? job.tags;
@@ -618,6 +655,7 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
   const rec = recommendSections(formatOf(s, job.format), job.facts);
   const left = offeredFixed(s.org).filter((k) => !fixedList(job, lang).includes(k));
   const version = lang && lang !== jobLang(job) ? lang : undefined;
+  const needProject = !keys.includes(PROJECT_SECTION) && !version;
   useEffect(() => {
     requestAnimationFrame(() => box.current?.querySelector<HTMLElement>('button, input')?.focus({ preventScroll: true }));
     const down = (e: PointerEvent) => {
@@ -626,15 +664,24 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
     document.addEventListener('pointerdown', down);
     return () => document.removeEventListener('pointerdown', down);
   }, [onClose]);
+  const focusAdded = (key: string) => {
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>(`[data-grip-key="${version ? `ver:${key}` : key}"]`)?.focus({ preventScroll: true });
+    });
+  };
   const add = (key: string) => {
     const op = at.end ? ({ op: 'add', key } as const) : ({ op: 'add', key, after: at.after } as const);
     if (version) versionOp(job.id, version, op);
     else outlineOp(job.id, op);
     onClose();
-    // Keep the viewport still (Phase 6 review revision); only focus the new grip if it is already on screen.
-    requestAnimationFrame(() => {
-      document.querySelector<HTMLElement>(`[data-grip-key="${version ? `ver:${key}` : key}"]`)?.focus({ preventScroll: true });
-    });
+    focusAdded(key);
+  };
+  const addProject = () => {
+    const op = at.end ? ({ op: 'add', key: PROJECT_SECTION } as const) : ({ op: 'add', key: PROJECT_SECTION, after: at.after } as const);
+    outlineOp(job.id, op);
+    renameSection(job.id, PROJECT_SECTION, 'About the project');
+    onClose();
+    focusAdded(PROJECT_SECTION);
   };
   const addOwn = (heading: string) => {
     if (ownDone.current) return;
@@ -646,6 +693,15 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
     else outlineOp(job.id, op);
     onClose();
   };
+  const addGroup = (label: string) => {
+    if (groupDone.current || version) return;
+    const name = label.trim();
+    if (!name) return;
+    groupDone.current = true;
+    outlineOp(job.id, { op: 'addGroup', label: name });
+    onClose();
+  };
+  const chipLabel = (key: string, label: string) => (key === PROJECT_SECTION ? 'Project' : label);
   return (
     <div
       ref={box}
@@ -662,7 +718,7 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
       }}
     >
       {groups.map((gk) => {
-        const missing = SECTIONS.filter((d) => d.group === gk && !keys.includes(d.key));
+        const missing = SECTIONS.filter((d) => d.group === gk && !keys.includes(d.key) && !(needProject && d.key === PROJECT_SECTION));
         const label = GROUPS.find((x) => x.key === gk)?.label ?? (view?.customGroups ?? job.customGroups)?.find((x) => x.id === gk)?.label ?? gk;
         if (!missing.length && gk !== here) return null;
         return (
@@ -671,9 +727,9 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
             <div className="flex flex-wrap gap-1 px-1.5">
               {missing.map((d) => (
                 <Tip key={d.key} label={`${d.hint}${rec.includes(d.key) ? ' · recommended for this job' : ''}`}>
-                  <button type="button" className="ej-add" data-recommended={rec.includes(d.key)} onClick={() => add(d.key)} aria-label={`Add ${d.label}${rec.includes(d.key) ? ', recommended for this job' : ''}`}>
+                  <button type="button" className="ej-add" data-recommended={rec.includes(d.key)} onClick={() => add(d.key)} aria-label={`Add ${chipLabel(d.key, d.label)}${rec.includes(d.key) ? ', recommended for this job' : ''}`}>
                     <Plus size={11} strokeWidth={2} aria-hidden />
-                    {d.label}
+                    {chipLabel(d.key, d.label)}
                     {rec.includes(d.key) && <Sparkles size={10} strokeWidth={2} aria-hidden className="ej-ol-rec" />}
                   </button>
                 </Tip>
@@ -711,6 +767,20 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
           </div>
         );
       })}
+      {needProject && (
+        <div className="flex flex-col gap-1" role="group" aria-label="Project">
+          <span className="ej-menu-label">Project</span>
+          <div className="flex flex-wrap gap-1 px-1.5">
+            <Tip label="Add About the project to this job, with its page field in that section">
+              <button type="button" className="ej-add" data-recommended onClick={addProject} aria-label="Add About the project">
+                <Plus size={11} strokeWidth={2} aria-hidden />
+                About the project
+                <Sparkles size={10} strokeWidth={2} aria-hidden className="ej-ol-rec" />
+              </button>
+            </Tip>
+          </div>
+        </div>
+      )}
       {left.length > 0 && (
         <div className="flex flex-col gap-1" role="group" aria-label="Fixed texts left out">
           <span className="ej-menu-label">Our commitments</span>
@@ -733,6 +803,38 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
           </div>
         </div>
       )}
+      {!version && (
+        <div className="ej-ol-add-group px-1.5 pt-1">
+          {groupName !== null ? (
+            <input
+              className="ej-ol-input"
+              style={{ minWidth: 160 }}
+              value={groupName}
+              autoFocus
+              placeholder="Name this group"
+              aria-label="Name this group"
+              onChange={(e) => setGroupName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addGroup(groupName);
+                }
+              }}
+              onBlur={() => {
+                if (groupName.trim()) addGroup(groupName);
+                else setGroupName(null);
+              }}
+            />
+          ) : (
+            <Tip label="Add a top-level group of your own">
+              <button type="button" className="ej-ol-add-group-btn" onClick={() => setGroupName('')} aria-label="Add a group">
+                <Plus size={13} strokeWidth={2} aria-hidden />
+                Add a group
+              </button>
+            </Tip>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -753,10 +855,11 @@ function RemovedNote({ job }: { job: DemoJob }) {
 }
 
 /** `current`: the section in view in the window, marked; `noteEdits`: the window's chat notices hand edits; `draft`: the window's icons. */
-export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inWindow }: { job: DemoJob; s: State; onSeeChat?: () => void; current?: string | null; noteEdits?: boolean; draft?: boolean }) {
+export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inWindow, open }: { job: DemoJob; s: State; onSeeChat?: () => void; current?: string | null; noteEdits?: boolean; draft?: boolean; open?: (t: OpenTarget) => void }) {
   const [flag, setFlag] = useState<Flag | null>(null);
   const [since] = useState(() => Date.now());
   const [adding, setAdding] = useState<{ after: string | null; anchor: HTMLElement; end: boolean } | null>(null);
+  useNoteDismiss(job.id, job.lastChange?.text ?? (job.undoStep && !job.undoStep.writing ? `${job.undoStep.text}|${job.undoStep.removed?.key ?? ''}` : undefined));
   const [dropAfter, setDropAfter] = useState<string | null | undefined>(undefined);
   const root = useRef<HTMLElement>(null);
   const live = s.jobs.filter((j) => j.id !== job.id && (j.status === 'live' || j.status === 'scheduled')).map((j) => j.facts.title);
@@ -820,22 +923,17 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inW
         </div>
         {note && <StepNote job={job} onSeeChat={onSeeChat} />}
         {removedAt === null && <RemovedNote job={job} />}
-        {keys.map((k, i) => {
+        {keys.map((k) => {
           const sec = job.sections.find((x) => x.key === k);
+          const pageKind = k === 'about' ? 'about' : k === PROJECT_SECTION ? 'project' : null;
           return (
             <Fragment key={k}>
-              {icons && i > 0 && (
-                <div className="ej-addline" aria-hidden>
-                  <button type="button" tabIndex={-1} className="ej-addline-btn" onClick={(e) => openAdd(keys[i - 1], e.currentTarget, false)} title="Add a section here">
-                    <Plus size={12} strokeWidth={2.2} />
-                  </button>
-                </div>
-              )}
               {sec ? (
-                <SectionView job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === k)} onFlag={setFlag} onSeeChat={onSeeChat} current={current === k} noteEdits={noteEdits} since={since} draft={tools} />
+                <SectionView job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === k)} onFlag={setFlag} onSeeChat={onSeeChat} current={current === k} noteEdits={noteEdits} since={since} draft={tools} open={open} />
               ) : (
-                <section key={k} id={`ej-sec-${k}`} className="rounded-2xl px-3 py-2" data-drop-key={icons ? k : undefined} data-drop-group={icons ? groupOfKey(g, k) : undefined} data-drop={dropAfter === k ? 'after' : undefined} aria-label={`${heading(k)}, not written yet`} style={{ scrollMarginTop: 12 }}>
+                <section id={`ej-sec-${k}`} className="rounded-2xl px-3 py-2" data-drop-key={icons ? k : undefined} data-drop-group={icons ? groupOfKey(g, k) : undefined} data-drop={dropAfter === k ? 'after' : undefined} aria-label={`${heading(k)}, not written yet`} style={{ scrollMarginTop: 12 }}>
                   <h3 className="aj-faint">{heading(k)}</h3>
+                  {pageKind && icons && <PageField job={job} s={s} kind={pageKind} open={open ?? pageOpen} compact />}
                   <p className="aj-faint m-0" style={{ fontSize: 12.5 }}>
                     Written when we get here.
                   </p>

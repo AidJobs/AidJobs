@@ -14,7 +14,7 @@ import { inputStyle } from './ui';
  * route; or the text pasted; or a file, read in the browser. Each is cut to 8,000 characters and drafted from, never put on the job
  * until the draft is accepted.
  */
-export function PageField({ job, s, kind, open }: { job: DemoJob; s: State; kind: 'about' | 'project'; open: (t: OpenTarget) => void }) {
+export function PageField({ job, s, kind, open, compact }: { job: DemoJob; s: State; kind: 'about' | 'project'; open: (t: OpenTarget) => void; compact?: boolean }) {
   const [url, setUrl] = useState(kind === 'about' ? s.org.website : '');
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -42,11 +42,13 @@ export function PageField({ job, s, kind, open }: { job: DemoJob; s: State; kind
   };
   return (
     <div className="flex flex-col gap-2" role="group" aria-label={kind === 'about' ? 'Draft About us from your organisation’s page' : 'The project this job is for'}>
-      <span className="aj-muted">
-        {kind === 'about'
-          ? 'Draft About us from your organisation’s own page (one page, such as your About page). Only that page is read, and nothing goes on the job until you accept the draft.'
-          : 'The project this job is for: a link to its page, the text, or a file. I draft About the project from it alone; it stays on this job.'}
-      </span>
+      {!compact && (
+        <span className="aj-muted">
+          {kind === 'about'
+            ? 'Draft About us from your organisation’s own page (one page, such as your About page). Only that page is read, and nothing goes on the job until you accept the draft.'
+            : 'The project this job is for: a link to its page, the text, or a file. I draft About the project from it alone; it stays on this job.'}
+        </span>
+      )}
       <div className="flex flex-wrap items-center gap-1.5">
         <Link2 size={14} strokeWidth={1.8} className="aj-faint shrink-0" aria-hidden />
         <input

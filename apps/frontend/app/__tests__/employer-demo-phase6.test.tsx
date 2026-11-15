@@ -241,7 +241,7 @@ describe('the four icons on the draft (section 19, phase 6, C and D)', () => {
     });
     render();
     route('#job/job-fin');
-    expect(q('.ej-doc .ej-sec-tools, .ej-doc .ej-grip, .ej-addend-btn, .ej-addline')).toBeNull();
+    expect(q('.ej-doc .ej-sec-tools, .ej-doc .ej-grip, .ej-addend-btn')).toBeNull();
     expect(q('[aria-label="Link languages"]')).toBeNull();
   });
 

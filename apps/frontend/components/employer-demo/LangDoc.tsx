@@ -4,7 +4,7 @@ import { ChevronUp, Pencil, Plus, X } from 'lucide-react';
 import { Fragment, useRef, useState } from 'react';
 import Tip from '@/components/site/Tip';
 import { dismissToUpdate, editVersionSection, keepTranslation, refreshTranslation, reviewTranslation, subId, undoStep, versionOp } from './actions';
-import { AddPanel, StepNote } from './DocPane';
+import { AddPanel, StepNote, useNoteDismiss } from './DocPane';
 import FixedBlock from './FixedBlock';
 import Grip, { dropAt, type GripAction } from './Grip';
 import { groupLabelOf, groupOfKey, groupOrderOf, KEPT } from './outline';
@@ -224,6 +224,7 @@ export function LangDoc({ job, s, lang, readOnly = false }: { job: DemoJob; s: S
   const [adding, setAdding] = useState<{ after: string | null; anchor: HTMLElement; end: boolean } | null>(null);
   const [dropAfter, setDropAfter] = useState<string | null | undefined>(undefined);
   const t = job.translations?.[lang];
+  useNoteDismiss(job.id, job.undoStep && !job.undoStep.writing && job.undoStep.tab === lang ? `${job.undoStep.text}|${job.undoStep.removed?.key ?? ''}` : undefined);
   if (!t) return null;
   const info = langOf(lang);
   const own = langOf(jobLang(job));
@@ -302,15 +303,8 @@ export function LangDoc({ job, s, lang, readOnly = false }: { job: DemoJob; s: S
         <div />
         {topNote && !job.lastChange && <StepNote job={job} />}
         {removedAt === null && removedNote}
-        {t.sections.map((sec, i) => (
+        {t.sections.map((sec) => (
           <Fragment key={sec.key}>
-            {!readOnly && i > 0 && (
-              <div className="ej-addline" aria-hidden>
-                <button type="button" tabIndex={-1} className="ej-addline-btn" onClick={(e) => openAdd(keys[i - 1], e.currentTarget, false)} title="Add a section here">
-                  <Plus size={12} strokeWidth={2.2} />
-                </button>
-              </div>
-            )}
             <VersionSection job={job} lang={lang} sec={sec} tools={tools} readOnly={readOnly} />
             {removedAt === sec.key && removedNote}
           </Fragment>

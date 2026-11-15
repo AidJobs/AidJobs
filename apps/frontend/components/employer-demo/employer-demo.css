@@ -1837,10 +1837,10 @@ button.ej-step:hover {
   font-size: 12px;
 }
 
-/* The progress line at the top of the panel (the user, 12 November 2026): a thin line with small dots and small labels, each a link. */
+/* The progress line at the top of the panel: a thin line with small dots and small labels, each a link. */
 .ej-pline {
   flex-shrink: 0;
-  padding: 8px 14px 6px;
+  padding: 3px 12px 2px;
   border-bottom: 1px solid var(--hair);
 }
 
@@ -1852,9 +1852,9 @@ button.ej-step:hover {
 
 .ej-pline .ej-line:not(.ej-measure)::before {
   position: absolute;
-  top: 6px;
-  right: 10px;
-  left: 10px;
+  top: 5px;
+  right: 8px;
+  left: 8px;
   height: 1px;
   background: var(--hair-strong, var(--hair));
   content: '';
@@ -1862,16 +1862,16 @@ button.ej-step:hover {
 
 .aj-root .ej-pline .ej-line-part {
   position: relative;
-  max-width: 104px;
+  max-width: 96px;
   height: auto;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 0 6px 2px;
+  gap: 2px;
+  padding: 0 4px 0;
   border-radius: 6px;
   background: transparent;
-  font-size: 11px;
-  line-height: 1.2;
+  font-size: 10.5px;
+  line-height: 1.15;
 }
 
 .aj-root .ej-pline .ej-line-part:hover,
@@ -1893,9 +1893,9 @@ button.ej-step:hover {
 .ej-pline-dot {
   position: relative;
   z-index: 1;
-  width: 7px;
-  height: 7px;
-  margin-top: 3px;
+  width: 6px;
+  height: 6px;
+  margin-top: 2px;
   border: 1.5px solid var(--text-3);
   border-radius: 50%;
   background: var(--surface);
@@ -1907,12 +1907,12 @@ button.ej-step:hover {
 }
 
 [aria-current] > .ej-pline-dot {
-  width: 9px;
-  height: 9px;
-  margin-top: 2px;
+  width: 8px;
+  height: 8px;
+  margin-top: 1px;
   border-color: var(--sage-7);
   background: var(--sage-7);
-  box-shadow: 0 0 0 3px var(--sage-2);
+  box-shadow: 0 0 0 2px var(--sage-2);
 }
 
 .aj-root .ej-pline .ej-line-part[aria-current] .ej-line-label {
@@ -1926,10 +1926,10 @@ button.ej-step:hover {
 }
 
 .aj-root .ej-pline .ej-line-more {
-  height: 22px;
-  margin-top: -2px;
-  padding: 0 8px;
-  font-size: 11px;
+  height: 20px;
+  margin-top: -1px;
+  padding: 0 6px;
+  font-size: 10.5px;
 }
 
 /* On phones the line is a short list in a sheet. */
@@ -2629,8 +2629,8 @@ button.ej-step:hover {
 }
 
 /*
- * The draft's icons (section 19, phase 6, C): the pencil and the grip in each section's header, faint at rest and clearer on hover or
- * focus; a hairline + between sections for a pointer, on hover; one + after the last section, always there.
+ * The draft's icons (section 19, phase 6, C): Approve / Undo / pencil / grip on one header row; faint tools at rest; one + after the last
+ * section. No hover + between sections.
  */
 .ej-sec-tools {
   display: inline-flex;
@@ -2677,48 +2677,6 @@ button.ej-step:hover {
   box-shadow: 0 2px 0 0 var(--sage-5);
 }
 
-.ej-addline {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  height: 8px;
-  margin: -4px 0;
-}
-
-.ej-addline::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  right: 12px;
-  left: 12px;
-  border-top: 1px solid var(--sage-5);
-  opacity: 0;
-  transition: opacity 120ms ease;
-}
-
-.aj-root .ej-addline-btn {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  margin-top: -7px;
-  padding: 0;
-  border: 1px solid var(--sage-5);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--sage-8);
-  opacity: 0;
-  cursor: pointer;
-  transition: opacity 120ms ease;
-}
-
-.ej-addline:hover::before,
-.ej-addline:hover .ej-addline-btn {
-  opacity: 1;
-}
-
 .ej-addend {
   display: flex;
   justify-content: center;
@@ -2757,10 +2715,6 @@ button.ej-step:hover {
 @media (hover: none) {
   .ej-sec-tools {
     opacity: 0.55;
-  }
-
-  .ej-addline {
-    display: none;
   }
 }
 
