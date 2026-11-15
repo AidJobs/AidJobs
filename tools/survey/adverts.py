@@ -2475,25 +2475,42 @@ LENGTH_BANDS = {"national_ngo_south": (200, 600, "whole"), "ingo": (650, 1150, "
 
 
 def score_decision_facts(given: set[str]) -> int:
-    """Section 5's decision facts (field conditions belong to field realism, which is coded, not
-    scored here): 3 for every applicable fact with pay, 0 under a third without pay; pay counts
-    double. Travel and hours apply only "where they vary", which a script cannot tell, so they count
-    when stated and are not required. The anchors for 1 and 2 (a third, two thirds) are provisional
-    until Phase 0's guide fixes them."""
-    facts = [f for f in DECISION_FACTS if f not in OPTIONAL_FACTS or f in given]
-    units = len(facts) + 1
-    have = sum(1 for f in facts if f in given) + ("pay" in given)
-    share = have / units
-    if share >= 1 and "pay" in given:
-        return 3
-    if share >= 2 / 3:
-        return 2
-    if share >= 1 / 3 or "pay" in given:
+    """Phase 0 guide v1.1 decision facts (field conditions stay on field realism). Pay counts double.
+    Travel and hours apply only when stated (a script cannot tell "where they vary"). Contract type
+    and length are one human fact; closing day and closing time are one human fact — both halves must
+    be present for that fact to count."""
+    tokens = [f for f in DECISION_FACTS if f not in OPTIONAL_FACTS or f in given]
+    # Collapse script tokens to the guide's fact list.
+    present = set(tokens) & given
+    facts_present = 0
+    facts_applicable = 0
+    for key in ("pay", "duty_station", "start_date", "selection_steps", "how_to_apply", "languages"):
+        facts_applicable += 1
+        facts_present += key in present
+    facts_applicable += 1
+    facts_present += ("contract_type" in present and "contract_length" in present)
+    facts_applicable += 1
+    facts_present += ("closing_date" in present and "closing_time" in present)
+    for key in OPTIONAL_FACTS:
+        if key in present:
+            facts_applicable += 1
+            facts_present += 1
+    pay = 1 if "pay" in present else 0
+    p, a = facts_present, facts_applicable
+    if pay == 0 and 3 * p < a:
+        return 0
+    if (pay == 1 or 3 * p >= a) and 3 * (p + pay) < 2 * (a + 1):
         return 1
-    return 0
+    if 3 * (p + pay) >= 2 * (a + 1) and p < a:
+        return 2
+    if p == a:
+        return 3
+    return 1
 
 
 def score_readability(median_sentence: float) -> int:
+    """Sentence-length band only (guide v1.1's L). Coded faults (F) are not scored here; the partial
+    score remains an Estimate until faults are measured."""
     if 13 <= median_sentence <= 20:
         return 3
     if 10 <= median_sentence <= 25:
@@ -2504,29 +2521,36 @@ def score_readability(median_sentence: float) -> int:
 
 
 def score_length(org_type: str, words_total: int, words_role: int, standard_share: float) -> int | None:
+    """Guide v1.1 right-length cut-points. Bands are ceilings, never targets."""
     band = LENGTH_BANDS.get(org_type)
     if not band:
         return None                              # the band comes from Phase 2's own counts (section 5)
     low, high, basis = band
     n = words_total if basis == "whole" else words_role
-    if standard_share > 0.5:
+    if words_total <= 0:
+        return None
+    if 2 * standard_share * words_total > words_total:   # share > 1/2
         return 0
-    # The bands are ceilings, never targets (section 5): at or under the ceiling scores 3 unless the
-    # advert is under half the band's lower end; over the ceiling loses points.
-    if n <= high:
-        return 3 if n >= low * 0.5 else 2
-    if n <= high * 1.25:
-        return 2
-    if n <= high * 1.5:
+    if 2 * n < low or 2 * n > 3 * high:                   # far outside
+        return 0
+    if low <= n <= high and 3 * standard_share * words_total <= words_total:  # in band, share ≤ 1/3
+        return 3
+    if 4 * n > 5 * high and 2 * n <= 3 * high:             # further overflow
         return 1
+    if low <= n <= high:                                   # in band, share above one third
+        return 2
+    if (2 * n >= low and n < low) or (n > high and 4 * n <= 5 * high):
+        return 2
     return 0
 
 
 def score_findability(role: roles.Role, title: str, google: dict) -> int:
+    """Guide v1.1: a 3 needs a clear title and all eight job-posting facts (G = 8)."""
+    letters = max(sum(c.isalpha() for c in title), 1)
     clear = bool(role.function) and bool(role.level) and not re.search(r"[!*#@]", title) and not \
-        (sum(c.isupper() for c in title) > 0.6 * max(sum(c.isalpha() for c in title), 1) and len(title) > 12)
+        (sum(c.isupper() for c in title) > 0.5 * letters and letters >= 4 and len(title) > 12)
     n = sum(1 for v in google.values() if v)
-    if clear and n >= 7:
+    if clear and n >= 8:
         return 3
     if role.function and n >= 5:
         return 2
