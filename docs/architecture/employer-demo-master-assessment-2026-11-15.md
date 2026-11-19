@@ -303,7 +303,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 
 | Date | IDs fixed | Commit | Notes |
 | --- | --- | --- | --- |
-| 20 Nov 2026 | U-1 spacing (pending preview confirm) | `4817986` | Job-panel progress kept. Gap hairline→dot top **3px** (was 5px). `.ej-pline--tabs` drops its bottom rule. Mark Fixed only after user confirms on preview. |
+| 20 Nov 2026 | U-1 spacing (pending preview confirm) | `4817986` + follow-up | Job-panel progress kept. Gap hairline→dot top tightened to **~1px** after 3px proved invisible on screen; pline `overflow: hidden` clips current-step glow. Mark Fixed only after user confirms on preview. |
 
 ---
 

@@ -1838,12 +1838,13 @@ button.ej-step:hover {
 }
 
 /*
- * Progress line: top of the job panel only (phase 3). U-1 — 3px from the header hairline to the top of a normal dot
- * (0 padding-top here + 3px on .ej-pline-dot); not pulled toward the language/Preview tabs (`.ej-pline--tabs`).
+ * Progress line: top of the job panel only (phase 3). U-1 — ~1px from the header hairline to the top of a normal dot
+ * (0 padding-top here + 1px on .ej-pline-dot); overflow clips the current-step glow so it does not cross the hairline.
  */
 .ej-pline {
   flex-shrink: 0;
   padding: 0 14px 4px;
+  overflow: hidden;
   border-bottom: 1px solid var(--hair);
 }
 
@@ -1860,7 +1861,7 @@ button.ej-step:hover {
 
 .ej-pline .ej-line:not(.ej-measure)::before {
   position: absolute;
-  top: 6px;
+  top: 4px;
   right: 10px;
   left: 10px;
   height: 1px;
@@ -1903,7 +1904,7 @@ button.ej-step:hover {
   z-index: 1;
   width: 7px;
   height: 7px;
-  margin-top: 3px;
+  margin-top: 1px;
   border: 1.5px solid var(--text-3);
   border-radius: 50%;
   background: var(--surface);
@@ -1917,7 +1918,7 @@ button.ej-step:hover {
 [aria-current] > .ej-pline-dot {
   width: 9px;
   height: 9px;
-  margin-top: 2px;
+  margin-top: 0;
   border-color: var(--sage-7);
   background: var(--sage-7);
   box-shadow: 0 0 0 3px var(--sage-2);
