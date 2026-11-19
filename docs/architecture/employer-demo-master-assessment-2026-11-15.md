@@ -7,6 +7,8 @@
 **Code:** `apps/frontend/components/employer-demo/` in the `AidJobsGit-employer-demo` worktree  
 **Related plan:** `docs/architecture/employer-side-plan.md` (Round 7 / Phase 6 polish and later)
 
+**Demo AI (20 November 2026):** User confirmed **OpenRouter credits are up and running** on the employer demo preview — chat/AI paths that call OpenRouter can be exercised again during review and manual QA (Vercel env still gated to `demo/employer` only; no secret values in this file).
+
 **User lock (15 November 2026):** Finalise **English** first. Language-variant work waits unless a bug blocks English chrome. Do not invent polish; fix only recorded findings the user prioritises.
 
 **Recommended fix order (English first), unchanged until the user says otherwise:**
@@ -95,22 +97,26 @@
 
 ---
 
-## Round 2 — master assessment (in progress, 15 November 2026)
+## Round 2 — master assessment (relaunched 20 November 2026)
 
 **Goal:** Exhaustive multi-persona pass over every tab, icon, menu, chat path, add/delete/save/cancel, workflow bottlenecks, design uniformity, and logic vs real HR use — novice to expert; local NGO, INGO, UN/donor; desktop and phone.
 
-**Personas launched (fill in agent ids when Round 2 closes):**
+**Attempt 1 (15 November 2026):** All eight agents stopped on Cursor **weekly usage limit** before final reports (ids `406c4b33…` through `db60b9f0…` — no usable output).
+
+**Attempt 2 (20 November 2026):** Relaunched after OpenRouter credits confirmed; synthesis into this file runs when all eight below finish (or as each completes, merged by parent agent).
 
 | Persona | Focus | Agent id |
 | --- | --- | --- |
-| Novice local NGO (low web skill) | First JD end-to-end; chat wording; Save/Cancel; fear of breaking things | [Novice NGO path](406c4b33-e3df-43a0-ace4-8889d3d5cd3e) |
-| Programme manager (occasional) | Mid-skill; shortcuts vs chat; repetition; when to leave chat for icons | [Programme manager path](e7c98361-e996-44c3-a31c-1ddacbf1d66e) |
-| INGO talent acquisition | Multi-country, languages, Amplify, Reach, flyer, linked edits | [INGO TA multi-hub](6fb90439-c5c3-46f5-a826-232910756226) |
-| UN / agency HR | Templates, grade, closing, competencies, clearance logic | [UN HR classification](fb6e0ab2-2a97-4135-b772-9394f58e1faf) |
-| Chat & walk auditor | Every prompt, quick reply, Undo in chat, double answers, dead ends | [Chat walk auditor](5fe61c7e-1041-4c21-9756-9c7e4ef396c9) |
-| Chrome / icons / tabs auditor | Every control in JD window: tabs, Eye, History, progress, grip, +, pencil, Approve | [JD chrome every control](8d96528d-fe48-4e80-94ce-9d18050e0141) |
-| Design uniformity & friction | Rows, alignment, labels, empty states, confirmations, recoverability | [Design friction uniformity](8af77d24-3d2a-472e-83b7-d73abbd1357b) |
-| Phone / small screen | Sheets, clipped tools, Preview, publish path on ~390px | [Phone small-screen JD](db60b9f0-3ac7-408e-a061-3678032625cb) |
+| Novice local NGO | First JD; Save/Cancel; Undo; Free | [Novice NGO path R2](8442906c-3d03-4b4a-8a45-575f31966a17) |
+| Programme manager | Chat vs icons; reorder; uniformity | [Programme manager R2](f89d6d5d-19b2-400e-b6b5-8fbeab44f4cb) |
+| INGO talent acquisition | Languages; Amplify; Reach; flyer | [INGO TA R2](820bc43e-cbfc-4690-815f-1caef831312c) |
+| UN / agency HR | UN format; clearance; chrome | [UN HR R2](25354dc1-d747-4981-be21-c5e2f542af3a) |
+| Chat & walk auditor | Prompts; parks; dead ends | [Chat walk R2](c6278e66-6733-42d3-9872-0b2efbd22c89) |
+| Chrome / icons / tabs | Every control inventory | [JD chrome R2](5269c381-e3ba-4468-9c1c-82c93246fbd3) |
+| Design uniformity | Save/Cancel matrix; naming | [Design uniformity R2](991e0fd1-ac42-405e-818a-f2cf5ae86929) |
+| Phone ~390px | Touch; clipped tools | [Phone R2](033c02d6-9e1f-40bd-a8a5-4e71b6565a6a) |
+
+**Synthesis status:** *In progress — parent chat appends Section Round 2 findings and deduped master list when agents complete.*
 
 **Findings from Round 2:** *(append below when agents complete; do not delete Round 1.)*
 
