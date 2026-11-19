@@ -1513,6 +1513,20 @@ button.ej-step:hover {
   white-space: nowrap;
 }
 
+/*
+ * Progress line also uses `.ej-line.ej-measure` for width measuring. `.ej-pline .ej-line { position: relative }`
+ * is more specific than `.ej-measure` alone, so the hidden row was staying in flow (~29px of empty band under
+ * the header). Win that fight so only the visible parts row takes height (U-1, 20 November 2026).
+ */
+.ej-pline .ej-line.ej-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .ej-more-facts {
   font-size: 12px;
   font-weight: 700;

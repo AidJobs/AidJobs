@@ -303,7 +303,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 
 | Date | IDs fixed | Commit | Notes |
 | --- | --- | --- | --- |
-| 20 Nov 2026 | U-1 spacing (pending preview confirm) | `4817986` + follow-up | Job-panel progress kept. Gap hairline→dot top tightened to **~1px** after 3px proved invisible on screen; pline `overflow: hidden` clips current-step glow. Mark Fixed only after user confirms on preview. |
+| 20 Nov 2026 | U-1 spacing (pending preview confirm) | follow-ups | Root cause: `.ej-pline .ej-line` overrode `.ej-measure` so the hidden measure row stayed in flow (~29px empty band). Fix: `.ej-pline .ej-line.ej-measure { position: absolute }`. Earlier 1–3px padding tweaks were real but invisible beside that. Mark Fixed only after user confirms on preview. |
 
 ---
 
