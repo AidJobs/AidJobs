@@ -116,7 +116,7 @@
 | Design uniformity | Save/Cancel matrix; naming | [Design uniformity R2](991e0fd1-ac42-405e-818a-f2cf5ae86929) |
 | Phone ~390px | Touch; clipped tools | [Phone R2](033c02d6-9e1f-40bd-a8a5-4e71b6565a6a) |
 
-**Synthesis status:** *In progress (1/8 recorded) — full deduped master list after all eight finish.*
+**Synthesis status:** *In progress (2/8 recorded) — full deduped master list after all eight finish.*
 
 **Findings from Round 2:** *(append below; do not delete Round 1.)*
 
@@ -150,6 +150,33 @@
 | 20 | P2 | Content | Years inclusive skip on UN formats works; full check still rewrites | Works + hole |
 
 **Works (UN path):** Dual UN formats and heading order; familiar P/NO year bands; grade underline hints; past deadline flagged; no-fee line; high-risk conditions section.
+
+### [Design uniformity R2](991e0fd1-ac42-405e-818a-f2cf5ae86929) — action semantics across surfaces
+
+**Verdict:** Save / Cancel / Approve / Undo / Remove / Add **do not mean the same thing** across chat, JD, pencil, About–Project field, languages, publish, and outline. **Uniform today:** pencil Save/Cancel on English and language versions; grip menu shape; Accept/Edit/Reject on drafts; How to apply cannot be removed.
+
+**Action × surface (summary):** Chat setup cards — no Save/Cancel; yes/ok/sure skips project. JD title/facts — keystroke save, no Cancel. About/Project compact field — Save/Cancel but Save renames heading; hidden `sec.lines`. Section Approve — ignores pencil/`edit` buffer. Remove — grip immediate + 2s Undo; lang tab confirm, no Undo; lang Remove no confirm. Add — blur commits own name; Escape still adds (outline NameField differs).
+
+**Top friction multipliers (Round 2):**
+
+1. **Background / Project / About the project** — one key `background`, four names; grip “Add About the project” only when key missing; Save forces “About the project”. CONFIRMS U-4, R1-16.  
+2. **Undo lifetime** — icon undo persists; remove undo + `lastChange` cleared at 2s (`dismissChange`); Accept, title, facts, lang remove often no undo. CONFIRMS R1-05, R1-04.  
+3. **Approve vs buffer** — `approveSection` / “good” skip section while pencil or dirty PageField open; `walk.approved` not cleared on `editSection`. CONFIRMS R1-06.  
+4. **Yes on project question** — same tokens as assent skip project and drop paste. CONFIRMS R1-02.  
+5. **Clipped header row** — Approve/Undo/Also-in compete with ellipsis title. CONFIRMS R1-12.
+
+**Findings (22):** Full matrix and items 1–22 in agent report; highlights:
+
+| R2-UX | Sev | Summary | R1 |
+| --- | --- | --- | --- |
+| 1–5 | High | Naming, Save rename, form hides lines, yes-skip, Accept 40-char rule + no Undo + auto-approve | U-4, R1-01,02,17 |
+| 6–8 | Med–High | Dual PageField buffers; Approve triple meaning; no “Approved” after tick | R1-06,19 |
+| 9–11 | Med–High | 2s remove dismiss; `lastChange` vs `undoStep` split; chat undo order | R1-05,04; NEW facts no buffer |
+| 12–15 | Med–High | Add blur/Escape; lang remove asymmetry; Mark reviewed while untranslated | R1-11,07 |
+| 16–17 | Med | Grip 3px drag; group remove deletes sections | R1-10 |
+| 18–22 | Med–Low | Label soup (Save/Done/Accept…); fixed-text variant controls; dual project UI during setup | NEW |
+
+**Already uniform (keep):** Pencil Save/Cancel EN + langs; grip menu pattern; suggestion Accept/Edit/Reject; fixed-text pencil+grip; RTL version body / LTR chrome.
 
 ---
 
