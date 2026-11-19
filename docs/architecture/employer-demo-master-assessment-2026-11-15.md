@@ -116,9 +116,40 @@
 | Design uniformity | Save/Cancel matrix; naming | [Design uniformity R2](991e0fd1-ac42-405e-818a-f2cf5ae86929) |
 | Phone ~390px | Touch; clipped tools | [Phone R2](033c02d6-9e1f-40bd-a8a5-4e71b6565a6a) |
 
-**Synthesis status:** *In progress — parent chat appends Section Round 2 findings and deduped master list when agents complete.*
+**Synthesis status:** *In progress (1/8 recorded) — full deduped master list after all eight finish.*
 
-**Findings from Round 2:** *(append below when agents complete; do not delete Round 1.)*
+**Findings from Round 2:** *(append below; do not delete Round 1.)*
+
+### [UN HR R2](25354dc1-d747-4981-be21-c5e2f542af3a) — Nadia Okello, UN country-office HR Officer
+
+**Publishable: N** (demo essentials gate still passes; classifier would return the draft).
+
+**Verdict:** Headings look UN; grade, education, competencies, eligibility, pay, closing instant, special notice, and apply method fail clearance. Chrome can make a good draft worse (Amplify cuts years; 2s Undo dismiss; Approve on unsaved buffer; progress line placement).
+
+| R2-UN | Sev | Kind | Summary | Round 1 |
+| --- | --- | --- | --- | --- |
+| 1 | P0 | Content | UN body is NGO HR text (competencies, reporting line, education shape) | CONFIRMS R1-08 |
+| 2 | P0 | Content | Riverstone B2–D2 vs P2–P4; GS/ICS/NPSA/IPSA not parsed; `G5` → wrong years line | CONFIRMS R1-08; **NEW** scale collision |
+| 3 | P0 | Content | One ICSC USD band for all P/D grades and stations | CONFIRMS R1-08 |
+| 4 | P0 | Content | Closing 23:59 duty-station TZ, not NY for IP posts | CONFIRMS R1-08 |
+| 5 | P0 | Content | No full special notice / PSEA; agency “communities we work with” line | CONFIRMS R1-08 |
+| 6 | P0 | Content | CV careers-site apply on INGO sample org, not Inspira/PHP | CONFIRMS R1-08 |
+| 7 | P0 | Content | Eligibility “Anyone” not on UN outline (`practical` only) | CONFIRMS R1-26 |
+| 8 | P0 | Content | Roster/pool wording = unpaid deployment block | CONFIRMS R1-26 |
+| 9 | P0 | Content | Author Approve + skip review ≠ clearance | CONFIRMS R1-26 |
+| 10 | P0 | Content | Full check rewrites years vs NGO sample (HR median ~3 vs P4 7) | CONFIRMS R1-26 |
+| 11 | P1 | Content | Languages not UN levels; market pushes Swahili on Nairobi | NEW |
+| 12 | P1 | Content | Contract picks not FTA/TA; no post number / org unit | NEW |
+| 13 | P1 | Content | Safeguarding asked before person sections on UN formats | NEW |
+| 14 | P1 | Content | Conditions block from high-risk station reorders vs Inspira | NEW |
+| 15 | P1 | Chrome | Removed-section Undo dies at 2s | CONFIRMS R1-05 |
+| 16 | P1 | Chrome | Undo/Market guard narrower after dismiss | CONFIRMS R1-04 |
+| 17 | P1 | Chrome | Approve vs unsaved pencil | CONFIRMS R1-06 |
+| 18 | P1 | Chrome | Progress line / icons (U-1, R1-09) | CONFIRMS |
+| 19 | P2 | Chrome | Quality never blocks publish; past deadline advisory only | CONFIRMS gate |
+| 20 | P2 | Content | Years inclusive skip on UN formats works; full check still rewrites | Works + hole |
+
+**Works (UN path):** Dual UN formats and heading order; familiar P/NO year bands; grade underline hints; past deadline flagged; no-fee line; high-risk conditions section.
 
 ---
 
