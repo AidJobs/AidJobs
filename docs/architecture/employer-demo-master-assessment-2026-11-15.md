@@ -116,7 +116,7 @@
 | Design uniformity | Save/Cancel matrix; naming | [Design uniformity R2](991e0fd1-ac42-405e-818a-f2cf5ae86929) |
 | Phone ~390px | Touch; clipped tools | [Phone R2](033c02d6-9e1f-40bd-a8a5-4e71b6565a6a) |
 
-**Synthesis status:** *In progress (2/8 recorded) — full deduped master list after all eight finish.*
+**Synthesis status:** *In progress (5/8 recorded) — full deduped master list after Novice, Programme manager, and Phone finish.*
 
 **Findings from Round 2:** *(append below; do not delete Round 1.)*
 
@@ -177,6 +177,68 @@
 | 18–22 | Med–Low | Label soup (Save/Done/Accept…); fixed-text variant controls; dual project UI during setup | NEW |
 
 **Already uniform (keep):** Pencil Save/Cancel EN + langs; grip menu pattern; suggestion Accept/Edit/Reject; fixed-text pencil+grip; RTL version body / LTR chrome.
+
+### [JD chrome R2](5269c381-e3ba-4468-9c1c-82c93246fbd3) — every tab and icon
+
+**Verdict:** Uneven chrome. **Works:** Back, pencil Save/Cancel, progress dot states, fixed-text grip dead-ends, History dialog, reviewer Comment/Suggest. **Broken/partial:** Eye+Preview state, 3px grip drag, 2s remove Undo, Approve, language tab X, Add blur, phone label over Eye/History.
+
+Full **icon inventory table** (Eye, History, progress, tabs, X, Approve, pencil, grip, +, gear, etc.) in agent report. **25 findings** — highlights:
+
+| # | Status | Summary | R1 |
+| --- | --- | --- | --- |
+| 1 | Broken | Progress part while Preview open hides Eye; preview flag not cleared | R1-13 |
+| 2–3 | Partial | Progress not under header; label clip; phone parts over icons | U-1, R1-09,20 |
+| 4–7 | Broken/Partial | 3px grip; fake “Moved”; invisible group join; 2s dismiss | R1-10,05 |
+| 8–10 | Broken/Partial | Approve ignores buffer; Project Save rename; no Approved mark | R1-06,16,19 |
+| 11–14 | Partial/Broken | Header clip/opacity; Add no Cancel; lang X confirm-only | R1-12,11,07,25 |
+| 15–25 | Partial | Unwritten sections; apply gear split; three close patterns; icon size soup; duplicate Flyer/Reach card | mixed |
+
+**Uniformity note:** Fixed-text row is the strict pattern; section row is loose; language chrome looser still.
+
+### [INGO TA R2](820bc43e-cbfc-4690-815f-1caef831312c) — Lea, multi-hub TA
+
+**Verdict:** **Not publishable** for a multi-hub language launch. English Amplify path finishable; language/link/flyer/QR mostly **LANG-ONLY** (defer per English-first lock). **EN-BLOCK** items still block an English Amplify publish.
+
+**21 findings** (tags EN-BLOCK / LANG-ONLY in agent report). EN-BLOCK highlights:
+
+| # | Summary |
+| --- | --- |
+| 1 | `version` step cannot park — blocks Reach/flyer/publish |
+| 2–3 | Pay for unreviewed/lang slot order wrong |
+| 4 | Reach settled vs `reachPlan` disagree |
+| 5 | Team email single `@org.domain` |
+| 6 | Market/full check English patterns only |
+| 7–8 | Flyer print clip + demo footer on field notice |
+| 9 | Remove language no undo (except tab X confirm) |
+| 21 | French edit withdraws English approval + stales flyer |
+
+**Bottlenecks:** Serial walk; link-all vs miss-with-unlinked; one job cannot be multi-hub facts; QR/lang-less URL; Reach HQ-only.
+
+**Works:** Free has no langs; Amplify price on button; RTL Arabic; tab X asks first; how to apply fixed.
+
+### [Chat walk R2](c6278e66-6733-42d3-9872-0b2efbd22c89) — walk and prompts
+
+**Verdict:** Single ordered walk is clear; **many replies leave the path** (yes/ok project, title=“Skip”, double bubbles, chat undo vs `lastChange`, 2s remove undo).
+
+**Chat map** (agent report): template → About → Project → facts → tone → pace → write/approve → leftovers → go-out (checks, plan, review, Reach, flyer, publish).
+
+**30 findings** — High (1–10): yes/ok skips project and About; card hides on non-quick reply; title stores Skip/Yes; email method loop; held+yes abandons park; chat undo leaves `lastChange`; 2s dismiss; stranded page draft; 40-char extract; dual buffers. **Medium (11–26):** double AI bubbles; leave-it vs Leave it as it is; no project not remembered; Accept renames/approves; version cannot park; essentials no park; AI project yes; eligibility/method gaps. **Low (27–30):** online→careers; hire-again ok; flag genuine; thinking duplicate.
+
+**Dead ends** listed in agent report (project yes+hidden card, by-email loop, lang version, plan lockout, 2s undo, line stops following after text undo).
+
+**Seamless:** `nextStep` order; template/tone/pace quick picks; explicit skip+hold+Next question; fact chips; AI tagged step no double bubble; how-to-apply protected.
+
+### Round 2 cross-cut (partial, 5/8) — English-first pressure
+
+| Theme | Chrome R2 | Design R2 | Chat R2 | INGO EN-BLOCK |
+| --- | --- | --- | --- | --- |
+| Progress / Preview | Eye hidden, line not in header | — | — | — |
+| Undo | 2s remove; two stacks | dismissChange | chat undo vs lastChange | — |
+| About/Project | Approve+grip | Save rename, form hides lines | yes/ok skip, card hide | — |
+| Grip / Add | 3px drag, Add blur | Escape commits | — | — |
+| Publish path | Approve buffer | Approve semantics | essentials/method loops | version park, Reach, flyer print |
+
+*Pending personas:* [Novice NGO R2](8442906c-3d03-4b4a-8a45-575f31966a17), [Programme manager R2](f89d6d5d-19b2-400e-b6b5-8fbeab44f4cb), [Phone R2](033c02d6-9e1f-40bd-a8a5-4e71b6565a6a).
 
 ---
 
