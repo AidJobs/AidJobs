@@ -116,7 +116,7 @@
 | Design uniformity | Save/Cancel matrix; naming | [Design uniformity R2](991e0fd1-ac42-405e-818a-f2cf5ae86929) |
 | Phone ~390px | Touch; clipped tools | [Phone R2](033c02d6-9e1f-40bd-a8a5-4e71b6565a6a) |
 
-**Synthesis status:** *In progress (6/8 recorded) — full deduped master list after Novice NGO and Phone finish.*
+**Synthesis status:** *In progress (7/8 recorded) — full deduped master list after Novice NGO finishes.*
 
 **Findings from Round 2:** *(append below; do not delete Round 1.)*
 
@@ -250,7 +250,17 @@ Full **icon inventory table** (Eye, History, progress, tabs, X, Approve, pencil,
 
 **Works:** Local NGO concise order; how to apply fixed; edit withdraws approval; pay not taken from budget without pay words.
 
-*Pending personas:* [Novice NGO R2](8442906c-3d03-4b4a-8a45-575f31966a17), [Phone R2](033c02d6-9e1f-40bd-a8a5-4e71b6565a6a).
+### [Phone R2](033c02d6-9e1f-40bd-a8a5-4e71b6565a6a) — Fatima, ~390px mobile HR
+
+**Mobile viable: No** for create-and-polish. **Publish** alone is OK (44px full-width). Writing chrome is not: 12–34px targets, 45% opacity tools, keyboard covers Save/Send.
+
+Live preview checked (390×844): Communications Intern, Child Protection Specialist, Finance Officer. **18 findings** — touch killers 1–9 (pencil/grip 28px + 3px drag; Remove no confirm; Save 34px bottom; 12px chat grip; Send 30px; Chat/Job 28px; Reset in icon row; parts sheet hides Publish below fold; title crushes status). Also: quick replies 30px; Preview/History 30px overrides phone 40px; Approve 28px; draft/chat never together; phone CSS undone by inline heights.
+
+**CONFIRMS:** R1-10 grip, R1-12 header/opacity, R1-20 phone parts, U-1 progress hidden on phone layout.
+
+**Recommended to make mobile viable (agent):** pencil, grip, Approve, Save, Send, Chat/Job switch **≥44px, full opacity**, Save/Send **above keyboard**; Publish can stay.
+
+*Pending persona:* [Novice NGO R2](8442906c-3d03-4b4a-8a45-575f31966a17).
 
 ---
 
