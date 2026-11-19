@@ -116,7 +116,7 @@
 | Design uniformity | Save/Cancel matrix; naming | [Design uniformity R2](991e0fd1-ac42-405e-818a-f2cf5ae86929) |
 | Phone ~390px | Touch; clipped tools | [Phone R2](033c02d6-9e1f-40bd-a8a5-4e71b6565a6a) |
 
-**Synthesis status:** *In progress (5/8 recorded) — full deduped master list after Novice, Programme manager, and Phone finish.*
+**Synthesis status:** *In progress (6/8 recorded) — full deduped master list after Novice NGO and Phone finish.*
 
 **Findings from Round 2:** *(append below; do not delete Round 1.)*
 
@@ -238,7 +238,19 @@ Full **icon inventory table** (Eye, History, progress, tabs, X, Approve, pencil,
 | Grip / Add | 3px drag, Add blur | Escape commits | — | — |
 | Publish path | Approve buffer | Approve semantics | essentials/method loops | version park, Reach, flyer print |
 
-*Pending personas:* [Novice NGO R2](8442906c-3d03-4b4a-8a45-575f31966a17), [Programme manager R2](f89d6d5d-19b2-400e-b6b5-8fbeab44f4cb), [Phone R2](033c02d6-9e1f-40bd-a8a5-4e71b6565a6a).
+### [Programme manager R2](f89d6d5d-19b2-400e-b6b5-8fbeab44f4cb) — Sam, national NGO WASH Coordinator
+
+**Workflow: 4/10.** One window works; template/facts opening loses trust; Save/Cancel/Approve/Undo rules diverge after draft exists.
+
+**22 findings** — CONFIRMS most English chrome (U-1–U-4, R1-01–06, 09–13, 20). **NEW:** opening brief pay/date wrong on preview (180k→120k, date); UN templates in chips before Local NGO; org type does not override house format; org settings no Save; approval rule “senior P4/D” on national NGO; composer readiness ring swallows first Send.
+
+**Repetitions:** Setup stack (About, project, style, pace) before write; “yes” means three different things; long walk after brief already typed.
+
+**Icons vs chat:** Chat faster for template name in sentence and chips; worse for typed yes/ok and UN chip bias. Icons faster for pencil/grip/progress once writing; worse during setup (no Preview/History), clipped line, grip/Approve commits.
+
+**Works:** Local NGO concise order; how to apply fixed; edit withdraws approval; pay not taken from budget without pay words.
+
+*Pending personas:* [Novice NGO R2](8442906c-3d03-4b4a-8a45-575f31966a17), [Phone R2](033c02d6-9e1f-40bd-a8a5-4e71b6565a6a).
 
 ---
 
