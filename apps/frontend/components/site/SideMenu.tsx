@@ -292,7 +292,8 @@ export default function SideMenu(props: Props) {
       <aside
         className={`aj-menu hidden h-full shrink-0 lg:block${edge ? ' border-r aj-hair' : ''}`}
         style={{
-          width: props.collapsed ? 64 : (props.width ?? 248),
+          // While dragging, width follows the pointer even on the collapsed rail so open/close can be continuous.
+          width: props.widthLocked ? (props.width ?? (props.collapsed ? 64 : 248)) : props.collapsed ? 64 : (props.width ?? 248),
           background: 'var(--surface)',
           transition: props.widthLocked ? undefined : 'width 160ms ease',
         }}

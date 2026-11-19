@@ -1,7 +1,7 @@
 'use client';
 
 import { Archive, Briefcase, Building2, CreditCard, Eye, Globe2, LayoutDashboard, Menu, Palette, Plus, RotateCcw, Sparkles, Users } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { chooseAiModel, probeAi, useAi } from './ai';
 import SideMenu, { type MenuEntry } from '@/components/site/SideMenu';
 import Billing from './Billing';
@@ -22,12 +22,19 @@ import Window from './Window';
 import { DemoMark, Dialog, HeaderSlotContext, LegalLine, NoticeBar } from './ui';
 
 const MENU_W_KEY = 'aidjobs.employerDemo.menuWidth';
+const MENU_RAIL = 64;
 const MENU_W_MIN = 180;
 const MENU_W_MAX = 360;
 const MENU_W_DEFAULT = 216;
+/** Drag narrower than this and release → collapse to the icon rail. */
+const MENU_COLLAPSE_AT = 140;
 
 function clampMenuW(w: number) {
   return Math.min(MENU_W_MAX, Math.max(MENU_W_MIN, Math.round(w)));
+}
+
+function clampDragW(w: number) {
+  return Math.min(MENU_W_MAX, Math.max(MENU_RAIL, Math.round(w)));
 }
 
 /** While the AI is on and offers more than one model: which one writes, for comparing them in the preview (demo only). */
@@ -130,13 +137,31 @@ export default function EmployerDemo() {
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
   const [menuW, setMenuW] = usePersistentState(MENU_W_KEY, MENU_W_DEFAULT);
   const [menuDragging, setMenuDragging] = useState(false);
+  const [dragW, setDragW] = useState<number | null>(null);
+  const dragWRef = useRef<number | null>(null);
   useEffect(() => {
     void probeAi();
   }, []);
   useEffect(() => {
     if (!menuDragging) return;
-    const move = (e: PointerEvent) => setMenuW(clampMenuW(e.clientX));
-    const up = () => setMenuDragging(false);
+    const move = (e: PointerEvent) => {
+      const w = clampDragW(e.clientX);
+      dragWRef.current = w;
+      setDragW(w);
+    };
+    const up = () => {
+      const w = dragWRef.current;
+      dragWRef.current = null;
+      setDragW(null);
+      setMenuDragging(false);
+      if (w == null) return;
+      if (w < MENU_COLLAPSE_AT) {
+        setCollapsed(true);
+        return;
+      }
+      setCollapsed(false);
+      setMenuW(clampMenuW(w));
+    };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
     return () => {
@@ -217,6 +242,8 @@ export default function EmployerDemo() {
   }
 
   const width = clampMenuW(menuW);
+  const liveW = dragW ?? (collapsed ? MENU_RAIL : width);
+  const liveCollapsed = dragW != null ? dragW < MENU_COLLAPSE_AT : collapsed;
   return (
     <div className="ej-app flex h-full" style={{ userSelect: menuDragging ? 'none' : undefined }}>
       <SideMenu
@@ -232,13 +259,13 @@ export default function EmployerDemo() {
             ),
           },
         ]}
-        collapsed={collapsed}
+        collapsed={liveCollapsed}
         onToggleCollapsed={() => setCollapsed(!collapsed)}
         drawerOpen={drawer}
         onCloseDrawer={() => setDrawer(false)}
         homeHref="/employer-demo"
-        width={width}
-        edge={collapsed}
+        width={liveW}
+        edge={false}
         widthLocked={menuDragging}
         footer={(isCollapsed) => (
           <>
@@ -247,29 +274,38 @@ export default function EmployerDemo() {
           </>
         )}
       />
-      {!collapsed && (
-        <div
-          className="aj-divider hidden lg:block"
-          data-dragging={menuDragging}
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Resize the menu"
-          aria-valuenow={width}
-          aria-valuemin={MENU_W_MIN}
-          aria-valuemax={MENU_W_MAX}
-          tabIndex={0}
-          title="Drag to resize"
-          onPointerDown={(e) => {
-            e.preventDefault();
-            setMenuDragging(true);
-          }}
-          onKeyDown={(e) => {
-            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-            e.preventDefault();
-            setMenuW(clampMenuW(width + (e.key === 'ArrowLeft' ? -24 : 24)));
-          }}
-        />
-      )}
+      <div
+        className="aj-divider hidden lg:block"
+        data-dragging={menuDragging}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize the menu"
+        aria-valuenow={liveW}
+        aria-valuemin={MENU_RAIL}
+        aria-valuemax={MENU_W_MAX}
+        tabIndex={0}
+        title={collapsed ? 'Drag to open the menu' : 'Drag to resize or close'}
+        onPointerDown={(e) => {
+          e.preventDefault();
+          const start = clampDragW(collapsed ? MENU_RAIL : width);
+          dragWRef.current = start;
+          setDragW(start);
+          setMenuDragging(true);
+        }}
+        onKeyDown={(e) => {
+          if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+          e.preventDefault();
+          if (collapsed) {
+            if (e.key === 'ArrowRight') setCollapsed(false);
+            return;
+          }
+          if (e.key === 'ArrowLeft' && width <= MENU_W_MIN) {
+            setCollapsed(true);
+            return;
+          }
+          setMenuW(clampMenuW(width + (e.key === 'ArrowLeft' ? -24 : 24)));
+        }}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className={`flex shrink-0 items-center gap-2 border-b px-3 py-2 aj-hair lg:px-6 ${workspace ? 'lg:hidden' : ''}`} style={{ background: 'var(--surface)' }}>
           <span className="lg:hidden">
