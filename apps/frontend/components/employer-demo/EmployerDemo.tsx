@@ -10,6 +10,7 @@ import { freeSummary, paidJobsLeft } from './plans';
 import Create from './Create';
 import Home from './Home';
 import Tip from '@/components/site/Tip';
+import { usePersistentState } from '@/components/site/SiteRoot';
 import Jobs from './Jobs';
 import Public from './Public';
 import Publish from './Publish';
@@ -19,6 +20,15 @@ import { setReviewer } from './Review';
 import MenuButton from './MenuButton';
 import Window from './Window';
 import { DemoMark, Dialog, HeaderSlotContext, LegalLine, NoticeBar } from './ui';
+
+const MENU_W_KEY = 'aidjobs.employerDemo.menuWidth';
+const MENU_W_MIN = 180;
+const MENU_W_MAX = 360;
+const MENU_W_DEFAULT = 216;
+
+function clampMenuW(w: number) {
+  return Math.min(MENU_W_MAX, Math.max(MENU_W_MIN, Math.round(w)));
+}
 
 /** While the AI is on and offers more than one model: which one writes, for comparing them in the preview (demo only). */
 function ModelChoice({ collapsed, inHeader }: { collapsed: boolean; inHeader: boolean }) {
@@ -118,9 +128,22 @@ export default function EmployerDemo() {
   const [drawer, setDrawer] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
+  const [menuW, setMenuW] = usePersistentState(MENU_W_KEY, MENU_W_DEFAULT);
+  const [menuDragging, setMenuDragging] = useState(false);
   useEffect(() => {
     void probeAi();
   }, []);
+  useEffect(() => {
+    if (!menuDragging) return;
+    const move = (e: PointerEvent) => setMenuW(clampMenuW(e.clientX));
+    const up = () => setMenuDragging(false);
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+  }, [menuDragging, setMenuW]);
 
   if (!mounted) {
     return (
@@ -193,8 +216,9 @@ export default function EmployerDemo() {
       screen = <Create />;
   }
 
+  const width = clampMenuW(menuW);
   return (
-    <div className="ej-app flex h-full">
+    <div className="ej-app flex h-full" style={{ userSelect: menuDragging ? 'none' : undefined }}>
       <SideMenu
         primary={primary}
         sections={[
@@ -213,7 +237,9 @@ export default function EmployerDemo() {
         drawerOpen={drawer}
         onCloseDrawer={() => setDrawer(false)}
         homeHref="/employer-demo"
-        width={216}
+        width={width}
+        edge={collapsed}
+        widthLocked={menuDragging}
         footer={(isCollapsed) => (
           <>
             <DemoControls collapsed={isCollapsed} onReset={() => setResetting(true)} />
@@ -221,6 +247,29 @@ export default function EmployerDemo() {
           </>
         )}
       />
+      {!collapsed && (
+        <div
+          className="aj-divider hidden lg:block"
+          data-dragging={menuDragging}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize the menu"
+          aria-valuenow={width}
+          aria-valuemin={MENU_W_MIN}
+          aria-valuemax={MENU_W_MAX}
+          tabIndex={0}
+          title="Drag to resize"
+          onPointerDown={(e) => {
+            e.preventDefault();
+            setMenuDragging(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+            e.preventDefault();
+            setMenuW(clampMenuW(width + (e.key === 'ArrowLeft' ? -24 : 24)));
+          }}
+        />
+      )}
       <div className="flex min-w-0 flex-1 flex-col">
         <header className={`flex shrink-0 items-center gap-2 border-b px-3 py-2 aj-hair lg:px-6 ${workspace ? 'lg:hidden' : ''}`} style={{ background: 'var(--surface)' }}>
           <span className="lg:hidden">

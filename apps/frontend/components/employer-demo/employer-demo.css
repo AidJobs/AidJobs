@@ -1723,11 +1723,12 @@ button.ej-step:hover {
 }
 
 /* Round 7: creating a job in one window. The chat on the left; the output panel on the right.
- * Chat sits in an aj-card (same 20px radius / hair border as the JD doc card); no full-bleed surface. */
+ * Chat sits in an aj-card (same 20px radius / hair border as the JD doc card); no full-bleed surface.
+ * No top padding — the card top lines up with the progress line on the job side. */
 .ej-w-chat {
   flex-shrink: 0;
   box-sizing: border-box;
-  padding: 12px;
+  padding: 0 12px 12px;
   background: transparent;
 }
 

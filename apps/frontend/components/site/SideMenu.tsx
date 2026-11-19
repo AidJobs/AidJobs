@@ -39,6 +39,10 @@ type Props = {
   homeHref: string;
   /** Expanded width in pixels; the public site uses the default. */
   width?: number;
+  /** When false, omit the right border (a sibling drag divider draws the edge). Default true. */
+  edge?: boolean;
+  /** When true, skip the width transition (while the user is dragging to resize). */
+  widthLocked?: boolean;
   /** Extra controls at the bottom, beside the theme and accessibility settings. */
   footer?: (collapsed: boolean) => ReactNode;
 };
@@ -282,11 +286,16 @@ function MenuBody({ props, collapsed }: { props: Props; collapsed: boolean }) {
 
 /** Desktop: a column that collapses to an icon rail. Phone: a drawer from the left. */
 export default function SideMenu(props: Props) {
+  const edge = props.edge !== false;
   return (
     <>
       <aside
-        className="aj-menu hidden h-full shrink-0 border-r lg:block aj-hair"
-        style={{ width: props.collapsed ? 64 : (props.width ?? 248), background: 'var(--surface)', transition: 'width 160ms ease' }}
+        className={`aj-menu hidden h-full shrink-0 lg:block${edge ? ' border-r aj-hair' : ''}`}
+        style={{
+          width: props.collapsed ? 64 : (props.width ?? 248),
+          background: 'var(--surface)',
+          transition: props.widthLocked ? undefined : 'width 160ms ease',
+        }}
       >
         <MenuBody props={props} collapsed={props.collapsed} />
       </aside>
