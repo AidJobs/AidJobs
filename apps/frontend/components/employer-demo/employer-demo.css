@@ -1708,19 +1708,19 @@ button.ej-step:hover {
   }
 }
 
-/* Round 7: creating a job in one window. The chat on the left; the output panel on the right, with the progress line above it. */
+/* Round 7: creating a job in one window. The chat on the left; the output panel on the right. */
 .ej-w-chat {
   flex-shrink: 0;
   background: var(--surface);
 }
 
-/* One header row: back, the title with its status beside it, the progress line, and the tools. */
+/* One header row: back, title/status, Preview / Earlier versions. Progress stays in the job panel (phase 3 / U-1). */
 .ej-w-head {
   display: flex;
   flex-shrink: 0;
   align-items: center;
   gap: 10px;
-  padding: 6px 14px;
+  padding: 6px 14px 2px;
   border-bottom: 1px solid var(--hair);
 }
 
@@ -1837,11 +1837,19 @@ button.ej-step:hover {
   font-size: 12px;
 }
 
-/* The progress line: original size; tight under the header rule (Preview / Earlier versions icons sit in that header). */
+/*
+ * Progress line: top of the job panel only (phase 3). U-1 — 3px from the header hairline to the top of a normal dot
+ * (0 padding-top here + 3px on .ej-pline-dot); not pulled toward the language/Preview tabs (`.ej-pline--tabs`).
+ */
 .ej-pline {
   flex-shrink: 0;
-  padding: 2px 14px 6px;
+  padding: 0 14px 4px;
   border-bottom: 1px solid var(--hair);
+}
+
+.ej-pline.ej-pline--tabs {
+  border-bottom: 0;
+  padding-bottom: 2px;
 }
 
 .ej-pline .ej-line {
@@ -1862,7 +1870,7 @@ button.ej-step:hover {
 
 .aj-root .ej-pline .ej-line-part {
   position: relative;
-  max-width: 104px;
+  max-width: 128px;
   height: auto;
   flex-direction: column;
   align-items: center;
@@ -1921,7 +1929,7 @@ button.ej-step:hover {
 }
 
 .ej-pline .ej-line-label {
-  max-width: 96px;
+  max-width: 120px;
   white-space: nowrap;
 }
 

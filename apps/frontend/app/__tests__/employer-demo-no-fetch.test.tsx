@@ -1314,7 +1314,7 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     expect(container.querySelector('.ej-w-head .ej-w-title')?.textContent).toBe('Nutrition Officer');
     expect(container.querySelector('.ej-w-head .ej-w-status')?.textContent).toMatch(/^Draft/);
     expect(container.querySelector('.ej-w-head nav[aria-label="Parts of this job"]')).toBeNull();
-    expect(container.querySelector('.ej-pline nav[aria-label="Parts of this job"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="The job"] > .ej-pline nav[aria-label="Parts of this job"]')).not.toBeNull();
     expect(line().querySelectorAll('.ej-pline-dot').length).toBeGreaterThan(0);
     expect(container.querySelector('[role="tab"]')).toBeNull();
     expect(container.querySelector('.ej-line-mark')).toBeNull();

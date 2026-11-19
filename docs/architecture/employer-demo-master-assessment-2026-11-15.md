@@ -13,7 +13,7 @@
 
 **Recommended fix order (English first), unchanged until the user says otherwise:**
 
-1. Progress line under Preview / Earlier versions (header rule), not toward language tabs  
+1. Progress line flush under header rule on the **job panel** (phase 3), not toward language tabs — **re-opened 20 Nov 2026** until user confirms the screenshot  
 2. Undo / remove / walk focus (no Market steal; keep Undo until used)  
 3. About us / Project: show saved text; working Save/Cancel; stop forced rename; stop yes-skip discard  
 4. Grip: Project/Background when relevant; open menu without accidental drag  
@@ -26,11 +26,11 @@
 **Agents:** [HR review UN agency](c56d4342-bc46-4b16-a61d-22cccb85cb07), [HR review local NGO](f87e9add-a843-44ea-a3eb-6c534199501a), [HR review INGO](54c43449-021d-4c76-977c-d0b3853bd5c6), [UX chrome audit](b6ab0953-572b-4d59-807e-442ed88e9a17).  
 **Code tip when Round 1 was taken:** polish commits through `13891bb` (later tip may move; re-verify before fixing).
 
-### A. User-reported bugs (confirmed in code) — all OPEN
+### A. User-reported bugs (confirmed in code) — U-1 re-opened pending confirm; U-2–U-4 OPEN
 
 | ID | Status | Fault | Evidence |
 | --- | --- | --- | --- |
-| U-1 | OPEN | Progress line sits as a second strip (`.ej-pline`) under `.ej-w-head`. User wants it tighter under the header rule next to Preview / Earlier versions icons — not toward the language / Preview tab row. Placement was misunderstood twice. | User (15 Nov); NGO; chrome |
+| U-1 | OPEN (pending confirm) | Progress line sits as a second strip (`.ej-pline`) under `.ej-w-head`. Correct reading (20 Nov): keep it on the **job panel** (phase 3), flush under the window header rule that runs under Preview / Earlier versions — not in the header row, not over chat, not pulled toward language / Preview **tabs**. Prior agents only tweaked padding (`300aa5d` toward tabs, `29a9d89` “header-tight”); this chat wrongly moved the DOM twice. | User (15 Nov); NGO; chrome |
 | U-2 | OPEN | Undo after adding a section removes the section and opens Market check on top of the JD. `undoStep` clears the undo guard in the same update; `seenStep` effect then `setPart`s away. | User; chrome High #2; INGO |
 | U-3 | OPEN | About us / Project Save and Cancel still do not work as a product action (buffer, rename, hide advert text, Cancel only clears local typing). | User; NGO; chrome High #8–10 |
 | U-4 | OPEN | Grip ⋯ has no Project / Background when that section already exists under another heading (e.g. Local NGO “Project brief”). “Add About the project” only when `background` missing. Three names for one key. | User; NGO |
@@ -54,7 +54,7 @@
 
 | ID | Status | Fault |
 | --- | --- | --- |
-| R1-09 | OPEN | Progress line not under Preview/History; labels clip (~96px); Publish can sit early while Languages/Review in +N; icons hidden until writing (U-1). |
+| R1-09 | OPEN | Progress line placement (U-1) pending user confirm. Also: Publish early while Languages/Review in +N; icons hidden until writing; phone parts over icons. |
 | R1-10 | OPEN | Grip: 3px move = drag (menu click swallowed); small drag reorders; Move up/down says “Moved” at ends; no group drop targets; remove group deletes its sections. |
 | R1-11 | OPEN | Add panel: blur commits “Add your own” / group; Escape still adds; no Cancel. |
 | R1-12 | OPEN | Section header row: Approve/Undo/Also-in clip; pencil/grip hard on narrow/touch (opacity 0.45). |
@@ -246,7 +246,7 @@ Full **icon inventory table** (Eye, History, progress, tabs, X, Approve, pencil,
 
 | ID | Maps | Finding |
 | --- | --- | --- |
-| R2-P1-1 | **(1) U-1** | Progress line not on header rule with Preview/History; clip; +N; phone sheet; Eye hidden until sections |
+| R2-P1-1 | **(1) U-1** | Placement pending confirm (job-panel flush under header rule). Still open: +N ordering, phone sheet, Eye hidden until sections |
 | R2-P1-2 | **(2)** | Chat `undo` vs `undoStep`; remove dismiss |
 | R2-P1-3 | **(3)** | Save/Cancel semantics; setup card no Save; 40-char draft rule |
 | R2-P1-4 | **(4)** | Grip 3px drag; Add blur/Escape; Move at end lies |
@@ -303,7 +303,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 
 | Date | IDs fixed | Commit | Notes |
 | --- | --- | --- | --- |
-| — | — | — | None yet after Round 1 record |
+| 20 Nov 2026 | U-1 spacing (pending preview confirm) | `2ff51d9` | Job-panel progress kept. Gap hairline→dot top **3px** (was 5px). `.ej-pline--tabs` drops its bottom rule. Mark Fixed only after user confirms on preview. |
 
 ---
 

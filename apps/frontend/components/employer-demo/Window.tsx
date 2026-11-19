@@ -125,9 +125,9 @@ function PartButton({ part, current, onGo }: { part: Part; current: boolean; onG
 }
 
 /**
- * The progress line at the top of the panel (the user, 12 November 2026): a thin line with a small dot for every part of the job,
- * current, done, or to do, starting with the template's name, each with its tooltip. Whatever does not fit goes into "+N", so nothing
- * is out of sight; the part in view always stays on the line.
+ * The progress line at the top of the job panel (phase 3): a thin line with a small dot for every part, current, done, or to do.
+ * U-1 (20 November 2026): keep it here — flush under the window header rule that runs under Preview / Earlier versions — not in the
+ * header row, not over the chat, and not pulled down toward the language / Preview tab row.
  */
 function PanelLine({ parts, current, onGo }: { parts: Part[]; current: string; onGo: (k: string) => void }) {
   const row = useRef<HTMLDivElement>(null);
@@ -1571,6 +1571,7 @@ function JobWindow({ id }: { id: string }) {
     );
   }
 
+  const tabRow = tabs.length > 1;
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="ej-w-head">
@@ -1606,10 +1607,10 @@ function JobWindow({ id }: { id: string }) {
           }}
         />
         <section className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="The job">
-          <div className="ej-pline">
+          <div className={tabRow ? 'ej-pline ej-pline--tabs' : 'ej-pline'}>
             <PanelLine parts={parts} current={current} onGo={goPart} />
           </div>
-          {tabs.length > 1 && (
+          {tabRow && (
             <div className="shrink-0 border-b aj-hair">
               <PanelTabs tabs={tabs} active={active} onPick={setTab} onRemove={removeLangTab} end={langs.length && !reviewing ? <LinkLangs job={job} disabled={false} /> : undefined} />
             </div>
