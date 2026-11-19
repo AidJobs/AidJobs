@@ -1948,11 +1948,34 @@ button.ej-step:hover {
   white-space: nowrap;
 }
 
+/*
+ * +N sits with the part labels, below the track — never on the connector.
+ * Its li paints over the trailing connector so the line ends at the last part.
+ */
+.ej-pline .ej-line > li:has(.ej-line-more) {
+  position: relative;
+  z-index: 1;
+  padding-left: 8px;
+}
+
+.ej-pline .ej-line > li:has(.ej-line-more)::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 12px;
+  background: var(--page);
+  content: '';
+}
+
 .aj-root .ej-pline .ej-line-more {
-  height: 22px;
-  margin-top: -2px;
+  position: relative;
+  z-index: 1;
+  height: 20px;
+  margin-top: 12px;
   padding: 0 8px;
   font-size: 11px;
+  background: var(--surface);
 }
 
 /* On phones the line is a short list in a sheet. */
