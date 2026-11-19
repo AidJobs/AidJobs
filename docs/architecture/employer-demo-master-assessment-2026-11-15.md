@@ -116,7 +116,7 @@
 | Design uniformity | Save/Cancel matrix; naming | [Design uniformity R2](991e0fd1-ac42-405e-818a-f2cf5ae86929) |
 | Phone ~390px | Touch; clipped tools | [Phone R2](033c02d6-9e1f-40bd-a8a5-4e71b6565a6a) |
 
-**Synthesis status:** *In progress (7/8 recorded) — full deduped master list after Novice NGO finishes.*
+**Synthesis status:** *Complete (8/8, 20 November 2026). Deduped master list below.*
 
 **Findings from Round 2:** *(append below; do not delete Round 1.)*
 
@@ -228,15 +228,40 @@ Full **icon inventory table** (Eye, History, progress, tabs, X, Approve, pencil,
 
 **Seamless:** `nextStep` order; template/tone/pace quick picks; explicit skip+hold+Next question; fact chips; AI tagged step no double bubble; how-to-apply protected.
 
-### Round 2 cross-cut (partial, 5/8) — English-first pressure
+### Round 2 — deduped master list (English-first)
 
-| Theme | Chrome R2 | Design R2 | Chat R2 | INGO EN-BLOCK |
-| --- | --- | --- | --- | --- |
-| Progress / Preview | Eye hidden, line not in header | — | — | — |
-| Undo | 2s remove; two stacks | dismissChange | chat undo vs lastChange | — |
-| About/Project | Approve+grip | Save rename, form hides lines | yes/ok skip, card hide | — |
-| Grip / Add | 3px drag, Add blur | Escape commits | — | — |
-| Publish path | Approve buffer | Approve semantics | essentials/method loops | version park, Reach, flyer print |
+**P0 — trust / wrong advert out (add to fix backlog after user priority)**
+
+| ID | Finding | Round 2 sources |
+| --- | --- | --- |
+| R2-P0-1 | **Free publish with empty / placeholder sections** (`canGoFree` no section gate; Amina live with missing Qualifications) | [Novice NGO R2](8442906c-3d03-4b4a-8a45-575f31966a17) #6 |
+| R2-P0-2 | **Sample org (Riverstone) on local NGO path** — template chips, apply URL, commitments, AI responsibilities, Google title | Novice #1,5,7,14 |
+| R2-P0-3 | **About/Project: form hides saved text; yes/ok wipes paste; dual buffers; Accept auto-approves** | Design, Chat, Chrome, Novice, Sam |
+| R2-P0-4 | **Project Save renames heading; grip has no Project when `background` exists** | U-4, all persona chrome |
+| R2-P0-5 | **Approve ignores pencil / PageField; section Approve vanishes with no mark** | Chrome, Design, Sam, Novice |
+| R2-P0-6 | **Remove Undo deleted at 2s** (`dismissChange`) | Chrome, Chat, Design, UN, Novice |
+| R2-P0-7 | **Undo / chat undo / `lastChange` → Market or stuck progress line** | U-2, Chat #7, Sam #9 |
+
+**P1 — English chrome / workflow (maps to recommended fix order 1–5 plus)**
+
+| ID | Maps | Finding |
+| --- | --- | --- |
+| R2-P1-1 | **(1) U-1** | Progress line not on header rule with Preview/History; clip; +N; phone sheet; Eye hidden until sections |
+| R2-P1-2 | **(2)** | Chat `undo` vs `undoStep`; remove dismiss |
+| R2-P1-3 | **(3)** | Save/Cancel semantics; setup card no Save; 40-char draft rule |
+| R2-P1-4 | **(4)** | Grip 3px drag; Add blur/Escape; Move at end lies |
+| R2-P1-5 | **(5)** | Approve vs buffer; triple meaning of Approve |
+| R2-P1-6 | NEW | **Opening brief facts wrong** (pay/date on AI path) — Sam, verify with tests |
+| R2-P1-7 | NEW | **House format + UN chips before NGO template** — Sam, Novice |
+| R2-P1-8 | NEW | **Check “done” vs empty Qualifications** — progress vs `walk.approved` — Novice #11, R1-14 |
+| R2-P1-9 | NEW | **Preview tab leaves Eye hidden** — R1-13 — Chrome, Novice |
+| R2-P1-10 | NEW | **Mobile not viable for polish** — [Phone R2](033c02d6-9e1f-40bd-a8a5-4e71b6565a6a) — 44px+ targets |
+
+**P2 — after English (langs, UN content, Amplify, mobile polish detail)**
+
+UN clearance blockers (R1-08, R2-UN), INGO LANG-ONLY pack, Reach/flyer/version park (INGO EN-BLOCK), UN template content, composer ring, style step no chips.
+
+**Round 2 still works (keep):** One-window create; template by plain English; quick picks when present; pencil Save/Cancel; Cancel/Undo recover on tested paths; How to apply protected; edit withdraws approval; Free path completes; preview shows paragraphs; grip menu on deliberate click; OpenRouter chat can follow pace/style.
 
 ### [Programme manager R2](f89d6d5d-19b2-400e-b6b5-8fbeab44f4cb) — Sam, national NGO WASH Coordinator
 
@@ -260,7 +285,17 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 
 **Recommended to make mobile viable (agent):** pencil, grip, Approve, Save, Send, Chat/Job switch **≥44px, full opacity**, Save/Send **above keyboard**; Publish can stay.
 
-*Pending persona:* [Novice NGO R2](8442906c-3d03-4b4a-8a45-575f31966a17).
+### [Novice NGO R2](8442906c-3d03-4b4a-8a45-575f31966a17) — Amina, Kisumu local NGO (Free, first tool)
+
+**Outcome:** Reached **live Free publish** on demo sample org (Riverstone Aid) — **unsafe** for her persona: incomplete Qualifications, INGO-flavoured responsibilities, wrong employer branding.
+
+**Seamless vs confusing:** Chat can start from one paragraph, switch template in plain language, Preview paragraphs, Cancel/Undo recover — vs forms that hide copy, “yes” wiping project paste, silent rename, publish without empty-section block.
+
+**22 findings** (table in agent report). **Blockers:** #6 free publish with placeholders; #1–5 Riverstone/UN path and fixed apply before asked; #7 INGO AI duties. **CONFIRMS:** R1-01,02,09,13,14,16,17,18; U-3; partial U-2. **NEW:** date conflict on Accept; `free: {}` allowance; dead quick replies on style; phone Chat/Job split; broken Accept copy; AI tip over title.
+
+**Bottlenecks:** No side-by-side on phone; About/Project never show as advert text; stacked dead chips; progress allows Publish; only once-ever free terms confirm.
+
+**Chat (OpenRouter):** Useful for template/pace/grade; harmful on dates, Riverstone apply text, style without buttons, broken rule strings.
 
 ---
 
