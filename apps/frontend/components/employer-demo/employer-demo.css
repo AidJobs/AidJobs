@@ -1722,10 +1722,13 @@ button.ej-step:hover {
   }
 }
 
-/* Round 7: creating a job in one window. The chat on the left; the output panel on the right. */
+/* Round 7: creating a job in one window. The chat on the left; the output panel on the right.
+ * Chat sits in an aj-card (same 20px radius / hair border as the JD doc card); no full-bleed surface. */
 .ej-w-chat {
   flex-shrink: 0;
-  background: var(--surface);
+  box-sizing: border-box;
+  padding: 12px;
+  background: transparent;
 }
 
 /* One header row: back, title/status, Preview / Earlier versions. Progress stays in the job panel (phase 3 / U-1). */
@@ -1735,7 +1738,6 @@ button.ej-step:hover {
   align-items: center;
   gap: 10px;
   padding: 6px 14px 2px;
-  border-bottom: 1px solid var(--hair);
 }
 
 .ej-w-titlebox {
@@ -1852,18 +1854,16 @@ button.ej-step:hover {
 }
 
 /*
- * Progress line: top of the job panel only (phase 3). U-1 — ~1px from the header hairline to the top of a normal dot
- * (0 padding-top here + 1px on .ej-pline-dot); overflow clips the current-step glow so it does not cross the hairline.
+ * Progress line: top of the job panel only (phase 3). U-1 — ~1px under the header row to the top of a normal dot
+ * (0 padding-top here + 1px on .ej-pline-dot); overflow clips the current-step glow so it does not bleed upward.
  */
 .ej-pline {
   flex-shrink: 0;
   padding: 0 14px 4px;
   overflow: hidden;
-  border-bottom: 1px solid var(--hair);
 }
 
 .ej-pline.ej-pline--tabs {
-  border-bottom: 0;
   padding-bottom: 2px;
 }
 

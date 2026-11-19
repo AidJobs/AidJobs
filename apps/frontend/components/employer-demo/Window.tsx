@@ -1582,7 +1582,7 @@ function JobWindow({ id }: { id: string }) {
       </div>
       <div ref={bodyRef} className="relative flex min-h-0 flex-1" style={{ userSelect: dragging ? 'none' : undefined }}>
         <section className="ej-w-chat flex min-h-0 flex-col" style={{ width: chatW }} aria-label={reviewing ? 'Review' : 'Chat with AidJobs'}>
-          {chat}
+          <div className="aj-card flex min-h-0 flex-1 flex-col overflow-hidden">{chat}</div>
         </section>
         <div
           className="aj-divider"
