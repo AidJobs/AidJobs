@@ -16,9 +16,9 @@
 1. ~~Progress line / window chrome (U-1)~~ — **Fixed 20 Nov 2026** (user confirmed on preview)  
 2. ~~Undo / remove / walk focus (no Market steal; keep Undo until used)~~ — **Fixed 20 Nov 2026** (U-2; user confirmed on preview, including Removed-note hide)  
 3. ~~About us / Project (U-3)~~ — **Fixed 20 Nov 2026** (Step A + Step B; preview confirmed)  
-4. ~~Grip: Project/Background when relevant; open menu without accidental drag~~ — **U-4 Step A confirmed; Step B shipped (threshold)**  
+4. ~~Grip: Project/Background when relevant; open menu without accidental drag~~ — **Fixed 20 Nov 2026** (U-4; user confirmed Step A + Step B)
 
-5. Approve vs unsaved buffers; Add-panel blur/Escape  
+5. Approve vs unsaved buffers; Add-panel blur/Escape ← **next**
 
 ---
 
@@ -27,14 +27,14 @@
 **Agents:** [HR review UN agency](c56d4342-bc46-4b16-a61d-22cccb85cb07), [HR review local NGO](f87e9add-a843-44ea-a3eb-6c534199501a), [HR review INGO](54c43449-021d-4c76-977c-d0b3853bd5c6), [UX chrome audit](b6ab0953-572b-4d59-807e-442ed88e9a17).  
 **Code tip when Round 1 was taken:** polish commits through `13891bb` (later tip may move; re-verify before fixing).
 
-### A. User-reported bugs (confirmed in code) — U-1–U-4 Fixed (U-4 Step B awaiting preview confirm)
+### A. User-reported bugs (confirmed in code) — U-1–U-4 Fixed
 
 | ID | Status | Fault | Evidence |
 | --- | --- | --- | --- |
 | U-1 | **Fixed** (20 Nov 2026) | Progress line on the **job panel** (phase 3), flush under the window header; measure-row bug removed; header and progress hairlines removed; chat in `aj-card` aligned with the progress line; `+N` clear of the connector; side menu resizable (drag open/close) with open/closed remembered. | User confirmed on preview, 20 Nov 2026 |
 | U-2 | **Fixed** (20 Nov 2026) | Undo / remove / walk no longer open Market over the JD; chat undo and `lastChange` pin like icon Undo. Removed note hides after ~2s **without** clearing `undoStep` (polish `3f0f4c4` + R1-05; U-2 had wrongly left the note forever). | User confirmed on preview, 20 Nov 2026 (Market steal + Removed note hide) |
 | U-3 | **Fixed** (20 Nov 2026; Step A/B; JD open→write→Save/Cancel `6670de3`) | Step A/B as before. Follow-up: About us / Project match other sections — pencil opens one box with Save/Cancel; link/Read/Draft/Upload fill that same box (no always-on second pad). Project Save still uses `intoSection` (no heading rename / parent wipe). Chat window PageField still uses draft card Accept. | User confirmed on preview, 20 Nov 2026 |
-| U-4 | **Fixed** (20 Nov 2026; Step A `314a4b0`, Step B grip threshold) | Step A: one `background` slot; Add uses format heading; no force-rename; no duplicate Project chip. Step B: grip drag threshold 3→12px so a normal press opens the menu (R1-10 click part). Rest of R1-10 (fake Moved, group drops) stays open. | Step A user-confirmed on preview; Step B awaiting preview confirm |
+| U-4 | **Fixed** (20 Nov 2026; Step A `314a4b0`, Step B `b7fbbf4`) | Step A: one `background` slot; Add uses format heading; no force-rename; no duplicate Project chip. Step B: grip drag threshold 3→12px so a normal press opens the menu (R1-10 click part). Rest of R1-10 (fake Moved, group drops) stays open. | User confirmed Step A and Step B on preview, 20 Nov 2026 |
 
 ### B. Combined open findings (Round 1)
 
