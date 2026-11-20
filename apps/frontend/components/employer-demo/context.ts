@@ -101,9 +101,8 @@ export function clearPageIntake(id: string, kind?: 'about' | 'project') {
 }
 
 /**
- * Write About/Project text through `intoSection` (exact "About the project" sub), never rename the heading, clear intake.
- * Kept for tests / intoSection path; the compact PageField no longer exposes Save (pencil edits the body; U-3 follow-up).
- * Does not update the context pack — that stays for Accept.
+ * JD pencil Save for About the project: write through `intoSection` (exact project sub), never rename unless caller did,
+ * clear intake. About us Save uses `editSection` instead. Does not update the context pack — that stays for Accept.
  */
 export function savePageFieldText(id: string, kind: 'about' | 'project', raw: string) {
   const s0 = getState();

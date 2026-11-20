@@ -1,6 +1,6 @@
 /**
  * U-3 Step A (20 November 2026): About us / Project display, intoSection write path, project yes, paste draft.
- * Compact PageField Save/Cancel removed (follow-up): intake clear must not wipe saved body. Accept Undo is Step B.
+ * Follow-up: JD uses open→write→Save/Cancel (helpers fill the same box); clear intake must not wipe saved body. Accept Undo is Step B.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { applyTemplate, editSection, sendChat, startJob, toggleSection } from '../../components/employer-demo/actions';

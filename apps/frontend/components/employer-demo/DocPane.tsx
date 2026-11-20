@@ -8,16 +8,17 @@ import type { OpenTarget } from './aiActions';
 import Grip, { dropAt, type GripAction } from './Grip';
 import FixedBlock from './FixedBlock';
 import { fixedLabel, fixedList, offeredFixed } from './fixed';
-import { PageField } from './ContextCards';
+import { PageFillTools } from './ContextCards';
 import { viewOf } from './langs';
 import { jobLang, langOf } from './translate';
 import { placeFor } from './MenuButton';
 import { groupLabelOf, groupOfKey, groupOrderOf, KEPT, placeSaid } from './outline';
 import { contractPicks, deadlinePicks, eligibilityPicks, gradePicks, languagePicks, methodPicks, placePatch, placePicks, salaryPicks, safeguardingPicks, type Pick } from './answers';
 import { DOCUMENTS } from './apply';
-import { PROJECT_SECTION, saveAboutForOrg } from './context';
+import { PROJECT_SECTION, saveAboutForOrg, savePageFieldText } from './context';
 import Composer, { type ComposerHandle } from './Composer';
 import { addDays, commitmentText, COMMITMENTS, completeText, findInclusive, GROUPS, headingFor, inOutlineOrder, longDate, looseLocation, PLACES, quality, recommendSections, SECTIONS, suggestTitle, titleSuggestions, type QualityItem } from './engine';
+import { MAX_TEXT } from './pages';
 import type { ApplySettings, ChatMsg, DemoJob, Facts, GroupKey, JobLang, Section as Sec, State } from './types';
 import { RevealBlock } from './Reveal';
 import { getState } from './store';
@@ -229,15 +230,10 @@ export function ApplyFields({ job }: { job: DemoJob }) {
   );
 }
 
-type SectionProps = { job: DemoJob; sec: Sec; s: State; notes: QualityItem[]; onFlag: (f: Flag) => void; onSeeChat?: () => void; current?: boolean; noteEdits?: boolean; since?: number; draft?: DraftTools; open?: (t: OpenTarget) => void };
+type SectionProps = { job: DemoJob; sec: Sec; s: State; notes: QualityItem[]; onFlag: (f: Flag) => void; onSeeChat?: () => void; current?: boolean; noteEdits?: boolean; since?: number; draft?: DraftTools };
 
 /** What the window's draft gives each section (section 19, phase 6, C): its grip's moves and the + panel opened from it. */
 type DraftTools = { grip: (sec: Sec) => GripAction[]; onKey: (key: string, by: -1 | 1) => void; onDrag: (key: string, y: number | null, done: boolean) => void; dropAfter: string | null | undefined };
-
-const pageOpen = (t: OpenTarget) => {
-  if (!t.startsWith('section:')) return;
-  document.getElementById(`ej-sec-${t.slice(8)}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-};
 
 /**
  * The change note for the last change made with the icons, with its Undo; while a linked translation is written, Undo waits. After a
@@ -303,32 +299,48 @@ function SectionText({ job, sec, since, children }: { job: DemoJob; sec: Sec; si
 
 const asText = (lines: string[]) => lines.map((l) => (l.startsWith('- ') ? `• ${l.slice(2)}` : l)).join('\n');
 
-function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits, since, draft, open }: SectionProps) {
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState('');
-  const [title, setTitle] = useState('');
+const PROJECT_SUB = 'About the project';
+
+/** Text shown in the open About the project editor: the project sub when present, else the section lines. */
+function projectBoxText(sec: Sec): string {
+  const sub = sec.subs?.find((sb) => sb.title === PROJECT_SUB);
+  if (sub) return asText(sub.lines);
+  return asText(sec.lines);
+}
+
+function sectionStartsEmpty(sec: Sec, pageKind: 'about' | 'project' | null): boolean {
+  if (!pageKind) return false;
+  if (pageKind === 'about') return sec.lines.length === 0;
+  const sub = sec.subs?.find((sb) => sb.title === PROJECT_SUB);
+  if (sub) return sub.lines.length === 0;
+  return sec.lines.length === 0;
+}
+
+function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits, since, draft }: SectionProps) {
+  const reviewing = Boolean(s.reviewerAs);
+  const pageKind = sec.key === 'about' ? 'about' : sec.key === PROJECT_SECTION ? 'project' : null;
+  const [editing, setEditing] = useState(() => !reviewing && sectionStartsEmpty(sec, pageKind));
+  const [text, setText] = useState(() => (!reviewing && pageKind === 'project' ? projectBoxText(sec) : !reviewing && pageKind === 'about' ? asText(sec.lines) : ''));
+  const [title, setTitle] = useState(() => (!reviewing && pageKind ? sec.title : ''));
   const [subs, setSubs] = useState<Array<{ id: string; title: string; text: string }>>([]);
   const others = editing ? titleSuggestions(s.formats, sec.key, title) : [];
   const startEdit = () => {
-    setText(asText(sec.lines));
+    setText(pageKind === 'project' ? projectBoxText(sec) : asText(sec.lines));
     setTitle(sec.title);
-    setSubs((sec.subs ?? []).map((sb) => ({ id: sb.id, title: sb.title, text: asText(sb.lines) })));
+    setSubs(pageKind === 'project' ? [] : (sec.subs ?? []).map((sb) => ({ id: sb.id, title: sb.title, text: asText(sb.lines) })));
     setEditing(true);
   };
   const [remark, setRemark] = useState<'comment' | 'suggestion' | null>(null);
   const [remarkText, setRemarkText] = useState('');
   const [suggestText, setSuggestText] = useState('');
   const [applyOpen, setApplyOpen] = useState(false);
-  const reviewing = Boolean(s.reviewerAs);
   const remarks = job.review.remarks.filter((r) => r.section === sec.key && r.state === 'open');
   const changed = Boolean(job.lastChange?.keys.includes(sec.key)) || Boolean(job.undoStep?.tab === 'doc' && job.undoStep.keys?.[0] === sec.key);
   const sinceLastRound = reviewing && changedSinceLastRound(job).includes(sec.key);
-  // One header row: heading, Approve, Undo, pencil, grip. About us / Project page fields live in the section body.
+  // One header row: heading, Approve, Undo, pencil, grip. About us / Project helpers live inside the open editor (like other sections).
   const icons = Boolean(draft) && !reviewing;
   const editTip = `Edit ${sec.title}${sec.key === 'apply' ? ': its text and how people apply' : ''}${sec.edited ? ' · Edited by you' : ''}`;
   const noteText = changed && !reviewing ? (job.lastChange?.text ?? (job.undoStep && !job.undoStep.removed ? job.undoStep.text : undefined)) : undefined;
-  const pageKind = sec.key === 'about' ? 'about' : sec.key === PROJECT_SECTION ? 'project' : null;
-  const openPage = open ?? pageOpen;
   return (
     <section id={`ej-sec-${sec.key}`} className="ej-dsec rounded-2xl px-3 py-2" data-changed={changed} data-review-changed={sinceLastRound} data-current={current || undefined} data-drop-key={draft ? sec.key : undefined} data-drop-group={draft ? groupOfKey(groupingOf(job), sec.key) : undefined} data-drop={draft && draft.dropAfter === sec.key ? 'after' : undefined} aria-label={sec.title} style={{ scrollMarginTop: 12 }}>
       <div className="ej-sec-head flex items-center gap-2">
@@ -433,11 +445,6 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
           <AlertCircle size={12} strokeWidth={2} /> <span style={{ color: 'var(--text-2)' }}>{n.text.replace(`${sec.title}: `, '')}</span>
         </div>
       ))}
-      {pageKind && !reviewing && !editing && (
-        <div className="mb-2 flex flex-col gap-2">
-          <PageField job={job} s={s} kind={pageKind} open={openPage} compact />
-        </div>
-      )}
       {editing ? (
         <div className="flex flex-col gap-2">
           {draft && sec.key === 'apply' && (
@@ -464,33 +471,49 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
               ))}
             </div>
           )}
-          <textarea style={{ ...inputStyle, minHeight: 140, lineHeight: 1.6 }} value={text} onChange={(e) => setText(e.target.value)} aria-label={`${sec.title} text`} autoFocus />
-          {subs.map((sb, i) => (
-            <div key={sb.id} className="flex flex-col gap-1 rounded-xl border p-2 aj-hair">
-              <div className="flex items-center gap-1">
-                <input style={{ ...inputStyle, fontWeight: 650, flex: 1 }} value={sb.title} onChange={(e) => setSubs(subs.map((x) => (x.id === sb.id ? { ...x, title: e.target.value } : x)))} aria-label={`Heading ${i + 1} inside ${sec.title}`} placeholder="Heading" />
-                <Tip label="Move this heading up">
-                  <button type="button" className="aj-icon-btn" style={{ width: 28, height: 28 }} disabled={i === 0} onClick={() => setSubs(swap(subs, i, i - 1))} aria-label={`Move ${sb.title || 'this heading'} up`}>
-                    <ChevronUp size={13} strokeWidth={2} />
-                  </button>
-                </Tip>
-                <Tip label="Remove this heading and its text">
-                  <button type="button" className="aj-icon-btn" style={{ width: 28, height: 28 }} onClick={() => setSubs(subs.filter((x) => x.id !== sb.id))} aria-label={`Remove ${sb.title || 'this heading'}`}>
-                    <X size={13} strokeWidth={2} />
-                  </button>
-                </Tip>
+          {pageKind && <PageFillTools kind={pageKind} website={s.org.website} text={text} onText={(t) => setText(t.slice(0, MAX_TEXT))} disabled={reviewing} />}
+          <textarea style={{ ...inputStyle, minHeight: 140, lineHeight: 1.6 }} value={text} onChange={(e) => setText(e.target.value)} aria-label={`${sec.title} text`} autoFocus placeholder={pageKind ? `Write ${sec.title} here` : undefined} />
+          {!pageKind &&
+            subs.map((sb, i) => (
+              <div key={sb.id} className="flex flex-col gap-1 rounded-xl border p-2 aj-hair">
+                <div className="flex items-center gap-1">
+                  <input style={{ ...inputStyle, fontWeight: 650, flex: 1 }} value={sb.title} onChange={(e) => setSubs(subs.map((x) => (x.id === sb.id ? { ...x, title: e.target.value } : x)))} aria-label={`Heading ${i + 1} inside ${sec.title}`} placeholder="Heading" />
+                  <Tip label="Move this heading up">
+                    <button type="button" className="aj-icon-btn" style={{ width: 28, height: 28 }} disabled={i === 0} onClick={() => setSubs(swap(subs, i, i - 1))} aria-label={`Move ${sb.title || 'this heading'} up`}>
+                      <ChevronUp size={13} strokeWidth={2} />
+                    </button>
+                  </Tip>
+                  <Tip label="Remove this heading and its text">
+                    <button type="button" className="aj-icon-btn" style={{ width: 28, height: 28 }} onClick={() => setSubs(subs.filter((x) => x.id !== sb.id))} aria-label={`Remove ${sb.title || 'this heading'}`}>
+                      <X size={13} strokeWidth={2} />
+                    </button>
+                  </Tip>
+                </div>
+                <textarea style={{ ...inputStyle, minHeight: 80, lineHeight: 1.6 }} value={sb.text} onChange={(e) => setSubs(subs.map((x) => (x.id === sb.id ? { ...x, text: e.target.value } : x)))} aria-label={`${sb.title || 'Heading'} text`} />
               </div>
-              <textarea style={{ ...inputStyle, minHeight: 80, lineHeight: 1.6 }} value={sb.text} onChange={(e) => setSubs(subs.map((x) => (x.id === sb.id ? { ...x, text: e.target.value } : x)))} aria-label={`${sb.title || 'Heading'} text`} />
-            </div>
-          ))}
-          <button type="button" className="aj-text-btn self-start" style={{ height: 28, paddingInline: 0 }} onClick={() => setSubs([...subs, { id: subId(), title: '', text: '' }])} aria-label="Add a sub-section heading inside this section">
-            <Plus size={12} strokeWidth={2} aria-hidden /> Add a heading inside this section
-          </button>
+            ))}
+          {!pageKind && (
+            <button type="button" className="aj-text-btn self-start" style={{ height: 28, paddingInline: 0 }} onClick={() => setSubs([...subs, { id: subId(), title: '', text: '' }])} aria-label="Add a sub-section heading inside this section">
+              <Plus size={12} strokeWidth={2} aria-hidden /> Add a heading inside this section
+            </button>
+          )}
           <div className="flex gap-1.5">
             <button
               type="button"
               className="aj-ink-btn"
               onClick={() => {
+                if (pageKind === 'project') {
+                  const nextTitle = title.trim();
+                  if (nextTitle && nextTitle !== sec.title) renameSection(job.id, sec.key, nextTitle);
+                  if (text.trim()) savePageFieldText(job.id, 'project', text);
+                  setEditing(false);
+                  return;
+                }
+                if (pageKind === 'about') {
+                  editSection(job.id, sec.key, text, noteEdits, { title });
+                  setEditing(false);
+                  return;
+                }
                 editSection(job.id, sec.key, text, noteEdits, { title, subs: subs.map((x) => ({ id: x.id, title: x.title, text: x.text })) });
                 setEditing(false);
               }}
@@ -503,7 +526,7 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
           </div>
         </div>
       ) : (
-        // About us / Project: show saved lines and subs like Preview (U-3). PageField above is intake (Draft tools only); body edit is the pencil.
+        // Reading view only (like other sections). About us / Project open with the pencil: helpers + one box + Save/Cancel.
         <SectionText job={job} sec={sec} since={since}>
           <Lines lines={sec.lines} job={job} section={sec.key} onFlag={onFlag} />
           {sec.subs?.map((sb) => (
@@ -865,7 +888,7 @@ function RemovedNote({ job }: { job: DemoJob }) {
 }
 
 /** `current`: the section in view in the window, marked; `noteEdits`: the window's chat notices hand edits; `draft`: the window's icons. */
-export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inWindow, open }: { job: DemoJob; s: State; onSeeChat?: () => void; current?: string | null; noteEdits?: boolean; draft?: boolean; open?: (t: OpenTarget) => void }) {
+export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inWindow }: { job: DemoJob; s: State; onSeeChat?: () => void; current?: string | null; noteEdits?: boolean; draft?: boolean; open?: (t: OpenTarget) => void }) {
   const [flag, setFlag] = useState<Flag | null>(null);
   const [since] = useState(() => Date.now());
   const [adding, setAdding] = useState<{ after: string | null; anchor: HTMLElement; end: boolean } | null>(null);
@@ -952,14 +975,19 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inW
           return (
             <Fragment key={k}>
               {sec ? (
-                <SectionView job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === k)} onFlag={setFlag} onSeeChat={onSeeChat} current={current === k} noteEdits={noteEdits} since={since} draft={tools} open={open} />
+                <SectionView job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === k)} onFlag={setFlag} onSeeChat={onSeeChat} current={current === k} noteEdits={noteEdits} since={since} draft={tools} />
               ) : (
                 <section id={`ej-sec-${k}`} className="rounded-2xl px-3 py-2" data-drop-key={icons ? k : undefined} data-drop-group={icons ? groupOfKey(g, k) : undefined} data-drop={dropAfter === k ? 'after' : undefined} aria-label={`${heading(k)}, not written yet`} style={{ scrollMarginTop: 12 }}>
                   <h3 className="aj-faint">{heading(k)}</h3>
-                  {pageKind && icons && <PageField job={job} s={s} kind={pageKind} open={open ?? pageOpen} compact />}
-                  <p className="aj-faint m-0" style={{ fontSize: 12.5 }}>
-                    Written when we get here.
-                  </p>
+                  {icons && pageKind ? (
+                    <button type="button" className="aj-pill" style={{ height: 30 }} onClick={() => editSection(job.id, k, '')}>
+                      Write {heading(k)}
+                    </button>
+                  ) : (
+                    <p className="aj-faint m-0" style={{ fontSize: 12.5 }}>
+                      Written when we get here.
+                    </p>
+                  )}
                 </section>
               )}
               {removedAt === k && !hideRemoved && <RemovedNote job={job} />}

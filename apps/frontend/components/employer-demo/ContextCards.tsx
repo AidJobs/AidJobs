@@ -2,19 +2,106 @@
 
 import { FileUp, Link2 } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { acceptPageDraft, acceptSuggestion, addOrgSocial, canEditOrgSocial, rejectPageDraft, rejectSuggestion, removeOrgSocial, setPageIntake, socialLabel, toggleJobSocial } from './context';
+import { acceptPageDraft, acceptSuggestion, addOrgSocial, canEditOrgSocial, extractDraft, pageLinesOf, rejectPageDraft, rejectSuggestion, removeOrgSocial, setPageIntake, socialLabel, toggleJobSocial } from './context';
 import { draftFromPage, MAX_TEXT, readPageVia } from './pages';
 import { ACCEPTED, readJobFile } from './readFile';
 import type { OpenTarget } from './aiActions';
 import type { DemoJob, State } from './types';
 import { inputStyle } from './ui';
 
+/** Turn page/paste text into lines for the open section editor (fill the same box; Save still commits). */
+function fillLinesFrom(raw: string): string {
+  const page = raw.slice(0, MAX_TEXT);
+  const drafted = extractDraft(page);
+  if (drafted.length) return drafted.join('\n');
+  const lines = pageLinesOf(page);
+  return lines.length ? lines.map((l) => (l.startsWith('- ') ? `• ${l.slice(2)}` : l)).join('\n') : page;
+}
+
 /**
- * The website field (About us) or the project field (About the project), section 19, phase 5, A: one https page, read by the demo's page
- * route; or the text pasted; or a file, read in the browser. The box is intake only (URL / Read / Draft / Upload) — not the section body.
- * Body edit is the pencil (Save commits, Cancel closes). Compact JD no longer shows Save/Cancel on this pad (U-3 follow-up, 20 Nov 2026).
+ * Link / Read / Draft / Upload that fill an open About us or Project editor (same box as Save/Cancel).
+ * Used inside the JD pencil editor — not a second body.
  */
-export function PageField({ job, s, kind, open, compact }: { job: DemoJob; s: State; kind: 'about' | 'project'; open: (t: OpenTarget) => void; compact?: boolean }) {
+export function PageFillTools({ kind, website, text, onText, disabled }: { kind: 'about' | 'project'; website?: string; text: string; onText: (t: string) => void; disabled?: boolean }) {
+  const [url, setUrl] = useState(kind === 'about' ? website ?? '' : '');
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+  const file = useRef<HTMLInputElement>(null);
+  const read = async () => {
+    if (!url.trim() || disabled) return;
+    setBusy(true);
+    setNote('');
+    const r = await readPageVia(kind === 'about' ? 'website' : 'project', url);
+    setBusy(false);
+    if (!r.ok) return setNote(`${r.reason.charAt(0).toUpperCase()}${r.reason.slice(1)}: paste its text below, or upload the file.`);
+    onText(fillLinesFrom(r.text));
+  };
+  return (
+    <div className="flex flex-col gap-2" role="group" aria-label={kind === 'about' ? 'Fill About us from a page or file' : 'Fill About the project from a page or file'}>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Link2 size={14} strokeWidth={1.8} className="aj-faint shrink-0" aria-hidden />
+        <input
+          style={{ ...inputStyle, minHeight: 34, flex: 1, minWidth: 180 }}
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && !busy && !disabled && read()}
+          placeholder={kind === 'about' ? 'https://your-organisation.org/about' : 'https://… the project’s page'}
+          aria-label={kind === 'about' ? 'Your organisation’s page address' : 'The project page address'}
+          disabled={disabled || busy}
+          inputMode="url"
+        />
+        <button type="button" className="aj-pill" style={{ height: 34 }} disabled={busy || disabled || !url.trim()} onClick={read}>
+          {busy ? 'Reading…' : 'Read this page'}
+        </button>
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          className="aj-text-btn"
+          style={{ height: 30 }}
+          disabled={busy || disabled || !text.trim()}
+          onClick={() => {
+            setNote('');
+            onText(fillLinesFrom(text));
+          }}
+        >
+          Draft from this text
+        </button>
+        <button type="button" className="aj-text-btn ej-upload-btn" style={{ height: 30 }} disabled={busy || disabled} onClick={() => file.current?.click()}>
+          <FileUp size={13} strokeWidth={1.8} aria-hidden />
+          <span>Upload a file</span>
+        </button>
+        <input
+          ref={file}
+          type="file"
+          accept={ACCEPTED}
+          className="sr-only"
+          tabIndex={-1}
+          aria-hidden
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            e.target.value = '';
+            if (!f || disabled) return;
+            const r = await readJobFile(f);
+            if (r.error !== undefined) return setNote(r.error);
+            onText(fillLinesFrom(r.text));
+          }}
+        />
+      </div>
+      {note && (
+        <span role="alert" style={{ color: 'var(--amber)' }}>
+          {note}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Chat / window field (About us or About the project): link, paste, or upload → draft card (Accept / Edit / Reject).
+ * The JD pencil editor uses PageFillTools + Save/Cancel on the section instead (U-3, 20 Nov 2026).
+ */
+export function PageField({ job, s, kind, open }: { job: DemoJob; s: State; kind: 'about' | 'project'; open: (t: OpenTarget) => void; compact?: boolean }) {
   const [url, setUrl] = useState(kind === 'about' ? s.org.website : '');
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
@@ -43,13 +130,11 @@ export function PageField({ job, s, kind, open, compact }: { job: DemoJob; s: St
   };
   return (
     <div className="flex flex-col gap-2" role="group" aria-label={kind === 'about' ? 'Draft About us from your organisation’s page' : 'The project this job is for'}>
-      {!compact && (
-        <span className="aj-muted">
-          {kind === 'about'
-            ? 'Draft About us from your organisation’s own page (one page, such as your About page). Only that page is read, and nothing goes on the job until you accept the draft.'
-            : 'The project this job is for: a link to its page, the text, or a file. I draft About the project from it alone; it stays on this job.'}
-        </span>
-      )}
+      <span className="aj-muted">
+        {kind === 'about'
+          ? 'Draft About us from your organisation’s own page (one page, such as your About page). Only that page is read, and nothing goes on the job until you accept the draft.'
+          : 'The project this job is for: a link to its page, the text, or a file. I draft About the project from it alone; it stays on this job.'}
+      </span>
       <div className="flex flex-wrap items-center gap-1.5">
         <Link2 size={14} strokeWidth={1.8} className="aj-faint shrink-0" aria-hidden />
         <input
@@ -67,15 +152,15 @@ export function PageField({ job, s, kind, open, compact }: { job: DemoJob; s: St
         </button>
       </div>
       <textarea
-        style={{ ...inputStyle, minHeight: compact ? 96 : 64 }}
+        style={{ ...inputStyle, minHeight: 64 }}
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder={compact ? `Paste or write ${what} here, then Draft` : 'Or paste the text here'}
+        placeholder="Or paste the text here"
         aria-label={`Text for ${what}`}
         disabled={ro}
       />
       <div className="flex flex-wrap items-center gap-1.5">
-        <button type="button" className={compact ? 'aj-text-btn' : 'aj-pill'} style={{ height: 30 }} disabled={busy || ro || !text.trim()} onClick={() => makeDraft(text, 'you told us')}>
+        <button type="button" className="aj-pill" style={{ height: 30 }} disabled={busy || ro || !text.trim()} onClick={() => makeDraft(text, 'you told us')}>
           Draft from this text
         </button>
         <button type="button" className="aj-text-btn ej-upload-btn" style={{ height: 30 }} disabled={busy || ro} onClick={() => file.current?.click()}>
@@ -95,10 +180,6 @@ export function PageField({ job, s, kind, open, compact }: { job: DemoJob; s: St
             if (!f) return;
             const r = await readJobFile(f);
             if (r.error !== undefined) return setNote(r.error);
-            if (compact) {
-              setText(r.text.slice(0, MAX_TEXT));
-              return;
-            }
             await makeDraft(r.text, 'you told us');
           }}
         />
