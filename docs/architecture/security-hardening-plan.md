@@ -1678,6 +1678,14 @@ Approved by the user on 2 November 2026, with an independent code review before 
 - On Render: no setting change; the build log of the last deploy showed a fresh environment, so the next deploy is expected to install only the 49 packages, which its own check confirms ("All 51 locked packages", the 49 and the two build tools).
 - Reviewed by the independent code review: approve with changes (nothing at runtime or in tests needs the four packages; the lock diff is exactly those four); its changes, all in the records, applied.
 
+#### Stage 3A, soupsieve exception clearance (PR #175)
+
+Temporary entry in `.github/audit-exceptions.json` for soupsieve `GHSA-mmhr-3c5m-f64f` / `CVE-2026-126190` (`review_by` 2026-11-22), added during W-35 pull request 3a because `scripts/lock.sh` `exclude_newer` was `2026-10-30T20:55:00Z` and could not take soupsieve 4.0 (published 2026-11-03T14:28:53Z). Cleared 20 November 2026 as [PR #175](https://github.com/AidJobs/AidJobs/pull/175), merged at the approved head `5853318` as `664a8ff`:
+
+- `exclude_newer` moved to `2026-11-03T15:00:00Z`; locks recompiled with `scripts/lock.sh` only (uv 0.13.6, Python 3.11.9, Linux manylinux).
+- `soupsieve==4.0` in `requirements.txt` and `requirements-test.txt`; exceptions file emptied to `{"version": 1, "exceptions": []}`.
+- Same cut-off also took `anyio` 4.15.1→4.16.0 (runtime) and audit-tools patches (`filelock`, `pip`, `platformdirs`). Independent review: Approve. CI on `main` green (lock check, Render rehearsal, audit gate). Render Auto-Deploy put `664a8ff` live (Events). Dependabot alerts #118 and #119 fixed the same day.
+
 #### Stage 3A, part 3, step 3: live record (pull request B)
 
 Merge approved by the user on 2 November 2026, at first after the next scheduled crawl, then, after the user asked whether the wait was needed and the risk was set out (no package version had changed; the crawler loads at start-up; the removed packages are unused), immediately, with the crawl checked on the final build. Times IST, 2 November 2026; every check by the agent read-only.
