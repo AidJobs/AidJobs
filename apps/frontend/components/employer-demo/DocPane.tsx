@@ -670,6 +670,51 @@ export function TitleEditor({ job, disabled }: { job: DemoJob; disabled?: boolea
   );
 }
 /**
+ * How the Add panel name field finishes (R1-11 Step B): Enter commits a non-empty name; Escape and blur cancel without adding.
+ */
+export function addNameFinish(kind: 'enter' | 'escape' | 'blur', raw: string): { action: 'commit'; name: string } | { action: 'cancel' } {
+  if (kind === 'escape' || kind === 'blur') return { action: 'cancel' };
+  const name = raw.trim();
+  return name ? { action: 'commit', name } : { action: 'cancel' };
+}
+
+/** Name field for "Add your own" / "Add a group": Enter adds; Escape or blur abandons (does not add). */
+function AddNameField({ label, onCommit, onCancel }: { label: string; onCommit: (name: string) => void; onCancel: () => void }) {
+  const [draft, setDraft] = useState('');
+  const done = useRef(false);
+  const finish = (kind: 'enter' | 'escape' | 'blur') => {
+    if (done.current) return;
+    done.current = true;
+    const result = addNameFinish(kind, draft);
+    if (result.action === 'commit') onCommit(result.name);
+    else onCancel();
+  };
+  return (
+    <input
+      className="ej-ol-input"
+      style={{ minWidth: 140 }}
+      value={draft}
+      autoFocus
+      placeholder={label}
+      aria-label={label}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => finish('blur')}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          finish('enter');
+        }
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          finish('escape');
+        }
+      }}
+    />
+  );
+}
+
+/**
  * The + panel (section 19, phase 6, C): the outline's own chips, the group of the place it was opened first, then the other groups,
  * then any fixed text left out, to bring it back. A section goes where the + was opened (from the last +, at the end of its group).
  */
@@ -727,6 +772,14 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
     outlineOp(job.id, { op: 'addGroup', label: name });
     onClose();
   };
+  const startOwn = () => {
+    ownDone.current = false;
+    setOwnName('');
+  };
+  const startGroup = () => {
+    groupDone.current = false;
+    setGroupName('');
+  };
   // U-4 Step A: one chip per missing key, labeled with this job's format heading (e.g. Project brief) — not a second "Project" / "About the project" group.
   const chipName = (key: string) => headingFor(key, format);
   return (
@@ -763,28 +816,10 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
               ))}
               {gk === here &&
                 (ownName !== null ? (
-                  <input
-                    className="ej-ol-input"
-                    style={{ minWidth: 140 }}
-                    value={ownName}
-                    autoFocus
-                    placeholder="Name this section"
-                    aria-label="Name this section"
-                    onChange={(e) => setOwnName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addOwn(ownName);
-                      }
-                    }}
-                    onBlur={() => {
-                      if (ownName.trim()) addOwn(ownName);
-                      else setOwnName(null);
-                    }}
-                  />
+                  <AddNameField label="Name this section" onCommit={addOwn} onCancel={() => setOwnName(null)} />
                 ) : (
                   <Tip label="Add a section of your own here">
-                    <button type="button" className="ej-add" onClick={() => setOwnName('')} aria-label="Add your own section">
+                    <button type="button" className="ej-add" onClick={startOwn} aria-label="Add your own section">
                       <Plus size={11} strokeWidth={2} aria-hidden />
                       Add your own
                     </button>
@@ -819,28 +854,10 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
       {!version && (
         <div className="ej-ol-add-group px-1.5 pt-1">
           {groupName !== null ? (
-            <input
-              className="ej-ol-input"
-              style={{ minWidth: 160 }}
-              value={groupName}
-              autoFocus
-              placeholder="Name this group"
-              aria-label="Name this group"
-              onChange={(e) => setGroupName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  addGroup(groupName);
-                }
-              }}
-              onBlur={() => {
-                if (groupName.trim()) addGroup(groupName);
-                else setGroupName(null);
-              }}
-            />
+            <AddNameField label="Name this group" onCommit={addGroup} onCancel={() => setGroupName(null)} />
           ) : (
             <Tip label="Add a top-level group of your own">
-              <button type="button" className="ej-ol-add-group-btn" onClick={() => setGroupName('')} aria-label="Add a group">
+              <button type="button" className="ej-ol-add-group-btn" onClick={startGroup} aria-label="Add a group">
                 <Plus size={13} strokeWidth={2} aria-hidden />
                 Add a group
               </button>

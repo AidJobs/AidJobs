@@ -18,7 +18,7 @@
 3. ~~About us / Project (U-3)~~ — **Fixed 20 Nov 2026** (Step A + Step B; preview confirmed)  
 4. ~~Grip: Project/Background when relevant; open menu without accidental drag~~ — **Fixed 20 Nov 2026** (U-4; user confirmed Step A + Step B)
 
-5. Approve vs unsaved buffers; Add-panel blur/Escape ← **Step A built; confirm then Step B**
+5. ~~Approve vs unsaved buffers; Add-panel blur/Escape~~ — **Step A confirmed; Step B shipped (awaiting preview)**
 
 ---
 
@@ -47,7 +47,7 @@
 | R1-03 | OPEN | “Use our About us as it is” on Local NGO concise adds no About us section (template starts at Project brief); chat says kept. | NGO |
 | R1-04 | **Fixed** (with U-2, 20 Nov 2026) | Undo / remove / walk: focus steal to Market; remove can mount Market without scroll; lingering `lastChange`/`undoStep` permanently skips later Market open; chat Undo may not pin part. | Chrome, INGO, U-2 |
 | R1-05 | **Fixed** (U-2 + note-hide follow-up, 20 Nov 2026) | Removed note auto-dismiss (~2s) called `dismissChange` and deleted Undo. Now the note hides in the UI only; `undoStep` stays for chat Undo until the next change. | Chrome |
-| R1-06 | Step A built (20 Nov 2026); Step B is Add-panel | Approve hidden while pencil open; Save that changes text clears `walk.approved` for that section (`editSection` / project Save). | Step A awaiting preview confirm |
+| R1-06 | **Fixed** (20 Nov 2026; Step A `eccb4a7`) | Approve hidden while pencil open; Save that changes text clears `walk.approved` for that section (`editSection` / project Save). | User confirmed on preview, 20 Nov 2026 |
 | R1-07 | OPEN | Language “Mark as reviewed” while still source language; Remove language permanent (live too); tab X confirms but no Undo. | INGO *(language — defer unless blocks English)* |
 | R1-08 | OPEN | UN templates not classifiable: competencies, education, grade/GS/ICS, NY closing time, fake ICSC pay, no PSEA/special notice, CV-style apply. | UN *(format content — after English chrome)* |
 
@@ -57,7 +57,7 @@
 | --- | --- | --- |
 | R1-09 | OPEN (partial) | **U-1 placement Fixed 20 Nov 2026.** Still open: Publish early while Languages/Review in +N; icons hidden until writing; phone parts over icons. |
 | R1-10 | OPEN (partial: click/drag Fixed in U-4 Step B) | Grip drag threshold raised 3→12px (menu click). Still open: Move up/down says “Moved” at ends; no group drop targets; remove group deletes its sections. |
-| R1-11 | OPEN | Add panel: blur commits “Add your own” / group; Escape still adds; no Cancel. |
+| R1-11 | Step B built (20 Nov 2026) | Add panel name field: Enter commits; Escape and blur cancel without adding. | Awaiting preview confirm |
 | R1-12 | OPEN | Section header row: Approve/Undo/Also-in clip; pencil/grip hard on narrow/touch (opacity 0.45). |
 | R1-13 | OPEN | Preview Eye vanishes while Preview tab stays after picking a progress part. |
 | R1-14 | OPEN | Check card vs progress “Check done” disagree (skipped/google points). |
