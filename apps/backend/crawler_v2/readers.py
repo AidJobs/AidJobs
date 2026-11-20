@@ -284,17 +284,29 @@ class GreenhouseFeedReader(Reader):
 
 
 def _detail_refusal(answer: Response) -> bool:
-    """True when further Greenhouse detail GETs must stop (401/403/429/challenge/budget)."""
+    """True when further Greenhouse detail GETs must stop (refusals / challenges / budgets).
+
+    A successful empty stop at HTTP 200 is not a refusal. Any other 2xx with a stop (including
+    challenge pages named without the word "challenge", e.g. Akamai), and 401/403/429, stop the
+    remainder of the detail cap.
+    """
     if answer.status in (401, 403, 429):
         return True
-    stop = (answer.stop or "").lower()
+    # Non-200 2xx answers are refusals under the fetch policy (e.g. HTTP 202).
+    if 200 < answer.status < 300:
+        return True
+    stop = (answer.stop or "").strip()
+    if answer.status == 200 and stop:
+        return True
     if not stop:
         return False
+    lower = stop.lower()
     return any(
-        marker in stop
+        marker in lower
         for marker in (
             "challenge",
             "refused",
+            "akamai",
             "shared host budget",
             "request budget",
             "time budget",

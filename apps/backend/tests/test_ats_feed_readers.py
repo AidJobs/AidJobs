@@ -169,6 +169,28 @@ def test_greenhouse_detail_stops_after_refusal():
     assert all(not job.get("posted_on") for job in result.jobs)
 
 
+def test_greenhouse_detail_stops_on_akamai_challenge_at_200():
+    record = _record("greenhouse")
+    data = json.loads(_body("greenhouse"))
+    for item in data["jobs"]:
+        item.pop("first_published", None)
+    calls: list[str] = []
+
+    async def fetch(request: Request) -> Response:
+        calls.append(request.url)
+        return Response(200, "", stop="HTTP 200 (Akamai)")
+
+    result = asyncio.run(
+        GreenhouseFeedReader().read(
+            Response(200, json.dumps(data)),
+            {"careers_url": record["url"]},
+            fetch=fetch,
+        )
+    )
+    assert len(calls) == 1
+    assert all(not job.get("posted_on") for job in result.jobs)
+
+
 def test_greenhouse_detail_continues_after_404():
     record = _record("greenhouse")
     data = json.loads(_body("greenhouse"))
