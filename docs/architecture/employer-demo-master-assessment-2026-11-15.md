@@ -31,7 +31,7 @@
 | ID | Status | Fault | Evidence |
 | --- | --- | --- | --- |
 | U-1 | **Fixed** (20 Nov 2026) | Progress line on the **job panel** (phase 3), flush under the window header; measure-row bug removed; header and progress hairlines removed; chat in `aj-card` aligned with the progress line; `+N` clear of the connector; side menu resizable (drag open/close) with open/closed remembered. | User confirmed on preview, 20 Nov 2026 |
-| U-2 | **Fixed** (code 20 Nov 2026; confirm on preview) | Undo / remove / walk no longer open Market over the JD; Removed Undo stays until used; chat undo and `lastChange` pin like icon Undo. Builds on `13891bb`; finishes orphan `part`, shared pin, suppressed walk step, and 2s dismiss. | Tests in `employerDemoPhase6.test.ts` (U-2); independent plan review |
+| U-2 | **Fixed** (code 20 Nov 2026; confirm on preview) | Undo / remove / walk no longer open Market over the JD; chat undo and `lastChange` pin like icon Undo. Removed note hides after ~2s **without** clearing `undoStep` (polish `3f0f4c4` + R1-05; U-2 had wrongly left the note forever). | Tests in `employerDemoPhase6.test.ts` (U-2); independent plan review |
 | U-3 | OPEN | About us / Project Save and Cancel still do not work as a product action (buffer, rename, hide advert text, Cancel only clears local typing). | User; NGO; chrome High #8–10 |
 | U-4 | OPEN | Grip ⋯ has no Project / Background when that section already exists under another heading (e.g. Local NGO “Project brief”). “Add About the project” only when `background` missing. Three names for one key. | User; NGO |
 
@@ -45,7 +45,7 @@
 | R1-02 | OPEN | Setup “If this job is for a project…”: typing yes / ok / sure skips project and discards paste. Setup card has no Save/Cancel; draft disabled under 40 chars; bullets / no full stop rejected. | NGO, INGO |
 | R1-03 | OPEN | “Use our About us as it is” on Local NGO concise adds no About us section (template starts at Project brief); chat says kept. | NGO |
 | R1-04 | **Fixed** (with U-2, 20 Nov 2026) | Undo / remove / walk: focus steal to Market; remove can mount Market without scroll; lingering `lastChange`/`undoStep` permanently skips later Market open; chat Undo may not pin part. | Chrome, INGO, U-2 |
-| R1-05 | **Fixed** (with U-2, 20 Nov 2026) | Removed note auto-dismiss (~2s) calls `dismissChange` and deletes Undo — section unrestorable. | Chrome |
+| R1-05 | **Fixed** (U-2 + note-hide follow-up, 20 Nov 2026) | Removed note auto-dismiss (~2s) called `dismissChange` and deleted Undo. Now the note hides in the UI only; `undoStep` stays for chat Undo until the next change. | Chrome |
 | R1-06 | OPEN | Approve ignores unsaved pencil / PageField `edit`; later Save stays approved; `nextStep` skips that section. | Chrome |
 | R1-07 | OPEN | Language “Mark as reviewed” while still source language; Remove language permanent (live too); tab X confirms but no Undo. | INGO *(language — defer unless blocks English)* |
 | R1-08 | OPEN | UN templates not classifiable: competencies, education, grade/GS/ICS, NY closing time, fake ICSC pay, no PSEA/special notice, CV-style apply. | UN *(format content — after English chrome)* |
@@ -305,6 +305,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | --- | --- | --- | --- |
 | 20 Nov 2026 | U-1 (confirmed) | `3d8e2cc`…`2ac7419` | User confirmed on preview. Measure-row absolute (`3d8e2cc`); hairlines off + chat `aj-card` (`259e8e3`); `+N` below track (`9edf0db`); chat top aligned with progress + resizable menu (`0d190d6`); drag collapse/open (`9b448ad`…`cd6f266`); menu open/closed persisted (`2ac7419`). R1-09 / R2-P1-1 placement closed; their other bullets stay open. |
 | 20 Nov 2026 | U-2, R1-04, R1-05, R2-P0-6, R2-P0-7, R2-P1-2 | `7780a69` | Amended plan after [independent review](efa9f95b-2154-433d-be52-95eb4c61db0c). `keepJdPart` + pin on remove / removeGroup / toggleSection; unified undo (chat + `undoLastChange` clear both offers); `currentPart` orphan guard; `walkAutoOpen` + suppressed step (Market walk still follows when not on a JD section); removed 2s `useRemovedNoteDismiss`. Confirm on preview. |
+| 20 Nov 2026 | R1-05 / R2-P0-6 follow-up | *(pending)* | U-2 left the Removed note forever (wrong). Restore polish `3f0f4c4`: hide Removed note after ~2s via `useRemovedNoteHidden` **without** `dismissChange`, so chat Undo still works. |
 
 ---
 

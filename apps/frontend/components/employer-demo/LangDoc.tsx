@@ -4,7 +4,7 @@ import { ChevronUp, Pencil, Plus, X } from 'lucide-react';
 import { Fragment, useRef, useState } from 'react';
 import Tip from '@/components/site/Tip';
 import { dismissToUpdate, editVersionSection, keepTranslation, refreshTranslation, reviewTranslation, subId, undoStep, versionOp } from './actions';
-import { AddPanel, StepNote } from './DocPane';
+import { AddPanel, StepNote, useRemovedNoteHidden } from './DocPane';
 import FixedBlock from './FixedBlock';
 import Grip, { dropAt, type GripAction } from './Grip';
 import { groupLabelOf, groupOfKey, groupOrderOf, KEPT } from './outline';
@@ -224,6 +224,8 @@ export function LangDoc({ job, s, lang, readOnly = false }: { job: DemoJob; s: S
   const [adding, setAdding] = useState<{ after: string | null; anchor: HTMLElement; end: boolean } | null>(null);
   const [dropAfter, setDropAfter] = useState<string | null | undefined>(undefined);
   const t = job.translations?.[lang];
+  const removedKey = job.undoStep?.removed && !job.undoStep.writing && job.undoStep.tab === lang ? job.undoStep.removed.key : undefined;
+  const hideRemoved = useRemovedNoteHidden(removedKey);
   if (!t) return null;
   const info = langOf(lang);
   const own = langOf(jobLang(job));
@@ -260,15 +262,16 @@ export function LangDoc({ job, s, lang, readOnly = false }: { job: DemoJob; s: S
   const step = job.undoStep?.tab === lang ? job.undoStep : undefined;
   const removedAt = step?.removed ? (step.removed.after && keys.includes(step.removed.after) ? step.removed.after : null) : undefined;
   const topNote = step && !step.removed && !step.keys?.some((k) => keys.includes(k));
-  const removedNote = step?.removed && (
-    <div className="ej-change-note ej-removed-note" role="status" lang="en" dir="ltr">
-      <X size={12} strokeWidth={2.4} />
-      <span className="min-w-0 flex-1">Removed {step.removed.title}</span>
-      <button type="button" className="aj-text-btn" style={{ height: 24 }} onClick={() => undoStep(job.id)}>
-        Undo
-      </button>
-    </div>
-  );
+  const removedNote =
+    step?.removed && !hideRemoved ? (
+      <div className="ej-change-note ej-removed-note" role="status" lang="en" dir="ltr">
+        <X size={12} strokeWidth={2.4} />
+        <span className="min-w-0 flex-1">Removed {step.removed.title}</span>
+        <button type="button" className="aj-text-btn" style={{ height: 24 }} onClick={() => undoStep(job.id)}>
+          Undo
+        </button>
+      </div>
+    ) : null;
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2 rounded-xl p-3" style={{ background: isStale ? 'var(--amber-bg)' : 'var(--surface-2)' }} lang="en" dir="ltr">

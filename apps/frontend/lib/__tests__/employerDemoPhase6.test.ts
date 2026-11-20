@@ -996,19 +996,19 @@ describe('U-2: Undo / remove / walk stay on the JD (no Market steal; Undo until 
     expect(job(id).part?.startsWith('s:') && job(id).tags.includes(job(id).part!.slice(2))).toBe(true);
   });
 
-  it('Removed note is not auto-dismissed: DocPane and LangDoc no longer call dismissChange on a timer', () => {
-    for (const f of ['DocPane.tsx', 'LangDoc.tsx']) {
-      const src = fs.readFileSync(path.join(__dirname, '../../components/employer-demo', f), 'utf8');
-      expect(src).not.toMatch(/useRemovedNoteDismiss/);
-      expect(src).not.toMatch(/dismissChange/);
-      expect(src).not.toMatch(/setTimeout\(\s*\(\)\s*=>\s*dismissChange/);
-    }
+  it('Removed note hides after a short wait without clearing undoStep (chat Undo still works)', () => {
+    const doc = fs.readFileSync(path.join(__dirname, '../../components/employer-demo/DocPane.tsx'), 'utf8');
+    expect(doc).toMatch(/useRemovedNoteHidden/);
+    expect(doc).toMatch(/setTimeout\(\s*\(\)\s*=>\s*setHiddenFor\(removedKey\),\s*2000\)/);
+    expect(doc).not.toMatch(/setTimeout\(\s*\(\)\s*=>\s*dismissChange/);
     const id = 'job-comms';
     const key = job(id).tags.find((k) => k !== 'apply')!;
     outlineOp(id, { op: 'remove', key });
     expect(job(id).undoStep?.removed?.key).toBe(key);
-    undoStep(id);
+    // Note may be hidden in the UI; undoStep must remain so chat Undo restores the section.
+    sendChat(id, 'undo');
     expect(job(id).tags).toContain(key);
+    expect(job(id).undoStep).toBeUndefined();
   });
 
   it('walkAutoOpen: edit holds Market; clearing skips that suppressed step; a walk already on details still follows Market', () => {

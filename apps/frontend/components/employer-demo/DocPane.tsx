@@ -23,6 +23,24 @@ import { RevealBlock } from './Reveal';
 import { getState } from './store';
 import { Dialog, Field, inputStyle } from './ui';
 
+/**
+ * Hide only the “Removed …” note after ~2s (polish `3f0f4c4`). Does not call `dismissChange`, so `undoStep` stays for chat Undo and
+ * Earlier versions until the next outline change (R1-05). Edit / StepNote stays until Undo.
+ */
+export function useRemovedNoteHidden(removedKey: string | undefined): boolean {
+  const [hiddenFor, setHiddenFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!removedKey) {
+      setHiddenFor(null);
+      return;
+    }
+    setHiddenFor(null);
+    const t = window.setTimeout(() => setHiddenFor(removedKey), 2000);
+    return () => clearTimeout(t);
+  }, [removedKey]);
+  return Boolean(removedKey && hiddenFor === removedKey);
+}
+
 export function rich(text: string): ReactNode {
   return text.split(/(\*\*[^*]+\*\*)/g).map((p, i) => (p.startsWith('**') ? <strong key={i}>{p.slice(2, -2)}</strong> : <Fragment key={i}>{p}</Fragment>));
 }
@@ -841,7 +859,7 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
   );
 }
 
-/** A section removed with the grip or the outline leaves a one-line note where it was, with its Undo — stays until Undo or the next outline change (U-2; no timed dismiss). */
+/** A section removed with the grip or the outline leaves a one-line note where it was, with its Undo (hidden after ~2s; undoStep remains). */
 function RemovedNote({ job }: { job: DemoJob }) {
   const r = job.undoStep?.removed;
   if (!r) return null;
@@ -862,6 +880,8 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inW
   const [since] = useState(() => Date.now());
   const [adding, setAdding] = useState<{ after: string | null; anchor: HTMLElement; end: boolean } | null>(null);
   const [dropAfter, setDropAfter] = useState<string | null | undefined>(undefined);
+  const removedKey = job.undoStep?.removed && !job.undoStep.writing ? job.undoStep.removed.key : undefined;
+  const hideRemoved = useRemovedNoteHidden(removedKey);
   const root = useRef<HTMLElement>(null);
   const live = s.jobs.filter((j) => j.id !== job.id && (j.status === 'live' || j.status === 'scheduled')).map((j) => j.facts.title);
   const checks = quality(job.sections, job.facts, s.today, live);
@@ -935,7 +955,7 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inW
           <TitleEditor job={job} disabled={Boolean(s.reviewerAs)} />
         </div>
         {note && <StepNote job={job} onSeeChat={onSeeChat} />}
-        {removedAt === null && <RemovedNote job={job} />}
+        {removedAt === null && !hideRemoved && <RemovedNote job={job} />}
         {keys.map((k) => {
           const sec = job.sections.find((x) => x.key === k);
           const pageKind = k === 'about' ? 'about' : k === PROJECT_SECTION ? 'project' : null;
@@ -952,7 +972,7 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inW
                   </p>
                 </section>
               )}
-              {removedAt === k && <RemovedNote job={job} />}
+              {removedAt === k && !hideRemoved && <RemovedNote job={job} />}
             </Fragment>
           );
         })}
