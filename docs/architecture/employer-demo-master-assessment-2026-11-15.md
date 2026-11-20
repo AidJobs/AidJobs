@@ -57,7 +57,7 @@
 | --- | --- | --- |
 | R1-09 | OPEN (partial) | **U-1 placement Fixed 20 Nov 2026.** Still open: Publish early while Languages/Review in +N; icons hidden until writing; phone parts over icons. |
 | R1-10 | OPEN (partial: click/drag Fixed in U-4 Step B) | Grip drag threshold raised 3→12px (menu click). Still open: Move up/down says “Moved” at ends; no group drop targets; remove group deletes its sections. |
-| R1-11 | Step B built (20 Nov 2026) | Add panel name field: Enter commits; Escape and blur cancel without adding. | Awaiting preview confirm |
+| R1-11 | Step B follow-up (Escape hardened 20 Nov 2026) | Enter commits; blur cancels (preview OK). Escape still added on first preview — panel Escape no longer closes into an add; cancel blocks commit. | Re-confirm Escape on preview |
 | R1-12 | OPEN | Section header row: Approve/Undo/Also-in clip; pencil/grip hard on narrow/touch (opacity 0.45). |
 | R1-13 | OPEN | Preview Eye vanishes while Preview tab stays after picking a progress part. |
 | R1-14 | OPEN | Check card vs progress “Check done” disagree (skipped/google points). |
@@ -67,6 +67,7 @@
 | R1-18 | OPEN | Free plan hides Languages; Amplify/market/Reach sit in front of a small NGO post. |
 | R1-19 | OPEN | Approve vanishes with no “Approved” mark on the section. |
 | R1-20 | OPEN | Phone: template picker has no Cancel during first template choice; parts button label paints over Eye/History. |
+| R1-28 | OPEN | Pencil Save on How to apply (and likely any section) sets `part` to that section, so the How to apply / section fields open at the top of the JD until Hide. Save itself works. | User, 20 Nov 2026; English chrome |
 
 #### P2 — Languages / Amplify / UN policy (after English)
 

@@ -16,6 +16,7 @@ describe('R1-11 Step B: Add panel name finish', () => {
 
   it('Escape cancels even with typed text', () => {
     expect(addNameFinish('escape', 'Would have been added')).toEqual({ action: 'cancel' });
+    // Panel must cancel naming without closing into an add (preview finding, 20 Nov 2026).
   });
 
   it('Blur cancels even with typed text (abandon; does not add)', () => {

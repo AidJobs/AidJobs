@@ -703,10 +703,13 @@ function AddNameField({ label, onCommit, onCancel }: { label: string; onCommit: 
         if (e.key === 'Enter') {
           e.preventDefault();
           finish('enter');
+          return;
         }
-        if (e.key === 'Escape') {
+        if (e.key === 'Escape' || e.key === 'Esc') {
+          // Stop the panel's Escape (which closes it) and any later blur-commit race; cancel only.
           e.preventDefault();
           e.stopPropagation();
+          e.nativeEvent.stopImmediatePropagation?.();
           finish('escape');
         }
       }}
@@ -780,6 +783,14 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
     groupDone.current = false;
     setGroupName('');
   };
+  const cancelOwn = () => {
+    ownDone.current = true;
+    setOwnName(null);
+  };
+  const cancelGroup = () => {
+    groupDone.current = true;
+    setGroupName(null);
+  };
   // U-4 Step A: one chip per missing key, labeled with this job's format heading (e.g. Project brief) — not a second "Project" / "About the project" group.
   const chipName = (key: string) => headingFor(key, format);
   return (
@@ -791,8 +802,18 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
       role="dialog"
       aria-label="Add a section here"
       onKeyDown={(e) => {
-        if (e.key !== 'Escape') return;
+        if (e.key !== 'Escape' && e.key !== 'Esc') return;
+        e.preventDefault();
         e.stopPropagation();
+        // Naming first: Escape cancels the name field only (must not close+blur into an add).
+        if (ownName !== null) {
+          cancelOwn();
+          return;
+        }
+        if (groupName !== null) {
+          cancelGroup();
+          return;
+        }
         onClose();
         at.anchor.isConnected && at.anchor.focus();
       }}
@@ -816,7 +837,7 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
               ))}
               {gk === here &&
                 (ownName !== null ? (
-                  <AddNameField label="Name this section" onCommit={addOwn} onCancel={() => setOwnName(null)} />
+                  <AddNameField label="Name this section" onCommit={addOwn} onCancel={cancelOwn} />
                 ) : (
                   <Tip label="Add a section of your own here">
                     <button type="button" className="ej-add" onClick={startOwn} aria-label="Add your own section">
@@ -854,7 +875,7 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
       {!version && (
         <div className="ej-ol-add-group px-1.5 pt-1">
           {groupName !== null ? (
-            <AddNameField label="Name this group" onCommit={addGroup} onCancel={() => setGroupName(null)} />
+            <AddNameField label="Name this group" onCommit={addGroup} onCancel={cancelGroup} />
           ) : (
             <Tip label="Add a top-level group of your own">
               <button type="button" className="ej-ol-add-group-btn" onClick={startGroup} aria-label="Add a group">
