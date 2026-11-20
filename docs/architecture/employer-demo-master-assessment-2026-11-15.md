@@ -18,7 +18,7 @@
 3. ~~About us / Project (U-3)~~ — **Fixed 20 Nov 2026** (Step A + Step B; preview confirmed)  
 4. ~~Grip: Project/Background when relevant; open menu without accidental drag~~ — **Fixed 20 Nov 2026** (U-4; user confirmed Step A + Step B)
 
-5. ~~Approve vs unsaved buffers; Add-panel blur/Escape~~ — **Step A confirmed; Step B shipped (awaiting preview)**
+5. ~~Approve vs unsaved buffers; Add-panel blur/Escape~~ — **Fixed 20 Nov 2026** (Step A R1-06; Step B R1-11; user confirmed on preview)
 
 ---
 
@@ -57,7 +57,7 @@
 | --- | --- | --- |
 | R1-09 | OPEN (partial) | **U-1 placement Fixed 20 Nov 2026.** Still open: Publish early while Languages/Review in +N; icons hidden until writing; phone parts over icons. |
 | R1-10 | OPEN (partial: click/drag Fixed in U-4 Step B) | Grip drag threshold raised 3→12px (menu click). Still open: Move up/down says “Moved” at ends; no group drop targets; remove group deletes its sections. |
-| R1-11 | Step B follow-up (20 Nov 2026) | Enter commits; blur/Escape cancel (Escape re-confirmed). Add your own under every group (was only the open group). After Enter-add, JD scroll preserved (was jumping to the top). | Escape OK; Add-your-own groups + scroll awaiting confirm |
+| R1-11 | **Fixed** (20 Nov 2026; Step B `732a06f`…`9e4ae13`) | Enter commits; blur/Escape cancel. Add your own under every group. After Enter-add, JD scroll preserved (no jump to top). | User confirmed on preview, 20 Nov 2026 |
 | R1-12 | OPEN | Section header row: Approve/Undo/Also-in clip; pencil/grip hard on narrow/touch (opacity 0.45). |
 | R1-13 | OPEN | Preview Eye vanishes while Preview tab stays after picking a progress part. |
 | R1-14 | OPEN | Check card vs progress “Check done” disagree (skipped/google points). |
@@ -251,8 +251,8 @@ Full **icon inventory table** (Eye, History, progress, tabs, X, Approve, pencil,
 | R2-P1-1 | **(1) U-1** | **Placement Fixed 20 Nov 2026** (user confirmed). Still open: +N ordering (Publish early), phone sheet, Eye hidden until sections |
 | R2-P1-2 | **(2) Fixed with U-2** | Chat `undo` vs `undoStep`; remove dismiss |
 | R2-P1-3 | **(3)** | Save/Cancel semantics; setup card no Save; 40-char draft rule |
-| R2-P1-4 | **(4)** | Grip 3px drag; Add blur/Escape; Move at end lies |
-| R2-P1-5 | **(5)** | Approve vs buffer; triple meaning of Approve |
+| R2-P1-4 | **(4)/(5) partial Fixed** | Grip click Fixed (U-4 B); Add blur/Escape Fixed (R1-11). Still open: Move at end lies |
+| R2-P1-5 | **(5) partial Fixed** | Approve vs buffer Fixed (R1-06). Still open: triple meaning / no “Approved” mark (R1-19) |
 | R2-P1-6 | NEW | **Opening brief facts wrong** (pay/date on AI path) — Sam, verify with tests |
 | R2-P1-7 | NEW | **House format + UN chips before NGO template** — Sam, Novice |
 | R2-P1-8 | NEW | **Check “done” vs empty Qualifications** — progress vs `walk.approved` — Novice #11, R1-14 |
@@ -308,6 +308,8 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 20 Nov 2026 | U-1 (confirmed) | `3d8e2cc`…`2ac7419` | User confirmed on preview. Measure-row absolute (`3d8e2cc`); hairlines off + chat `aj-card` (`259e8e3`); `+N` below track (`9edf0db`); chat top aligned with progress + resizable menu (`0d190d6`); drag collapse/open (`9b448ad`…`cd6f266`); menu open/closed persisted (`2ac7419`). R1-09 / R2-P1-1 placement closed; their other bullets stay open. |
 | 20 Nov 2026 | U-2, R1-04, R1-05, R2-P0-6, R2-P0-7, R2-P1-2 | `7780a69` | Amended plan after [independent review](efa9f95b-2154-433d-be52-95eb4c61db0c). `keepJdPart` + pin on remove / removeGroup / toggleSection; unified undo (chat + `undoLastChange` clear both offers); `currentPart` orphan guard; `walkAutoOpen` + suppressed step (Market walk still follows when not on a JD section); removed 2s `useRemovedNoteDismiss`. Confirm on preview. |
 | 20 Nov 2026 | R1-05 / R2-P0-6 follow-up | `f34eb92` | U-2 left the Removed note forever (wrong). Restore polish `3f0f4c4`: hide Removed note after ~2s via `useRemovedNoteHidden` **without** `dismissChange`, so chat Undo still works. User confirmed on preview same day. |
+| 20 Nov 2026 | R1-06 (item 5 Step A) | `eccb4a7` | Approve hidden while pencil open; Save that changes text clears that section’s approval. User confirmed on preview. |
+| 20 Nov 2026 | R1-11 (item 5 Step B) | `732a06f`…`9e4ae13` | Add panel: Enter commits; Escape/blur cancel; Add your own under every group; Enter-add keeps JD scroll (`9e4ae13`). User confirmed on preview. R1-28 (How to apply Save opens part) still open. |
 
 ---
 
