@@ -69,7 +69,7 @@ import {
 } from './outline';
 import { canWord, fixedLabel, fixedList, fixedMarked, fixedShown, fixedStore, fixedWordingNow, isLocked, offeredFixed, ORG_LANG, orgWording } from './fixed';
 import { diffViews, isEmpty, langsOf, linkedTo, mirror, viewOf, withView, type Diff, type LangView } from './langs';
-import { keepJdPart } from './parts';
+import { hasFields, keepJdPart, sectionPart } from './parts';
 import type { ApplySettings, AskKind, ChatMsg, Content, CustomGroup, DeletedJob, Delivery, DemoJob, Facts, FixedOwn, Format, Grouping, JobLang, Pace, PayRequest, Person, Plan, ReachPlan, Recipient, Review, Section, State, Tone, Translation, UndoStep } from './types';
 
 /** A job's or a version's grouping (section 19, phase 6, B), with any added groups. */
@@ -2774,9 +2774,14 @@ export function editSection(id: string, key: string, text: string, note = false,
     const marks = Object.fromEntries(Object.entries(j.toUpdate ?? {}).filter(([k]) => k !== key));
     const base = { ...touched(j), tags, renamed, toUpdate: Object.keys(marks).length ? marks : undefined, sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${title}`, sections }], ...liveEdit(j) };
     const next: DemoJob = withoutWalkApproval(stepped(start ?? j, base, `Edited ${title}`, 'doc', { keys: [key] }), key);
-    return note
-      ? { ...next, part: `s:${key}`, chat: [...j.chat, msg('ai', `You changed **${title}** by hand. I'll keep your wording; ask me if another section should change to match.`)] }
-      : { ...next, part: `s:${key}` };
+    // Window pencil passes note=true so the chat can say so. Do not open a fields card (How to apply) on Save — R1-28.
+    // note=false (earlier workspace): leave part alone.
+    if (!note) return next;
+    const pinned = sectionPart(key);
+    const chat = [...j.chat, msg('ai', `You changed **${title}** by hand. I'll keep your wording; ask me if another section should change to match.`)];
+    // Sections with their own fields card (How to apply): keep the current part so Save does not open that card at the top.
+    if (hasFields(pinned)) return { ...next, chat };
+    return { ...next, part: pinned, chat };
   });
   if (note) ensureAsk(id);
 }
