@@ -12,7 +12,7 @@ import { PageFillTools } from './ContextCards';
 import { viewOf } from './langs';
 import { jobLang, langOf } from './translate';
 import { placeFor } from './MenuButton';
-import { groupLabelOf, groupOfKey, groupOrderOf, KEPT, placeSaid } from './outline';
+import { groupLabelOf, groupOfKey, groupOrderOf, isCustomSection, KEPT, placeSaid } from './outline';
 import { contractPicks, deadlinePicks, eligibilityPicks, gradePicks, languagePicks, methodPicks, placePatch, placePicks, salaryPicks, safeguardingPicks, type Pick } from './answers';
 import { DOCUMENTS } from './apply';
 import { PROJECT_SECTION, saveAboutForOrg, savePageFieldText } from './context';
@@ -22,7 +22,7 @@ import { MAX_TEXT } from './pages';
 import type { ApplySettings, ChatMsg, DemoJob, Facts, GroupKey, JobLang, Section as Sec, State } from './types';
 import { RevealBlock } from './Reveal';
 import { getState } from './store';
-import { Dialog, Field, inputStyle } from './ui';
+import { Dialog, Field, inputStyle, scrollInside } from './ui';
 
 /**
  * Hide only the “Removed …” note after ~2s (polish `3f0f4c4`). Does not call `dismissChange`, so `undoStep` stays for chat Undo and
@@ -745,9 +745,13 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
     document.addEventListener('pointerdown', down);
     return () => document.removeEventListener('pointerdown', down);
   }, [onClose]);
+  /** After Add, keep the JD on the new section (the change note at the top must not leave the panel scrolled away). */
   const focusAdded = (key: string) => {
     requestAnimationFrame(() => {
-      document.querySelector<HTMLElement>(`[data-grip-key="${version ? `ver:${key}` : key}"]`)?.focus({ preventScroll: true });
+      const grip = version ? `ver:${key}` : key;
+      const sec = document.getElementById(version ? `ej-ver-${key}` : `ej-sec-${key}`);
+      scrollInside(sec, 'start', false);
+      document.querySelector<HTMLElement>(`[data-grip-key="${grip}"]`)?.focus({ preventScroll: true });
     });
   };
   const add = (key: string) => {
@@ -762,10 +766,13 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
     const name = heading.trim();
     if (!name) return;
     ownDone.current = true;
+    const before = new Set(job.tags);
     const op = { op: 'addCustom' as const, heading: name, group: here, ...(at.end ? {} : { after: at.after }) };
     if (version) versionOp(job.id, version, op);
     else outlineOp(job.id, op);
     onClose();
+    const added = getState().jobs.find((j) => j.id === job.id)?.tags.find((k) => isCustomSection(k) && !before.has(k));
+    if (added) focusAdded(added);
   };
   const addGroup = (label: string) => {
     if (groupDone.current || version) return;
