@@ -133,7 +133,7 @@ class Reader:
     def first_request(self, source: Dict) -> Optional[Request]:
         """The first request for a source this reader recognises from its recruitment system's
         address, sent instead of fetching the careers page; None for a reader chosen by the
-        fetched page, as every reader is today."""
+        fetched page (HTML readers). ATS feed readers (W-38) return the documented GET feed."""
         del source
         return None
 

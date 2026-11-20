@@ -1,4 +1,4 @@
-"""The readers of a listing, in the order they are tried (ledger W-35).
+"""The readers of a listing, in the order they are tried (ledger W-35, W-38).
 
 HTML: chosen by what the fetched page shows, never by its address: the PageUp career-site
 reader, then the "Sites" engine reader, then the general rule-based reader. A reader that fails
@@ -6,6 +6,9 @@ or reads no rows passes the page to the next; the general reader's own failure f
 
 RSS and API (pull request 3b): one feed reader and one generic JSON reader. Each turns the first
 response into field-contract candidates; completeness only when the listing states a total.
+
+Public ATS feeds (W-38): Workable and Greenhouse, recognised from the source's board address via
+`first_request` (contract §10 amendment), before the generic JSON reader.
 
 The HTML adapters call the crawler's own methods, looked up when they run, so the paging walks
 stay where they are (contract §11) and a test that replaces one of those methods still reaches it.
@@ -15,11 +18,23 @@ from __future__ import annotations
 import contextvars
 import json
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import feedparser
 
 from contracts.reader import Fetch, ListingResult, Reader, Request, Response
+from crawler_v2.ats_feeds import (
+    greenhouse_job_url,
+    greenhouse_list_url,
+    greenhouse_token,
+    jobs_from_greenhouse,
+    jobs_from_workable,
+    looks_like_greenhouse,
+    looks_like_workable,
+    merge_greenhouse_detail,
+    workable_account,
+    workable_feed_url,
+)
 from crawler_v2.feed_fields import (
     job_from_json_item,
     job_from_rss_entry,
@@ -28,6 +43,9 @@ from crawler_v2.feed_fields import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Cap on Greenhouse single-job GETs for first_published when the list omits it (W-38 plan).
+GREENHOUSE_DETAIL_CAP = 10
 
 # The reader and the general reader's strategy for the current crawl, recorded on its extraction
 # log. Task-local: one crawler instance serves concurrent crawls.
@@ -179,12 +197,171 @@ class JsonApiReader(Reader):
         return ListingResult.from_report(self.name, jobs, json_listing_report(jobs, data))
 
 
+class WorkableFeedReader(Reader):
+    """Workable public widget feed (GET, no key). Recognised from apply.workable.com/{account}."""
+
+    name = "workable-feed"
+    source_types = frozenset({"api", "json"})
+    record_class = "api"
+    budget_group = "workable"
+    label = "Workable feed reader"
+
+    def first_request(self, source: Dict) -> Optional[Request]:
+        account = workable_account(source.get("careers_url") or "")
+        if not account:
+            return None
+        return Request(workable_feed_url(account), accept="application/json")
+
+    def marks(self, page: str) -> bool:
+        # Weaker than acceptance: widget-shaped JSON or a Workable board host in the body.
+        if not page:
+            return False
+        lower = page.lower()
+        return (
+            '"shortcode"' in lower
+            or "apply.workable.com" in lower
+            or ("\"jobs\"" in lower and "\"name\"" in lower and "workable" in lower)
+        )
+
+    async def read(self, first: Response, source: Dict, fetch: Optional[Fetch] = None):
+        del fetch
+        if first.stop or first.status != 200 or not (first.body or "").strip():
+            return ListingResult(self.name)
+        try:
+            data = json.loads(first.body)
+        except (TypeError, ValueError):
+            return None
+        if not looks_like_workable(data):
+            return None
+        account = workable_account(source.get("careers_url") or "") or "unknown"
+        jobs = jobs_from_workable(data, account)
+        logger.info("Workable feed reader found %s jobs", len(jobs))
+        # Widget has no catalogue total; multi-location rows inflate raw counts.
+        return ListingResult(self.name, jobs)
+
+
+class GreenhouseFeedReader(Reader):
+    """Greenhouse Job Board API (GET, no key). Recognised from job-boards.greenhouse.io/{token}."""
+
+    name = "greenhouse-feed"
+    source_types = frozenset({"api", "json"})
+    record_class = "api"
+    budget_group = "greenhouse"
+    label = "Greenhouse feed reader"
+
+    def first_request(self, source: Dict) -> Optional[Request]:
+        token = greenhouse_token(source.get("careers_url") or "")
+        if not token:
+            return None
+        return Request(greenhouse_list_url(token), accept="application/json")
+
+    def marks(self, page: str) -> bool:
+        if not page:
+            return False
+        lower = page.lower()
+        return (
+            '"absolute_url"' in lower
+            or "boards-api.greenhouse.io" in lower
+            or "job-boards.greenhouse.io" in lower
+            or ('"meta"' in lower and '"total"' in lower and '"jobs"' in lower)
+        )
+
+    async def read(self, first: Response, source: Dict, fetch: Optional[Fetch] = None):
+        if first.stop or first.status != 200 or not (first.body or "").strip():
+            return ListingResult(self.name)
+        try:
+            data = json.loads(first.body)
+        except (TypeError, ValueError):
+            return None
+        if not looks_like_greenhouse(data):
+            return None
+        token = greenhouse_token(source.get("careers_url") or "") or "unknown"
+        jobs, report = jobs_from_greenhouse(data, token)
+        if fetch is not None and token != "unknown":
+            await _fill_greenhouse_posted_on(jobs, token, fetch)
+        logger.info("Greenhouse feed reader found %s jobs", len(jobs))
+        return ListingResult.from_report(self.name, jobs, report)
+
+
+def _detail_refusal(answer: Response) -> bool:
+    """True when further Greenhouse detail GETs must stop (refusals / challenges / budgets).
+
+    A successful empty stop at HTTP 200 is not a refusal. Any other 2xx with a stop (including
+    challenge pages named without the word "challenge", e.g. Akamai), and 401/403/429, stop the
+    remainder of the detail cap.
+    """
+    if answer.status in (401, 403, 429):
+        return True
+    # Non-200 2xx answers are refusals under the fetch policy (e.g. HTTP 202).
+    if 200 < answer.status < 300:
+        return True
+    stop = (answer.stop or "").strip()
+    if answer.status == 200 and stop:
+        return True
+    if not stop:
+        return False
+    lower = stop.lower()
+    return any(
+        marker in lower
+        for marker in (
+            "challenge",
+            "refused",
+            "akamai",
+            "shared host budget",
+            "request budget",
+            "time budget",
+            "stopped after a refusal",
+            "robots.txt",
+            "host busy",
+        )
+    )
+
+
+async def _fill_greenhouse_posted_on(
+    jobs: List[Dict], token: str, fetch: Fetch
+) -> None:
+    """Fetch single-job bodies for first_published, capped; stop further fetches on refusal.
+
+    A 404 or malformed body skips that job only; a refusal stops the remainder of the cap.
+    """
+    missing = [job for job in jobs if not job.get("posted_on") and job.get("reference")]
+    for job in missing[:GREENHOUSE_DETAIL_CAP]:
+        answer = await fetch(Request(greenhouse_job_url(token, job["reference"])))
+        if _detail_refusal(answer):
+            logger.info(
+                "Greenhouse single-job fetch refused (%s); no further detail requests",
+                answer.stop or answer.status,
+            )
+            return
+        if answer.stop or answer.status != 200 or not (answer.body or "").strip():
+            # Missing job or empty answer: skip this id, keep trying within the cap.
+            continue
+        try:
+            detail = json.loads(answer.body)
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(detail, dict):
+            continue
+        merge_greenhouse_detail(job, detail)
+
+
 def rss_readers(_crawler=None) -> List[Reader]:
     return [RssFeedReader()]
 
 
 def api_readers(_crawler=None) -> List[Reader]:
-    return [JsonApiReader()]
+    return [WorkableFeedReader(), GreenhouseFeedReader(), JsonApiReader()]
+
+
+def resolve_feed_request(
+    readers: List[Reader], source: Dict
+) -> Tuple[Optional[Reader], Optional[Request]]:
+    """The first reader that recognises this source's address, and its first request."""
+    for reader in readers:
+        request = reader.first_request(source)
+        if request is not None:
+            return reader, request
+    return None, None
 
 
 async def read_listing(
@@ -201,6 +378,9 @@ async def read_listing(
             continue
         if result is not None and result.jobs:
             logger.info(f"{label} found {len(result.jobs)} jobs")
+            return result
+        if result is not None and result.jobs == [] and reader.first_request(source) is not None:
+            # Recognised feed that listed zero jobs — do not fall through.
             return result
     result = await last.read(first, source, fetch)
     return result if result is not None else ListingResult(last.name)

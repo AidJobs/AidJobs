@@ -1,0 +1,26 @@
+{
+  "jobs": [
+    {
+      "id": 4001,
+      "internal_job_id": 5001,
+      "title": "Grants Officer",
+      "updated_at": "2026-11-15T10:00:00-05:00",
+      "first_published": "2026-11-01T08:00:00Z",
+      "location": {"name": "New York, NY"},
+      "absolute_url": "https://job-boards.greenhouse.io/exampleaid/jobs/4001",
+      "language": "en",
+      "content": "Manage a grants portfolio.&lt;p&gt;Full description.&lt;/p&gt;"
+    },
+    {
+      "id": 4002,
+      "internal_job_id": 5002,
+      "title": "Field Coordinator",
+      "updated_at": "2026-11-18T12:00:00-05:00",
+      "location": {"name": "Remote"},
+      "absolute_url": "https://job-boards.greenhouse.io/exampleaid/jobs/4002",
+      "language": "en",
+      "content": "Coordinate field teams."
+    }
+  ],
+  "meta": {"total": 2}
+}

@@ -61,6 +61,16 @@ _HOSTS_KEPT = 1000
 CRAWL_REQUEST_BUDGET = 100
 CRAWL_TIME_BUDGET_SECONDS = 600.0
 
+# Shared request budgets for recruitment-system hosts many employers share (growth plan §4.2;
+# ledger W-34 leftover / W-38). Keys match Reader.budget_group. Spacing between hops on the
+# same host still applies separately.
+HOST_GROUP_BUDGET_REQUESTS = 12
+HOST_GROUP_BUDGET_WINDOW_SECONDS = 60.0
+HOST_GROUP_LIMITS: dict[str, tuple[int, float]] = {
+    "workable": (HOST_GROUP_BUDGET_REQUESTS, HOST_GROUP_BUDGET_WINDOW_SECONDS),
+    "greenhouse": (HOST_GROUP_BUDGET_REQUESTS, HOST_GROUP_BUDGET_WINDOW_SECONDS),
+}
+
 # RFC 9309: follow at least five redirects, parse at least 500 KiB, keep an answer up to 24 hours.
 ROBOTS_MAX_REDIRECTS = 5
 ROBOTS_MAX_BYTES = 500 * 1024
@@ -127,6 +137,7 @@ FETCH_MESSAGES = frozenset({
     "robots.txt unreachable",
     "robots.txt asks for too long a delay",
     "host busy",
+    "shared host budget wait",
     "stopped after a refusal",
     "request budget used up",
     "time budget used up",
@@ -138,6 +149,7 @@ POLITENESS_STOPS = frozenset({
     "robots.txt unreachable",
     "robots.txt asks for too long a delay",
     "host busy",
+    "shared host budget wait",
     "stopped after a refusal",
     "request budget used up",
     "time budget used up",
@@ -264,6 +276,27 @@ _sleep = asyncio.sleep
 # (the survey starts one per request); the locks belong to their loop.
 _last_answer: OrderedDict[str, float] = OrderedDict()
 _host_locks: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
+# Timestamps of requests that spent a shared ATS host-group slot (W-38).
+_group_hits: dict[str, list[float]] = {}
+
+# Optional host-group for the current fetch (Reader.budget_group); set by crawl callers.
+_HOST_GROUP: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "aidjobs_host_group", default=None
+)
+
+
+@contextmanager
+def host_group(group: str | None):
+    """Spend shared ATS host-group budget on fetches inside this block (ledger W-38)."""
+    token = _HOST_GROUP.set(group or None)
+    try:
+        yield
+    finally:
+        _HOST_GROUP.reset(token)
+
+
+def current_host_group() -> str | None:
+    return _HOST_GROUP.get()
 
 
 def _lock_for(host: str) -> asyncio.Lock:
@@ -283,6 +316,36 @@ def _answered(host: str) -> None:
     _last_answer.move_to_end(host)
     while len(_last_answer) > _HOSTS_KEPT:
         _last_answer.popitem(last=False)
+
+
+async def _take_group_slot(group: str | None, budget: CrawlBudget | None) -> None:
+    """Wait until this ATS group has a free request in its rolling window, then record one."""
+    if not group:
+        return
+    limits = HOST_GROUP_LIMITS.get(group)
+    if limits is None:
+        return
+    max_req, window = limits
+    lock = _lock_for(f"__group__:{group}")
+    while True:
+        wait = 0.0
+        async with lock:
+            now = time.monotonic()
+            hits = _group_hits.setdefault(group, [])
+            hits[:] = [stamp for stamp in hits if now - stamp < window]
+            if len(hits) < max_req:
+                hits.append(now)
+                return
+            wait = window - (now - hits[0]) + 0.01
+        bound = MAX_HOST_WAIT_SECONDS
+        if budget is not None:
+            left = budget.seconds_left()
+            if left <= 0:
+                raise FetchError("time budget used up")
+            bound = min(bound, left)
+        if wait > bound:
+            raise FetchError("shared host budget wait")
+        await _sleep(wait)
 
 
 @asynccontextmanager
@@ -776,6 +839,7 @@ async def fetch_url(
         dns_timeout,
     )
     budget = _BUDGET.get()
+    await _take_group_slot(_HOST_GROUP.get(), budget)
     result = await _follow(
         url, method, request_headers, identity, timeout, total_timeout, max_bytes,
         max_redirects, net, budget, check_robots=True,

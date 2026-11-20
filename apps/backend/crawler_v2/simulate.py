@@ -52,12 +52,19 @@ async def simulate_rss(body: str, careers_url: str) -> Dict[str, Any]:
     return summarise(result, "rss")
 
 
-async def simulate_api(body: str, careers_url: str) -> Dict[str, Any]:
-    """Read one JSON listing body through the generic JSON reader."""
+async def simulate_api(
+    body: str,
+    careers_url: str,
+    fetch=None,
+) -> Dict[str, Any]:
+    """Read one JSON listing body through the API readers (ATS feeds first, then generic)."""
+    source = {"careers_url": careers_url}
+    readers = api_readers()
     result = await read_listing(
-        api_readers(),
+        readers,
         Response(200, body, content_type="application/json"),
-        {"careers_url": careers_url},
+        source,
+        fetch=fetch,
     )
     return summarise(result, "api")
 
