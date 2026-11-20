@@ -22,6 +22,8 @@ import Window from './Window';
 import { DemoMark, Dialog, HeaderSlotContext, LegalLine, NoticeBar } from './ui';
 
 const MENU_W_KEY = 'aidjobs.employerDemo.menuWidth';
+/** Same key as the public site / SiteRoot bootstrap, so a closed menu stays closed after refresh. */
+const MENU_COLLAPSED_KEY = 'aidjobs.menuCollapsed';
 const MENU_RAIL = 64;
 const MENU_W_MIN = 180;
 const MENU_W_MAX = 360;
@@ -131,7 +133,7 @@ export default function EmployerDemo() {
   const mounted = useMounted();
   const s = useDemo();
   const route = useRoute();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = usePersistentState(MENU_COLLAPSED_KEY, false);
   const [drawer, setDrawer] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
