@@ -305,7 +305,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | --- | --- | --- | --- |
 | 20 Nov 2026 | U-1 (confirmed) | `3d8e2cc`…`2ac7419` | User confirmed on preview. Measure-row absolute (`3d8e2cc`); hairlines off + chat `aj-card` (`259e8e3`); `+N` below track (`9edf0db`); chat top aligned with progress + resizable menu (`0d190d6`); drag collapse/open (`9b448ad`…`cd6f266`); menu open/closed persisted (`2ac7419`). R1-09 / R2-P1-1 placement closed; their other bullets stay open. |
 | 20 Nov 2026 | U-2, R1-04, R1-05, R2-P0-6, R2-P0-7, R2-P1-2 | `7780a69` | Amended plan after [independent review](efa9f95b-2154-433d-be52-95eb4c61db0c). `keepJdPart` + pin on remove / removeGroup / toggleSection; unified undo (chat + `undoLastChange` clear both offers); `currentPart` orphan guard; `walkAutoOpen` + suppressed step (Market walk still follows when not on a JD section); removed 2s `useRemovedNoteDismiss`. Confirm on preview. |
-| 20 Nov 2026 | R1-05 / R2-P0-6 follow-up | *(pending)* | U-2 left the Removed note forever (wrong). Restore polish `3f0f4c4`: hide Removed note after ~2s via `useRemovedNoteHidden` **without** `dismissChange`, so chat Undo still works. |
+| 20 Nov 2026 | R1-05 / R2-P0-6 follow-up | `f34eb92` | U-2 left the Removed note forever (wrong). Restore polish `3f0f4c4`: hide Removed note after ~2s via `useRemovedNoteHidden` **without** `dismissChange`, so chat Undo still works. |
 
 ---
 
