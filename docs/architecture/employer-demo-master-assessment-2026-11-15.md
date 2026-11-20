@@ -16,7 +16,7 @@
 1. ~~Progress line / window chrome (U-1)~~ — **Fixed 20 Nov 2026** (user confirmed on preview)  
 2. ~~Undo / remove / walk focus (no Market steal; keep Undo until used)~~ — **Fixed 20 Nov 2026** (U-2; user confirmed on preview, including Removed-note hide)  
 3. ~~About us / Project (U-3)~~ — **Fixed 20 Nov 2026** (Step A + Step B; preview confirmed)  
-4. Grip: Project/Background when relevant; open menu without accidental drag ← **next**  
+4. Grip: Project/Background when relevant; open menu without accidental drag ← **U-4 Step A built; confirm then Step B**  
 
 5. Approve vs unsaved buffers; Add-panel blur/Escape  
 
@@ -34,7 +34,7 @@
 | U-1 | **Fixed** (20 Nov 2026) | Progress line on the **job panel** (phase 3), flush under the window header; measure-row bug removed; header and progress hairlines removed; chat in `aj-card` aligned with the progress line; `+N` clear of the connector; side menu resizable (drag open/close) with open/closed remembered. | User confirmed on preview, 20 Nov 2026 |
 | U-2 | **Fixed** (20 Nov 2026) | Undo / remove / walk no longer open Market over the JD; chat undo and `lastChange` pin like icon Undo. Removed note hides after ~2s **without** clearing `undoStep` (polish `3f0f4c4` + R1-05; U-2 had wrongly left the note forever). | User confirmed on preview, 20 Nov 2026 (Market steal + Removed note hide) |
 | U-3 | **Fixed** (20 Nov 2026; Step A/B; JD open→write→Save/Cancel `6670de3`) | Step A/B as before. Follow-up: About us / Project match other sections — pencil opens one box with Save/Cancel; link/Read/Draft/Upload fill that same box (no always-on second pad). Project Save still uses `intoSection` (no heading rename / parent wipe). Chat window PageField still uses draft card Accept. | User confirmed on preview, 20 Nov 2026 |
-| U-4 | OPEN | Grip ⋯ has no Project / Background when that section already exists under another heading (e.g. Local NGO “Project brief”). “Add About the project” only when `background` missing. Three names for one key. | User; NGO |
+| U-4 | Step A built (20 Nov 2026); Step B (drag) pending | One `background` slot: Add uses the format heading (e.g. Project brief / Background); no force-rename to “About the project”; no duplicate Project chip. When the section exists, no second add. | Step A awaiting preview confirm; Step B = raise grip drag threshold |
 
 ### B. Combined open findings (Round 1)
 

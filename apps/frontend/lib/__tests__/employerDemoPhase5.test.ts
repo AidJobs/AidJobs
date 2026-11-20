@@ -339,7 +339,10 @@ describe('context for the AI: pages, the context pack, suggestions, and the surv
     await draftFromPage('job-comms', 'project', PROJECT_PAGE, 'the project page', [], open);
     acceptPageDraft('job-comms');
     expect(job('job-comms').tags).toContain('background');
-    expect(sec('job-comms', 'background')).toMatchObject({ title: 'About the project', ai: true });
+    // U-4 Step A: Accept uses the format heading for a new background section (not forced "About the project").
+    expect(sec('job-comms', 'background')).toMatchObject({ title: expect.any(String), ai: true });
+    expect(sec('job-comms', 'background').title).not.toBe('');
+    expect(job('job-comms').renamed?.background).not.toBe('About the project');
     expect(job('job-comms').pack?.project).toMatchObject({ source: 'the project page', usedBy: [] });
     expect(job('job-comms').chat.some((m) => /gives the country as Uganda; the job says Kenya|gives the donor as Lake Fund; the job says Northfield Trust/.test(m.text))).toBe(true);
     writeSections('job-comms', [{ key: 'responsibilities', lines: ['- Repair the 40 water points with the community caretakers'] }], 'Used the project');

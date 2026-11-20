@@ -18,7 +18,7 @@ export const SOURCES: Source[] = ['you told us', 'your website', 'the project pa
 const say = (text: string, quick?: string[], card?: ChatMsg['card']): ChatMsg => ({ id: `m${Math.random().toString(36).slice(2, 9)}`, from: 'ai', text, ...(quick ? { quick } : {}), ...(card ? { card } : {}) });
 
 const LABEL = { about: 'About us', project: 'About the project' } as const;
-/** The section About the project is written in: the template's background section, headed "About the project" when added for it. */
+/** The section project text is written in: the template's `background` slot (heading from the format, e.g. Project brief / Background). */
 export const PROJECT_SECTION = 'background';
 
 export const KEEP_PROFILE_ABOUT = "Keep our profile's About us";
@@ -157,12 +157,13 @@ export function acceptPageDraft(id: string, lines?: string[]) {
     jobs: s.jobs.map((j) => {
       if (j.id !== id) return j;
       const tags = placeIn(j.tags, key);
-      const title = d.kind === 'project' && !j.tags.includes(key) ? LABEL.project : headingOf(s, j, key);
+      // U-4 Step A: new section keeps the format heading (headingOf); do not force "About the project" as the section title.
+      const title = headingOf(s, j, key);
       const sec: Section = { key, title, lines: text, ai: true };
       const sections = j.sections.some((x) => x.key === key) ? j.sections.map((x) => (x.key === key ? intoSection(x, d.kind, text, earlier?.text) : x)) : inOutlineOrder([...j.sections, sec], tags);
       const used = earlier?.usedBy?.filter((k) => k !== key && j.tags.includes(k)) ?? [];
       const pack: ContextPack = { ...j.pack, ...(d.kind === 'about' ? { about: { text: text.join('\n'), source } } : { project: { text: text.join('\n'), source, at: Date.now(), usedBy: [], ...(used.length ? { redo: used } : {}) } }) };
-      const renamed = d.kind === 'project' && !j.tags.includes(key) ? { ...j.renamed, [key]: LABEL.project } : j.renamed;
+      const renamed = j.renamed;
       const offerOrg = d.kind === 'about' && !s.org.about.trim() && s.me.role === 'owner';
       const conflicts = d.kind === 'project' ? projectConflicts(j, text.join('\n'), s.today) : [];
       // The facts first, one disagreement at a time with its own answers; then the offer to update the sections that used the old project.

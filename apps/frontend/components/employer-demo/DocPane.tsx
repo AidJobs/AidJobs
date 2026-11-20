@@ -685,10 +685,10 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
   const keys = view?.keys ?? job.tags;
   const here = at.after ? groupOfKey(g, at.after) : groupOrderOf(g)[0];
   const groups = [here, ...groupOrderOf(g).filter((x) => x !== here)];
-  const rec = recommendSections(formatOf(s, job.format), job.facts);
+  const format = formatOf(s, job.format);
+  const rec = recommendSections(format, job.facts);
   const left = offeredFixed(s.org).filter((k) => !fixedList(job, lang).includes(k));
   const version = lang && lang !== jobLang(job) ? lang : undefined;
-  const needProject = !keys.includes(PROJECT_SECTION) && !version;
   useEffect(() => {
     requestAnimationFrame(() => box.current?.querySelector<HTMLElement>('button, input')?.focus({ preventScroll: true }));
     const down = (e: PointerEvent) => {
@@ -709,13 +709,6 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
     onClose();
     focusAdded(key);
   };
-  const addProject = () => {
-    const op = at.end ? ({ op: 'add', key: PROJECT_SECTION } as const) : ({ op: 'add', key: PROJECT_SECTION, after: at.after } as const);
-    outlineOp(job.id, op);
-    renameSection(job.id, PROJECT_SECTION, 'About the project');
-    onClose();
-    focusAdded(PROJECT_SECTION);
-  };
   const addOwn = (heading: string) => {
     if (ownDone.current) return;
     const name = heading.trim();
@@ -734,7 +727,8 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
     outlineOp(job.id, { op: 'addGroup', label: name });
     onClose();
   };
-  const chipLabel = (key: string, label: string) => (key === PROJECT_SECTION ? 'Project' : label);
+  // U-4 Step A: one chip per missing key, labeled with this job's format heading (e.g. Project brief) — not a second "Project" / "About the project" group.
+  const chipName = (key: string) => headingFor(key, format);
   return (
     <div
       ref={box}
@@ -751,7 +745,7 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
       }}
     >
       {groups.map((gk) => {
-        const missing = SECTIONS.filter((d) => d.group === gk && !keys.includes(d.key) && !(needProject && d.key === PROJECT_SECTION));
+        const missing = SECTIONS.filter((d) => d.group === gk && !keys.includes(d.key));
         const label = GROUPS.find((x) => x.key === gk)?.label ?? (view?.customGroups ?? job.customGroups)?.find((x) => x.id === gk)?.label ?? gk;
         if (!missing.length && gk !== here) return null;
         return (
@@ -760,9 +754,9 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
             <div className="flex flex-wrap gap-1 px-1.5">
               {missing.map((d) => (
                 <Tip key={d.key} label={`${d.hint}${rec.includes(d.key) ? ' · recommended for this job' : ''}`}>
-                  <button type="button" className="ej-add" data-recommended={rec.includes(d.key)} onClick={() => add(d.key)} aria-label={`Add ${chipLabel(d.key, d.label)}${rec.includes(d.key) ? ', recommended for this job' : ''}`}>
+                  <button type="button" className="ej-add" data-recommended={rec.includes(d.key)} onClick={() => add(d.key)} aria-label={`Add ${chipName(d.key)}${rec.includes(d.key) ? ', recommended for this job' : ''}`}>
                     <Plus size={11} strokeWidth={2} aria-hidden />
-                    {chipLabel(d.key, d.label)}
+                    {chipName(d.key)}
                     {rec.includes(d.key) && <Sparkles size={10} strokeWidth={2} aria-hidden className="ej-ol-rec" />}
                   </button>
                 </Tip>
@@ -800,20 +794,6 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
           </div>
         );
       })}
-      {needProject && (
-        <div className="flex flex-col gap-1" role="group" aria-label="Project">
-          <span className="ej-menu-label">Project</span>
-          <div className="flex flex-wrap gap-1 px-1.5">
-            <Tip label="Add About the project to this job, with its page field in that section">
-              <button type="button" className="ej-add" data-recommended onClick={addProject} aria-label="Add About the project">
-                <Plus size={11} strokeWidth={2} aria-hidden />
-                About the project
-                <Sparkles size={10} strokeWidth={2} aria-hidden className="ej-ol-rec" />
-              </button>
-            </Tip>
-          </div>
-        </div>
-      )}
       {left.length > 0 && (
         <div className="flex flex-col gap-1" role="group" aria-label="Fixed texts left out">
           <span className="ej-menu-label">Our commitments</span>
@@ -916,13 +896,13 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inW
           { label: 'Move down', run: () => (outlineOp(job.id, { op: 'by', key: sec.key, by: 1, reading: true }), focusGrip(sec.key)) },
           { label: 'Move to group…', items: groupOrderOf(g).filter((x) => x !== groupOfKey(g, sec.key)).map((x) => ({ label: groupLabelOf(x, job.customGroups), run: () => (outlineOp(job.id, { op: 'toGroup', key: sec.key, group: x }), focusGrip(sec.key)) })) },
           { label: 'Add a section below', run: () => openAdd(sec.key, document.querySelector<HTMLElement>(`[data-grip-key="${sec.key}"]`), false) },
+          // U-4 Step A: when background is missing, offer Add with this format's heading; never force-rename to "About the project".
           ...(!keys.includes(PROJECT_SECTION)
             ? [
                 {
-                  label: 'Add About the project',
+                  label: `Add ${headingFor(PROJECT_SECTION, formatOf(s, job.format))}`,
                   run: () => {
                     outlineOp(job.id, { op: 'add', key: PROJECT_SECTION, after: sec.key });
-                    renameSection(job.id, PROJECT_SECTION, 'About the project');
                     focusGrip(PROJECT_SECTION);
                   },
                 },
