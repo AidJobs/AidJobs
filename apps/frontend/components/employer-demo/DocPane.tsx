@@ -502,18 +502,8 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
             </button>
           </div>
         </div>
-      ) : pageKind ? (
-        sec.subs?.length ? (
-          <SectionText job={job} sec={sec} since={since}>
-            {sec.subs.map((sb) => (
-              <div key={sb.id} className="ej-subsection">
-                <h4>{sb.title}</h4>
-                <Lines lines={sb.lines} job={job} section={sec.key} onFlag={onFlag} />
-              </div>
-            ))}
-          </SectionText>
-        ) : null
       ) : (
+        // About us / Project: show saved lines and subs like Preview (U-3). PageField above is intake only, not a second copy of the body.
         <SectionText job={job} sec={sec} since={since}>
           <Lines lines={sec.lines} job={job} section={sec.key} onFlag={onFlag} />
           {sec.subs?.map((sb) => (

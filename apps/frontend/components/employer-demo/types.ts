@@ -515,6 +515,11 @@ export type DemoJob = {
   pack?: ContextPack;
   /** A draft from a page or a text, waiting for Accept, Edit, or Reject. */
   pageDraft?: PageDraft;
+  /**
+   * Unsaved intake for the About us / Project page field (JD box and chat card share it). Cleared on Save, Accept, Reject, or an
+   * explicit skip — not a copy of the section body (U-3).
+   */
+  pageIntake?: { about?: string; project?: string };
   /** Suggestions offered on this job; one rejected is not offered again. */
   suggestions?: Suggestion[];
   /** The organisation's social links this job leaves out; the choice affects only this job. */

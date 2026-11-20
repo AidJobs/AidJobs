@@ -987,7 +987,10 @@ export function advanceFromAbout(id: string, said?: string) {
     org: { ...s.org, websiteAsked: true },
     jobs: s.jobs.map((j) => {
       if (j.id !== id || j.setup !== 'about') return j;
-      return { ...j, setup: 'project', chat: said ? [...j.chat, msg('user', said)] : j.chat };
+      const intake = j.pageIntake;
+      const pageIntake = intake?.about || intake?.project ? { ...intake, about: undefined } : undefined;
+      const cleared = pageIntake && (pageIntake.about || pageIntake.project) ? pageIntake : undefined;
+      return { ...j, setup: 'project', pageIntake: cleared, chat: said ? [...j.chat, msg('user', said)] : j.chat };
     }),
   }));
   ensureAsk(id);
@@ -1000,7 +1003,10 @@ export function advanceFromProject(id: string, said?: string) {
     ...s,
     jobs: s.jobs.map((j) => {
       if (j.id !== id || j.setup !== 'project') return j;
-      return { ...j, setup: 'style', chat: said ? [...j.chat, msg('user', said)] : j.chat };
+      const intake = j.pageIntake;
+      const pageIntake = intake?.about || intake?.project ? { ...intake, project: undefined } : undefined;
+      const cleared = pageIntake && (pageIntake.about || pageIntake.project) ? pageIntake : undefined;
+      return { ...j, setup: 'style', pageIntake: cleared, chat: said ? [...j.chat, msg('user', said)] : j.chat };
     }),
   }));
   ensureAsk(id);
@@ -1297,7 +1303,8 @@ function setupTurn(s: State, j: DemoJob, text: string): boolean {
   }
   if (j.setup === 'project') {
     const t = text.trim();
-    if (t === PROJECT_QUICK[0] || t === PROJECT_QUICK[1] || SKIP.test(t) || /\bskip\b|\bno project\b|\bnot a project\b|\blater\b|\bnot now\b/i.test(t) || YES.test(t)) {
+    // Bare yes/ok/sure must not skip: that discarded a paste in the card (U-3 / R1-02). About keep-YES stays in the about branch above.
+    if (t === PROJECT_QUICK[0] || t === PROJECT_QUICK[1] || SKIP.test(t) || /\bskip\b|\bno project\b|\bnot a project\b|\blater\b|\bnot now\b/i.test(t)) {
       advanceFromProject(j.id, text);
       return true;
     }

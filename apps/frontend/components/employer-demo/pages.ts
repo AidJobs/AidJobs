@@ -1,7 +1,7 @@
 'use client';
 
 import { aiOn, askAi } from './ai';
-import { extractDraft, showPageDraft } from './context';
+import { extractDraft, pageLinesOf, showPageDraft } from './context';
 import { dropPage, holdPage, pageFor } from './pageMemory';
 import { getState } from './store';
 import type { OpenTarget } from './aiActions';
@@ -49,6 +49,14 @@ export async function draftFromPage(id: string, kind: PageDraft['kind'], text: s
     }
     const lines = extractDraft(page);
     if (!lines.length) {
+      // User paste only (U-3): keep extractDraft for scrapes; bullets / short lines still draft via the same conversion as Save.
+      if (source === 'you told us' && page.trim()) {
+        const asLines = pageLinesOf(page);
+        if (asLines.length) {
+          showPageDraft(id, { kind, lines: asLines, used: 'Your text as you wrote it.', missing: 'Without the AI the demo does not say what the text leaves out; read it before accepting.', source, social });
+          return;
+        }
+      }
       showPageDraft(id, { kind, lines: [], used: 'The text has no full sentences to draft from.', missing: 'Paste the text that describes it, or write it in the section.', source, social });
       return;
     }

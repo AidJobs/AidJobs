@@ -1,6 +1,6 @@
 'use client';
 
-import { advanceFromAbout, advanceFromProject, formatOf, goOn, headingOf, liveEdit, setFacts, subId, touched } from './actions';
+import { advanceFromAbout, advanceFromProject, formatOf, goOn, headingOf, liveEdit, setFacts, stepped, subId, touched } from './actions';
 import { extractFacts, inOutlineOrder, longDate, placeIn, PLACES, roleByKey, salarySuggestion, SALARY_FACTS } from './engine';
 import { ASKS } from './flow';
 import { typicalYears } from './market';
@@ -74,6 +74,68 @@ function intoSection(x: Section, kind: PageDraft['kind'], text: string[], earlie
   return { ...x, subs };
 }
 
+/** Same bullet conversion as the section editor's Save (`linesOf` in actions). */
+export function pageLinesOf(text: string): string[] {
+  return text
+    .split('\n')
+    .map((l) => l.replace(/^[•*]\s*/, '- '))
+    .filter((l) => l.trim());
+}
+
+function withoutPageIntake(intake: DemoJob['pageIntake'], kind?: 'about' | 'project'): DemoJob['pageIntake'] {
+  if (!intake) return undefined;
+  if (!kind) return undefined;
+  const next = { ...intake, [kind]: undefined };
+  return next.about || next.project ? next : undefined;
+}
+
+/** Shared About us / Project intake (JD box and chat card). Not the section body. */
+export function setPageIntake(id: string, kind: 'about' | 'project', text: string) {
+  if (getState().reviewerAs) return;
+  updateJob(id, (j) => ({ ...j, pageIntake: { ...j.pageIntake, [kind]: text } }));
+}
+
+export function clearPageIntake(id: string, kind?: 'about' | 'project') {
+  if (getState().reviewerAs) return;
+  updateJob(id, (j) => ({ ...j, pageIntake: withoutPageIntake(j.pageIntake, kind) }));
+}
+
+/**
+ * Compact PageField Save (U-3): write intake through `intoSection` (exact "About the project" sub), never rename the heading, clear intake.
+ * Does not update the context pack — that stays for Accept.
+ */
+export function savePageFieldText(id: string, kind: 'about' | 'project', raw: string) {
+  const s0 = getState();
+  if (s0.reviewerAs) return;
+  const text = pageLinesOf(raw);
+  if (!text.length) return;
+  const key = kind === 'about' ? 'about' : PROJECT_SECTION;
+  updateJob(id, (j) => {
+    const earlier = kind === 'project' ? j.pack?.project?.text : undefined;
+    const tags = placeIn(j.tags, key);
+    const existing = j.sections.find((x) => x.key === key);
+    const title = existing?.title || j.renamed?.[key] || headingOf(s0, j, key);
+    const placed = existing
+      ? (() => {
+          const next = intoSection(existing, kind, text, earlier);
+          const bodyChanged = JSON.stringify(next.lines) !== JSON.stringify(existing.lines);
+          return { ...next, edited: true as const, ...(bodyChanged ? { ai: undefined } : {}) };
+        })()
+      : { key, title, lines: text, edited: true as const };
+    const sections = existing ? j.sections.map((x) => (x.key === key ? placed : x)) : inOutlineOrder([...j.sections, placed], tags);
+    const base: DemoJob = {
+      ...touched(j),
+      ...liveEdit(j),
+      tags,
+      sections,
+      pageIntake: withoutPageIntake(j.pageIntake, kind),
+      versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${title}`, sections }],
+      part: `s:${key}`,
+    };
+    return stepped(j, base, `Edited ${title}`, 'doc', { keys: [key] });
+  });
+}
+
 /**
  * The draft accepted (as it is, or edited): About us fills this job's About us; About the project fills its own section, added if the
  * template has none. Either goes into the context pack with its source. A project that replaces an earlier one marks the sections that
@@ -117,6 +179,7 @@ export function acceptPageDraft(id: string, lines?: string[]) {
         pack,
         walk,
         pageDraft: undefined,
+        pageIntake: withoutPageIntake(j.pageIntake, d.kind),
         versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `${LABEL[d.kind]} from ${source}`, sections }],
         chat: [...j.chat, say(notes.join(' '), quick)],
       };
@@ -136,7 +199,7 @@ export function rejectPageDraft(id: string) {
   update((st) => ({
     ...st,
     org: d.kind === 'about' ? { ...st.org, websiteAsked: true } : st.org,
-    jobs: st.jobs.map((j) => (j.id === id ? { ...j, pageDraft: undefined, chat: [...j.chat, say(`Left as it was: nothing from the draft went on the job.`)] } : j)),
+    jobs: st.jobs.map((j) => (j.id === id ? { ...j, pageDraft: undefined, pageIntake: withoutPageIntake(j.pageIntake, d.kind), chat: [...j.chat, say(`Left as it was: nothing from the draft went on the job.`)] } : j)),
   }));
   const after = getState().jobs.find((x) => x.id === id);
   if (after?.setup === 'about' && d.kind === 'about') advanceFromAbout(id);
