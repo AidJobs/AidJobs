@@ -15,7 +15,8 @@
 
 1. ~~Progress line / window chrome (U-1)~~ — **Fixed 20 Nov 2026** (user confirmed on preview)  
 2. ~~Undo / remove / walk focus (no Market steal; keep Undo until used)~~ — **Fixed 20 Nov 2026** (U-2; user confirmed on preview, including Removed-note hide)  
-3. About us / Project (U-3) — **Step A built 20 Nov 2026** (display, intake Save, project yes, paste draft); awaiting preview confirm; Step B (Accept Undo / auto-approve) still open  
+3. About us / Project (U-3) — **Step A Fixed 20 Nov 2026** (preview confirmed in Cursor browser); Step B (Accept Undo / auto-approve) still open ← **next**  
+
 4. Grip: Project/Background when relevant; open menu without accidental drag  
 5. Approve vs unsaved buffers; Add-panel blur/Escape  
 
@@ -26,13 +27,13 @@
 **Agents:** [HR review UN agency](c56d4342-bc46-4b16-a61d-22cccb85cb07), [HR review local NGO](f87e9add-a843-44ea-a3eb-6c534199501a), [HR review INGO](54c43449-021d-4c76-977c-d0b3853bd5c6), [UX chrome audit](b6ab0953-572b-4d59-807e-442ed88e9a17).  
 **Code tip when Round 1 was taken:** polish commits through `13891bb` (later tip may move; re-verify before fixing).
 
-### A. User-reported bugs (confirmed in code) — U-1–U-2 Fixed; U-3 Step A built (preview pending); U-4 OPEN
+### A. User-reported bugs (confirmed in code) — U-1–U-2 Fixed; U-3 Step A Fixed; U-4 OPEN
 
 | ID | Status | Fault | Evidence |
 | --- | --- | --- | --- |
 | U-1 | **Fixed** (20 Nov 2026) | Progress line on the **job panel** (phase 3), flush under the window header; measure-row bug removed; header and progress hairlines removed; chat in `aj-card` aligned with the progress line; `+N` clear of the connector; side menu resizable (drag open/close) with open/closed remembered. | User confirmed on preview, 20 Nov 2026 |
 | U-2 | **Fixed** (20 Nov 2026) | Undo / remove / walk no longer open Market over the JD; chat undo and `lastChange` pin like icon Undo. Removed note hides after ~2s **without** clearing `undoStep` (polish `3f0f4c4` + R1-05; U-2 had wrongly left the note forever). | User confirmed on preview, 20 Nov 2026 (Market steal + Removed note hide) |
-| U-3 | **Step A built** (20 Nov 2026; preview confirm pending) | Reading view shows `sec.lines` + subs; PageField is shared intake (not a second body); Save uses `intoSection` and does not rename; project bare yes no longer skips; paste drafts via `pageLinesOf` when `extractDraft` is empty. Cancel still discards intake only (same as pencil). **Step B still open:** Accept Undo / drop walk auto-approve (R1-17). | Code + `employerDemoU3StepA.test.ts`; independent plan review [1acaffc9](1acaffc9-e6a7-4c4c-b2f5-777b12e40f54) |
+| U-3 | **Step A Fixed** (20 Nov 2026; `2d325cc`) | Reading view shows `sec.lines` + subs; PageField is shared intake (not a second body); Save uses `intoSection` and does not rename; project bare yes no longer skips; paste drafts (short bullets enabled). Cancel still discards intake only. **Step B still open:** Accept Undo / drop walk auto-approve (R1-17). | Preview confirmed in Cursor browser, 20 Nov 2026 (comms Save; Project brief + sub; project yes kept paste; bullet Draft) |
 | U-4 | OPEN | Grip ⋯ has no Project / Background when that section already exists under another heading (e.g. Local NGO “Project brief”). “Add About the project” only when `background` missing. Three names for one key. | User; NGO |
 
 ### B. Combined open findings (Round 1)
@@ -41,8 +42,8 @@
 
 | ID | Status | Fault | Who |
 | --- | --- | --- | --- |
-| R1-01 | **Step A** (with U-3, 20 Nov 2026; preview pending) | About/Background reading view shows parent lines + subs; intake box no longer mirrors the body. Form (URL/Read/Draft/Upload) remains for new intake by design. | NGO, chrome |
-| R1-02 | **Step A partial** (with U-3, 20 Nov 2026; preview pending) | Project yes/ok/sure no longer skips; bullet / short paste drafts via `you told us`. Setup card still has no Save/Cancel (Phase 5: nothing on the job until Accept). | NGO, INGO |
+| R1-01 | **Fixed** (U-3 Step A, 20 Nov 2026) | About/Background reading view shows parent lines + subs; intake box no longer mirrors the body. Form (URL/Read/Draft/Upload) remains for new intake by design. | NGO, chrome |
+| R1-02 | **Fixed** (U-3 Step A, 20 Nov 2026; card Save/Cancel still out of scope) | Project yes/ok/sure no longer skips; bullet / short paste drafts via `you told us`. Setup card still has no Save/Cancel (Phase 5: nothing on the job until Accept). | NGO, INGO |
 | R1-03 | OPEN | “Use our About us as it is” on Local NGO concise adds no About us section (template starts at Project brief); chat says kept. | NGO |
 | R1-04 | **Fixed** (with U-2, 20 Nov 2026) | Undo / remove / walk: focus steal to Market; remove can mount Market without scroll; lingering `lastChange`/`undoStep` permanently skips later Market open; chat Undo may not pin part. | Chrome, INGO, U-2 |
 | R1-05 | **Fixed** (U-2 + note-hide follow-up, 20 Nov 2026) | Removed note auto-dismiss (~2s) called `dismissChange` and deleted Undo. Now the note hides in the UI only; `undoStep` stays for chat Undo until the next change. | Chrome |
@@ -61,7 +62,7 @@
 | R1-13 | OPEN | Preview Eye vanishes while Preview tab stays after picking a progress part. |
 | R1-14 | OPEN | Check card vs progress “Check done” disagree (skipped/google points). |
 | R1-15 | OPEN | Hide card + later ask leaves part highlighted with card shut. |
-| R1-16 | **Step A** (with U-3, 20 Nov 2026; preview pending) | Save no longer renames; shared `pageIntake` for JD + chat; Accept/Reject/skip clear intake so a dirty box cannot overwrite. Grip naming remains U-4. |
+| R1-16 | **Fixed** (U-3 Step A, 20 Nov 2026; grip naming remains U-4) | Save no longer renames; shared `pageIntake` for JD + chat; Accept/Reject/skip clear intake so a dirty box cannot overwrite. |
 | R1-17 | OPEN | Accept project draft: bullets/short lines → empty; inserts as sub if Background exists; no Undo; marks approved. |
 | R1-18 | OPEN | Free plan hides Languages; Amplify/market/Reach sit in front of a small NGO post. |
 | R1-19 | OPEN | Approve vanishes with no “Approved” mark on the section. |
