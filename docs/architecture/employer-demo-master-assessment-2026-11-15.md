@@ -310,7 +310,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 20 Nov 2026 | R1-05 / R2-P0-6 follow-up | `f34eb92` | U-2 left the Removed note forever (wrong). Restore polish `3f0f4c4`: hide Removed note after ~2s via `useRemovedNoteHidden` **without** `dismissChange`, so chat Undo still works. User confirmed on preview same day. |
 | 20 Nov 2026 | R1-06 (item 5 Step A) | `eccb4a7` | Approve hidden while pencil open; Save that changes text clears that section’s approval. User confirmed on preview. |
 | 20 Nov 2026 | R1-11 (item 5 Step B) | `732a06f`…`9e4ae13` | Add panel: Enter commits; Escape/blur cancel; Add your own under every group; Enter-add keeps JD scroll (`9e4ae13`). User confirmed on preview. |
-| 20 Nov 2026 | R1-28 | *(this commit)* | Pencil Save on How to apply no longer opens the fields card at the top of the JD. Confirm on preview. |
+| 20 Nov 2026 | R1-28 | `97e7fde` | Pencil Save on How to apply no longer opens the fields card at the top of the JD. Confirm on preview. |
 
 ---
 
