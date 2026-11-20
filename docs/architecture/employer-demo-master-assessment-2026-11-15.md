@@ -15,8 +15,9 @@
 
 1. ~~Progress line / window chrome (U-1)~~ — **Fixed 20 Nov 2026** (user confirmed on preview)  
 2. ~~Undo / remove / walk focus (no Market steal; keep Undo until used)~~ — **Fixed 20 Nov 2026** (U-2; user confirmed on preview, including Removed-note hide)  
-3. About us / Project (U-3) — **Step A Fixed**; **Step B built 20 Nov 2026** (no Accept auto-approve; Accept Undo restores pack + draft card); awaiting preview confirm  
-4. Grip: Project/Background when relevant; open menu without accidental drag ← **next** after U-3 Step B confirm  
+3. ~~About us / Project (U-3)~~ — **Fixed 20 Nov 2026** (Step A + Step B; preview confirmed)  
+4. Grip: Project/Background when relevant; open menu without accidental drag ← **next**  
+
 5. Approve vs unsaved buffers; Add-panel blur/Escape  
 
 ---
@@ -26,13 +27,13 @@
 **Agents:** [HR review UN agency](c56d4342-bc46-4b16-a61d-22cccb85cb07), [HR review local NGO](f87e9add-a843-44ea-a3eb-6c534199501a), [HR review INGO](54c43449-021d-4c76-977c-d0b3853bd5c6), [UX chrome audit](b6ab0953-572b-4d59-807e-442ed88e9a17).  
 **Code tip when Round 1 was taken:** polish commits through `13891bb` (later tip may move; re-verify before fixing).
 
-### A. User-reported bugs (confirmed in code) — U-1–U-2 Fixed; U-3 Step A Fixed / Step B built (preview pending); U-4 OPEN
+### A. User-reported bugs (confirmed in code) — U-1–U-3 Fixed; U-4 OPEN
 
 | ID | Status | Fault | Evidence |
 | --- | --- | --- | --- |
 | U-1 | **Fixed** (20 Nov 2026) | Progress line on the **job panel** (phase 3), flush under the window header; measure-row bug removed; header and progress hairlines removed; chat in `aj-card` aligned with the progress line; `+N` clear of the connector; side menu resizable (drag open/close) with open/closed remembered. | User confirmed on preview, 20 Nov 2026 |
 | U-2 | **Fixed** (20 Nov 2026) | Undo / remove / walk no longer open Market over the JD; chat undo and `lastChange` pin like icon Undo. Removed note hides after ~2s **without** clearing `undoStep` (polish `3f0f4c4` + R1-05; U-2 had wrongly left the note forever). | User confirmed on preview, 20 Nov 2026 (Market steal + Removed note hide) |
-| U-3 | **Step A Fixed**; **Step B built** (20 Nov 2026; preview pending) | Step A: lines + intake Save, no rename, project yes, paste draft (`2d325cc`). Step B: Accept no longer appends `walk.approved`; Undo via `contentSnap` (includes `pack`) + restored `pageDraft`, not `stepped`/`afterChange`; Background sub-insert unchanged. | Step A preview-confirmed; Step B tests `employerDemoU3StepB.test.ts` |
+| U-3 | **Fixed** (20 Nov 2026; Step A `2d325cc`, Step B `38812b0`) | Step A: lines + intake Save, no rename, project yes, paste draft. Step B: Accept no longer appends `walk.approved`; Undo restores pack + draft card (not `stepped`/`afterChange`); Background sub-insert unchanged. | Preview confirmed in Cursor browser, 20 Nov 2026 (Accept left Approve available; Undo restored pack + pageDraft) |
 | U-4 | OPEN | Grip ⋯ has no Project / Background when that section already exists under another heading (e.g. Local NGO “Project brief”). “Add About the project” only when `background` missing. Three names for one key. | User; NGO |
 
 ### B. Combined open findings (Round 1)
@@ -62,7 +63,7 @@
 | R1-14 | OPEN | Check card vs progress “Check done” disagree (skipped/google points). |
 | R1-15 | OPEN | Hide card + later ask leaves part highlighted with card shut. |
 | R1-16 | **Fixed** (U-3 Step A, 20 Nov 2026; grip naming remains U-4) | Save no longer renames; shared `pageIntake` for JD + chat; Accept/Reject/skip clear intake so a dirty box cannot overwrite. |
-| R1-17 | **Step B built** (U-3, 20 Nov 2026; preview pending) | Bullets/short paste fixed in Step A. Sub-insert stays by design. Accept no longer auto-approves; Undo restores pack, body, and draft card. |
+| R1-17 | **Fixed** (U-3 Step B, 20 Nov 2026) | Bullets/short paste fixed in Step A. Sub-insert stays by design. Accept no longer auto-approves; Undo restores pack, body, and draft card. |
 | R1-18 | OPEN | Free plan hides Languages; Amplify/market/Reach sit in front of a small NGO post. |
 | R1-19 | OPEN | Approve vanishes with no “Approved” mark on the section. |
 | R1-20 | OPEN | Phone: template picker has no Cancel during first template choice; parts button label paints over Eye/History. |
