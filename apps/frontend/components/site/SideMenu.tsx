@@ -295,10 +295,11 @@ export default function SideMenu(props: Props) {
         className={`aj-menu hidden h-full shrink-0 overflow-hidden lg:block${edge ? ' border-r aj-hair' : ''}`}
         style={{
           width,
+          // min/max snap with the target width so flex cannot block shrink; only `width` eases (not min/max).
           minWidth: width,
           maxWidth: width,
           background: 'var(--surface)',
-          transition: props.widthLocked ? undefined : 'width 160ms ease, min-width 160ms ease, max-width 160ms ease',
+          transition: props.widthLocked ? undefined : 'width 160ms ease',
         }}
       >
         <MenuBody props={props} collapsed={props.collapsed} />
