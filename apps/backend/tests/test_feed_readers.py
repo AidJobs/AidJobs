@@ -94,6 +94,12 @@ def test_rss_and_api_reader_source_types():
     assert RssFeedReader.record_class == "rss"
     assert JsonApiReader.source_types == frozenset({"api", "json"})
     assert JsonApiReader.record_class == "api"
+    # ATS feeds sit ahead of the generic JSON reader (W-38).
+    assert [r.name for r in api_readers()][:3] == [
+        "workable-feed",
+        "greenhouse-feed",
+        "json-api",
+    ]
 
 
 def test_iso_day_keeps_calendar_dates_and_rejects_blank():

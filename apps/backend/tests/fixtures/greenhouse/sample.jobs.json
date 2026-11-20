@@ -1,0 +1,30 @@
+{
+  "url": "https://job-boards.greenhouse.io/exampleaid",
+  "report": {
+    "pages": 1,
+    "expected": 2,
+    "complete": true,
+    "stop": null
+  },
+  "jobs": [
+    {
+      "title": "Grants Officer",
+      "apply_url": "https://job-boards.greenhouse.io/exampleaid/jobs/4001",
+      "record_class": "api",
+      "reference": "4001",
+      "location_raw": "New York, NY",
+      "posted_on": "2026-11-01",
+      "description": "Manage a grants portfolio.<p>Full description.</p>",
+      "advert_language": "en"
+    },
+    {
+      "title": "Field Coordinator",
+      "apply_url": "https://job-boards.greenhouse.io/exampleaid/jobs/4002",
+      "record_class": "api",
+      "reference": "4002",
+      "location_raw": "Remote",
+      "description": "Coordinate field teams.",
+      "advert_language": "en"
+    }
+  ]
+}

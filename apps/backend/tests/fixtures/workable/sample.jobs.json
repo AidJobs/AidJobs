@@ -1,0 +1,28 @@
+{
+  "url": "https://apply.workable.com/example-aid/",
+  "jobs": [
+    {
+      "title": "Programme Manager",
+      "apply_url": "https://apply.workable.com/example-aid/j/ABC12",
+      "record_class": "api",
+      "reference": "ABC12",
+      "employment_type": "Full-time",
+      "posted_on": "2026-11-01",
+      "description": "Lead a field programme in Nairobi.",
+      "location_raw": "Nairobi, Kenya; Kampala, Uganda",
+      "locations": ["Nairobi, Kenya", "Kampala, Uganda"]
+    },
+    {
+      "title": "Remote Analyst",
+      "apply_url": "https://apply.workable.com/example-aid/j/REM99",
+      "record_class": "api",
+      "reference": "REM99",
+      "employment_type": "Contract",
+      "is_remote": true,
+      "posted_on": "2026-11-10",
+      "description": "Analyse programme data remotely.",
+      "location_raw": "Remote",
+      "locations": ["Remote"]
+    }
+  ]
+}

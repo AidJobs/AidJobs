@@ -1022,8 +1022,20 @@ async def simulate_extract(
             return await simulate_rss(answer.body, source['careers_url'])
         elif source_type == 'api':
             from crawler_v2.api_crawler import SimpleAPICrawler
+            from crawler_v2.readers import api_readers, resolve_feed_request
             api_crawler = SimpleAPICrawler(db_url)
-            answer = await api_crawler.fetch_api_response(source['careers_url'])
+            readers = api_readers(api_crawler)
+            chosen, feed_request = resolve_feed_request(readers, source)
+            fetch_url_value = (
+                feed_request.url if feed_request else source["careers_url"]
+            )
+            group = getattr(chosen, "budget_group", None) if chosen else None
+            headers = {}
+            if feed_request and feed_request.accept:
+                headers["Accept"] = feed_request.accept
+            answer = await api_crawler.fetch_api_response(
+                fetch_url_value, headers=headers or None, budget_group=group
+            )
             if answer.stop or answer.status != 200 or not answer.body:
                 return {
                     "ok": False,
@@ -1032,7 +1044,11 @@ async def simulate_extract(
                     ),
                     "error_category": "runtime",
                 }
-            return await simulate_api(answer.body, source['careers_url'])
+            return await simulate_api(
+                answer.body,
+                source["careers_url"],
+                fetch=api_crawler._reader_fetch(group),
+            )
         else:
             raise HTTPException(
                 status_code=400, 
