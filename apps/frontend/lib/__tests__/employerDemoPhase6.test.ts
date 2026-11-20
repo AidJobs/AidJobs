@@ -772,9 +772,12 @@ describe('add your own group, section, and sub-section (section 19, phase 6 amen
     outlineOp('job-comms', { op: 'addCustom', heading: '  ', group: 'job' });
     expect(job('job-comms').tags.length).toBe(n);
     outlineOp('job-comms', { op: 'addCustom', heading: 'Day one', group: 'job' });
+    const first = job('job-comms').tags.find((k) => k.startsWith('c-'))!;
+    expect(job('job-comms').part).toBe(`s:${first}`);
     outlineOp('job-comms', { op: 'addCustom', heading: 'Day one', group: 'job' });
     const customs = job('job-comms').tags.filter((k) => k.startsWith('c-'));
     expect(customs).toHaveLength(2);
+    expect(job('job-comms').part).toBe(`s:${customs[1]}`);
     expect(customs.every((k) => job('job-comms').renamed?.[k] === 'Day one' || job('job-comms').sections.find((x) => x.key === k)?.title === 'Day one')).toBe(true);
     outlineOp('job-comms', { op: 'add', key: 'firstweeks', group: 'job' });
     expect(job('job-comms').tags).toContain('firstweeks');

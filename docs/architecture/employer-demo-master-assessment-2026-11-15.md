@@ -57,7 +57,7 @@
 | --- | --- | --- |
 | R1-09 | OPEN (partial) | **U-1 placement Fixed 20 Nov 2026.** Still open: Publish early while Languages/Review in +N; icons hidden until writing; phone parts over icons. |
 | R1-10 | OPEN (partial: click/drag Fixed in U-4 Step B) | Grip drag threshold raised 3→12px (menu click). Still open: Move up/down says “Moved” at ends; no group drop targets; remove group deletes its sections. |
-| R1-11 | Step B follow-up (20 Nov 2026) | Enter commits; blur/Escape cancel (Escape re-confirmed). After Enter-add, JD kept on the new section (was jumping to the top when the change note appeared). | Escape OK; scroll-after-add awaiting confirm |
+| R1-11 | Step B follow-up (20 Nov 2026) | Enter commits; blur/Escape cancel (Escape re-confirmed). Add your own under every group (was only the open group). After Enter-add, JD scroll preserved (was jumping to the top). | Escape OK; Add-your-own groups + scroll awaiting confirm |
 | R1-12 | OPEN | Section header row: Approve/Undo/Also-in clip; pencil/grip hard on narrow/touch (opacity 0.45). |
 | R1-13 | OPEN | Preview Eye vanishes while Preview tab stays after picking a progress part. |
 | R1-14 | OPEN | Check card vs progress “Check done” disagree (skipped/google points). |

@@ -14,15 +14,21 @@ import type { DemoJob, JobStatus } from './types';
  * Brings an element into view by scrolling only its nearest scrolling box, never the page around it, so the window's header stays in
  * place (scrollIntoView would scroll every scrollable ancestor too).
  */
-export function scrollInside(el: Element | null | undefined, where: 'start' | 'center' | 'end' = 'start', smooth = true) {
+export function scrollInside(el: Element | null | undefined, where: 'start' | 'center' | 'end' | 'nearest' = 'start', smooth = true) {
   if (!el || typeof window === 'undefined') return;
   let box = el.parentElement;
   while (box && !/(auto|scroll)/.test(window.getComputedStyle(box).overflowY)) box = box.parentElement;
   if (!box) return;
   const r = el.getBoundingClientRect();
   const b = box.getBoundingClientRect();
+  if (where === 'nearest' && r.top >= b.top + 8 && r.bottom <= b.bottom - 8) return;
   const offset = r.top - b.top + box.scrollTop;
-  const top = where === 'start' ? offset - 12 : where === 'center' ? offset - (box.clientHeight - r.height) / 2 : offset - box.clientHeight + r.height + 12;
+  const top =
+    where === 'start' || (where === 'nearest' && r.top < b.top)
+      ? offset - 12
+      : where === 'end' || (where === 'nearest' && r.bottom > b.bottom)
+        ? offset - box.clientHeight + r.height + 12
+        : offset - (box.clientHeight - r.height) / 2;
   box.scrollTo?.({ top: Math.max(0, top), behavior: smooth ? 'smooth' : 'auto' });
 }
 

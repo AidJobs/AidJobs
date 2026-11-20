@@ -12,7 +12,7 @@ import { PageFillTools } from './ContextCards';
 import { viewOf } from './langs';
 import { jobLang, langOf } from './translate';
 import { placeFor } from './MenuButton';
-import { groupLabelOf, groupOfKey, groupOrderOf, isCustomSection, KEPT, placeSaid } from './outline';
+import { groupLabelOf, groupOfKey, groupOrderOf, KEPT, placeSaid } from './outline';
 import { contractPicks, deadlinePicks, eligibilityPicks, gradePicks, languagePicks, methodPicks, placePatch, placePicks, salaryPicks, safeguardingPicks, type Pick } from './answers';
 import { DOCUMENTS } from './apply';
 import { PROJECT_SECTION, saveAboutForOrg, savePageFieldText } from './context';
@@ -718,13 +718,13 @@ function AddNameField({ label, onCommit, onCancel }: { label: string; onCommit: 
 }
 
 /**
- * The + panel (section 19, phase 6, C): the outline's own chips, the group of the place it was opened first, then the other groups,
- * then any fixed text left out, to bring it back. A section goes where the + was opened (from the last +, at the end of its group).
+ * The + panel (section 19, phase 6, C): catalog chips by group (place of the + first), Add your own under every group
+ * (same as the outline), then fixed texts left out. Catalog chips still insert at the +, Add your own names a section in that group.
  */
 export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State; at: { after: string | null; anchor: HTMLElement; end: boolean }; onClose: () => void; lang?: JobLang }) {
   const box = useRef<HTMLDivElement>(null);
   const [place] = useState(() => placeFor(at.anchor, 'left', at.end));
-  const [ownName, setOwnName] = useState<string | null>(null);
+  const [ownIn, setOwnIn] = useState<GroupKey | null>(null);
   const [groupName, setGroupName] = useState<string | null>(null);
   const ownDone = useRef(false);
   const groupDone = useRef(false);
@@ -745,14 +745,25 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
     document.addEventListener('pointerdown', down);
     return () => document.removeEventListener('pointerdown', down);
   }, [onClose]);
-  /** After Add, keep the JD on the new section (the change note at the top must not leave the panel scrolled away). */
+  /**
+   * After Add: keep the JD scroll where it was (pinning `part` can drop the fields card and yank the panel to the top),
+   * then only nudge if the new section is off-screen.
+   */
   const focusAdded = (key: string) => {
-    requestAnimationFrame(() => {
+    const panel = document.getElementById('ej-w-panel');
+    const kept = panel?.scrollTop ?? 0;
+    const run = (left: number) => {
       const grip = version ? `ver:${key}` : key;
       const sec = document.getElementById(version ? `ej-ver-${key}` : `ej-sec-${key}`);
-      scrollInside(sec, 'start', false);
+      if (!sec) {
+        if (left > 0) requestAnimationFrame(() => run(left - 1));
+        return;
+      }
+      if (panel) panel.scrollTop = kept;
+      scrollInside(sec, 'nearest', false);
       document.querySelector<HTMLElement>(`[data-grip-key="${grip}"]`)?.focus({ preventScroll: true });
-    });
+    };
+    requestAnimationFrame(() => run(24));
   };
   const add = (key: string) => {
     const op = at.end ? ({ op: 'add', key } as const) : ({ op: 'add', key, after: at.after } as const);
@@ -761,17 +772,20 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
     onClose();
     focusAdded(key);
   };
-  const addOwn = (heading: string) => {
+  const addOwn = (heading: string, group: GroupKey) => {
     if (ownDone.current) return;
     const name = heading.trim();
     if (!name) return;
     ownDone.current = true;
-    const before = new Set(job.tags);
-    const op = { op: 'addCustom' as const, heading: name, group: here, ...(at.end ? {} : { after: at.after }) };
+    // At the open +: keep insert place. Under another group: add at the end of that group (like the outline).
+    const op =
+      group === here && !at.end
+        ? ({ op: 'addCustom' as const, heading: name, group, after: at.after } as const)
+        : ({ op: 'addCustom' as const, heading: name, group } as const);
     if (version) versionOp(job.id, version, op);
     else outlineOp(job.id, op);
     onClose();
-    const added = getState().jobs.find((j) => j.id === job.id)?.tags.find((k) => isCustomSection(k) && !before.has(k));
+    const added = getState().jobs.find((j) => j.id === job.id)?.undoStep?.keys?.[0];
     if (added) focusAdded(added);
   };
   const addGroup = (label: string) => {
@@ -782,9 +796,9 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
     outlineOp(job.id, { op: 'addGroup', label: name });
     onClose();
   };
-  const startOwn = () => {
+  const startOwn = (group: GroupKey) => {
     ownDone.current = false;
-    setOwnName('');
+    setOwnIn(group);
   };
   const startGroup = () => {
     groupDone.current = false;
@@ -792,7 +806,7 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
   };
   const cancelOwn = () => {
     ownDone.current = true;
-    setOwnName(null);
+    setOwnIn(null);
   };
   const cancelGroup = () => {
     groupDone.current = true;
@@ -813,7 +827,7 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
         e.preventDefault();
         e.stopPropagation();
         // Naming first: Escape cancels the name field only (must not close+blur into an add).
-        if (ownName !== null) {
+        if (ownIn !== null) {
           cancelOwn();
           return;
         }
@@ -828,7 +842,6 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
       {groups.map((gk) => {
         const missing = SECTIONS.filter((d) => d.group === gk && !keys.includes(d.key));
         const label = GROUPS.find((x) => x.key === gk)?.label ?? (view?.customGroups ?? job.customGroups)?.find((x) => x.id === gk)?.label ?? gk;
-        if (!missing.length && gk !== here) return null;
         return (
           <div key={gk} className="flex flex-col gap-1" role="group" aria-label={label}>
             <span className="ej-menu-label">{label}</span>
@@ -842,17 +855,16 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
                   </button>
                 </Tip>
               ))}
-              {gk === here &&
-                (ownName !== null ? (
-                  <AddNameField label="Name this section" onCommit={addOwn} onCancel={cancelOwn} />
-                ) : (
-                  <Tip label="Add a section of your own here">
-                    <button type="button" className="ej-add" onClick={startOwn} aria-label="Add your own section">
-                      <Plus size={11} strokeWidth={2} aria-hidden />
-                      Add your own
-                    </button>
-                  </Tip>
-                ))}
+              {ownIn === gk ? (
+                <AddNameField label="Name this section" onCommit={(n) => addOwn(n, gk)} onCancel={cancelOwn} />
+              ) : (
+                <Tip label={`Add a section of your own in ${label}`}>
+                  <button type="button" className="ej-add" onClick={() => startOwn(gk)} aria-label={`Add your own section in ${label}`}>
+                    <Plus size={11} strokeWidth={2} aria-hidden />
+                    Add your own
+                  </button>
+                </Tip>
+              )}
             </div>
           </div>
         );

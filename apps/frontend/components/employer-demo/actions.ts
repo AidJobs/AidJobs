@@ -2489,7 +2489,8 @@ export function outlineOp(id: string, op: OutlineOp) {
         const sec = emptyCustomSection(key, heading);
         const withSec = { ...moved, sections: inOutlineOrder([...moved.sections.filter((x) => x.key !== key), sec], moved.tags) };
         const next = j.sections.length ? { ...withSec, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Added ${heading}`, sections: withSec.sections }] } : withSec;
-        return stepped(j, next, opNote(next, s, op, j), 'doc', { keys: [key] });
+        // Same as catalog add: pin the progress line on the new section (Add panel restores scroll so the JD does not jump to the top).
+        return { ...stepped(j, next, opNote(next, s, op, j), 'doc', { keys: [key] }), part: `s:${key}` };
       }
 
       if (op.op === 'remove' && (KEPT.includes(op.key) || !j.tags.includes(op.key) || j.tags.length < 2)) return j;
