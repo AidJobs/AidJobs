@@ -1,6 +1,6 @@
 'use client';
 
-import { advanceFromAbout, advanceFromProject, formatOf, goOn, headingOf, liveEdit, setFacts, stepped, subId, touched } from './actions';
+import { advanceFromAbout, advanceFromProject, contentSnap, formatOf, goOn, headingOf, liveEdit, setFacts, stepped, subId, touched } from './actions';
 import { extractFacts, inOutlineOrder, longDate, placeIn, PLACES, roleByKey, salarySuggestion, SALARY_FACTS } from './engine';
 import { ASKS } from './flow';
 import { typicalYears } from './market';
@@ -163,13 +163,13 @@ export function acceptPageDraft(id: string, lines?: string[]) {
       const used = earlier?.usedBy?.filter((k) => k !== key && j.tags.includes(k)) ?? [];
       const pack: ContextPack = { ...j.pack, ...(d.kind === 'about' ? { about: { text: text.join('\n'), source } } : { project: { text: text.join('\n'), source, at: Date.now(), usedBy: [], ...(used.length ? { redo: used } : {}) } }) };
       const renamed = d.kind === 'project' && !j.tags.includes(key) ? { ...j.renamed, [key]: LABEL.project } : j.renamed;
-      const walk = j.walk ? { ...j.walk, approved: Array.from(new Set([...j.walk.approved, key])) } : j.walk;
       const offerOrg = d.kind === 'about' && !s.org.about.trim() && s.me.role === 'owner';
       const conflicts = d.kind === 'project' ? projectConflicts(j, text.join('\n'), s.today) : [];
       // The facts first, one disagreement at a time with its own answers; then the offer to update the sections that used the old project.
       const ask = conflicts.length ? conflictQuestion(conflicts[0]) : used.length ? redoQuestion(used.map((k) => headingOf(s, j, k))) : null;
       const notes = [`**${LABEL[d.kind]}** is in the job, from ${source}.`, offerOrg ? "Your organisation has no About us yet: keep this one as its About us for every job? (Save it as your organisation's About us, on the section.)" : '', ask?.text ?? ''].filter(Boolean);
       const quick = ask?.quick;
+      // U-3 Step B: no walk auto-approve; Undo via contentSnap (includes pack), not stepped/afterChange; put the draft card back on Undo.
       return {
         ...touched(j),
         ...liveEdit(j),
@@ -177,11 +177,12 @@ export function acceptPageDraft(id: string, lines?: string[]) {
         sections,
         renamed,
         pack,
-        walk,
         pageDraft: undefined,
         pageIntake: withoutPageIntake(j.pageIntake, d.kind),
         versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `${LABEL[d.kind]} from ${source}`, sections }],
         chat: [...j.chat, say(notes.join(' '), quick)],
+        lastChange: undefined,
+        undoStep: { text: `${LABEL[d.kind]} from ${source}`, tab: 'doc', before: contentSnap(j), keys: [key], pageDraft: d },
       };
     }),
   }));

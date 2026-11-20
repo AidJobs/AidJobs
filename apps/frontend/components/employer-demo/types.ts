@@ -382,11 +382,12 @@ export type Snapshot = { facts: Facts; sections: Section[]; at: number };
  * A job's content, as one Undo step keeps it (section 19, phase 6, C): the sections and their grouping, the fixed texts and their
  * wording, the versions, and the links; not the facts, the review, or the chat.
  */
-export type Content = Pick<DemoJob, 'tags' | 'sections' | 'groupOrder' | 'groupOf' | 'customGroups' | 'renamed' | 'subsPlan' | 'commitments' | 'fixed' | 'translations' | 'linked' | 'toUpdate'>;
+export type Content = Pick<DemoJob, 'tags' | 'sections' | 'groupOrder' | 'groupOf' | 'customGroups' | 'renamed' | 'subsPlan' | 'commitments' | 'fixed' | 'translations' | 'linked' | 'toUpdate' | 'pack'>;
 
 /**
  * The last change made with the icons, the outline, or a version's editor: its note, where it was made (`tab`), the content before it,
  * and, after an unlinked edit, the other languages offered once ("Also in …"). `removed`: a section removed, noted where it was.
+ * Accept of a page draft (U-3 Step B) also stores `pageDraft` so Undo can put the draft card back; it does not use `stepped`/`afterChange`.
  */
 export type UndoStep = {
   text: string;
@@ -400,6 +401,8 @@ export type UndoStep = {
   settings?: boolean;
   /** A linked text change still being written by the AI: Undo waits until it is done. */
   writing?: boolean;
+  /** Accept only: the draft card to restore when this Undo runs (pack is in `before`). */
+  pageDraft?: PageDraft;
 };
 
 /** Text a linked change asked the AI to carry into other languages (section 19, phase 6, E), until it is written. */

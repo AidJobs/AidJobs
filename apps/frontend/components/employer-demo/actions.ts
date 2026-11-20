@@ -95,7 +95,7 @@ export function versionGrouped(t: Translation): Translation {
 
 /** The job's content, as one Undo step keeps it (section 19, phase 6, C). */
 export function contentSnap(j: DemoJob): Content {
-  return { tags: j.tags, sections: j.sections, groupOrder: j.groupOrder, groupOf: j.groupOf, customGroups: j.customGroups, renamed: j.renamed, subsPlan: j.subsPlan, commitments: j.commitments, fixed: j.fixed, translations: j.translations, linked: j.linked, toUpdate: j.toUpdate };
+  return { tags: j.tags, sections: j.sections, groupOrder: j.groupOrder, groupOf: j.groupOf, customGroups: j.customGroups, renamed: j.renamed, subsPlan: j.subsPlan, commitments: j.commitments, fixed: j.fixed, translations: j.translations, linked: j.linked, toUpdate: j.toUpdate, pack: j.pack };
 }
 
 /** An empty custom section until the user or the AI writes it. */
@@ -2284,7 +2284,15 @@ export function dismissChange(id: string) {
 function fromUndoStep(x: DemoJob): DemoJob | null {
   const st = x.undoStep;
   if (!st || st.writing) return null;
-  const back: DemoJob = { ...touched(x), ...st.before, ...liveEdit(x), lastChange: undefined, undoStep: undefined, wordingOffer: undefined };
+  const back: DemoJob = {
+    ...touched(x),
+    ...st.before,
+    ...liveEdit(x),
+    lastChange: undefined,
+    undoStep: undefined,
+    wordingOffer: undefined,
+    ...(st.pageDraft ? { pageDraft: st.pageDraft } : {}),
+  };
   const restored: DemoJob = { ...back, versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note: `Undid: ${st.text}`, sections: back.sections }] };
   // Prefer the restored removed section when undoing a remove; otherwise a live neighbour; never the added key that is gone after undoing an add.
   const neighbour = st.removed?.key && restored.tags.includes(st.removed.key) ? st.removed.key : st.removed?.after ?? null;
