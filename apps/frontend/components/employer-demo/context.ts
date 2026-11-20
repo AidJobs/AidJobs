@@ -1,6 +1,6 @@
 'use client';
 
-import { advanceFromAbout, advanceFromProject, contentSnap, formatOf, goOn, headingOf, liveEdit, setFacts, stepped, subId, touched } from './actions';
+import { advanceFromAbout, advanceFromProject, contentSnap, formatOf, goOn, headingOf, liveEdit, setFacts, stepped, subId, touched, withoutWalkApproval } from './actions';
 import { extractFacts, inOutlineOrder, longDate, placeIn, PLACES, roleByKey, salarySuggestion, SALARY_FACTS } from './engine';
 import { ASKS } from './flow';
 import { typicalYears } from './market';
@@ -123,6 +123,8 @@ export function savePageFieldText(id: string, kind: 'about' | 'project', raw: st
         })()
       : { key, title, lines: text, edited: true as const };
     const sections = existing ? j.sections.map((x) => (x.key === key ? placed : x)) : inOutlineOrder([...j.sections, placed], tags);
+    const beforeBody = existing ? JSON.stringify({ lines: existing.lines, subs: existing.subs }) : '';
+    const afterBody = JSON.stringify({ lines: placed.lines, subs: placed.subs });
     const base: DemoJob = {
       ...touched(j),
       ...liveEdit(j),
@@ -132,7 +134,8 @@ export function savePageFieldText(id: string, kind: 'about' | 'project', raw: st
       versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${title}`, sections }],
       part: `s:${key}`,
     };
-    return stepped(j, base, `Edited ${title}`, 'doc', { keys: [key] });
+    const next = stepped(j, base, `Edited ${title}`, 'doc', { keys: [key] });
+    return beforeBody !== afterBody ? withoutWalkApproval(next, key) : next;
   });
 }
 

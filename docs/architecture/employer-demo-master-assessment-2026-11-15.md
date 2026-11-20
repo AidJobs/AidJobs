@@ -18,7 +18,7 @@
 3. ~~About us / Project (U-3)~~ — **Fixed 20 Nov 2026** (Step A + Step B; preview confirmed)  
 4. ~~Grip: Project/Background when relevant; open menu without accidental drag~~ — **Fixed 20 Nov 2026** (U-4; user confirmed Step A + Step B)
 
-5. Approve vs unsaved buffers; Add-panel blur/Escape ← **next**
+5. Approve vs unsaved buffers; Add-panel blur/Escape ← **Step A built; confirm then Step B**
 
 ---
 
@@ -47,7 +47,7 @@
 | R1-03 | OPEN | “Use our About us as it is” on Local NGO concise adds no About us section (template starts at Project brief); chat says kept. | NGO |
 | R1-04 | **Fixed** (with U-2, 20 Nov 2026) | Undo / remove / walk: focus steal to Market; remove can mount Market without scroll; lingering `lastChange`/`undoStep` permanently skips later Market open; chat Undo may not pin part. | Chrome, INGO, U-2 |
 | R1-05 | **Fixed** (U-2 + note-hide follow-up, 20 Nov 2026) | Removed note auto-dismiss (~2s) called `dismissChange` and deleted Undo. Now the note hides in the UI only; `undoStep` stays for chat Undo until the next change. | Chrome |
-| R1-06 | OPEN | Approve ignores unsaved pencil / PageField `edit`; later Save stays approved; `nextStep` skips that section. | Chrome |
+| R1-06 | Step A built (20 Nov 2026); Step B is Add-panel | Approve hidden while pencil open; Save that changes text clears `walk.approved` for that section (`editSection` / project Save). | Step A awaiting preview confirm |
 | R1-07 | OPEN | Language “Mark as reviewed” while still source language; Remove language permanent (live too); tab X confirms but no Undo. | INGO *(language — defer unless blocks English)* |
 | R1-08 | OPEN | UN templates not classifiable: competencies, education, grade/GS/ICS, NY closing time, fake ICSC pay, no PSEA/special notice, CV-style apply. | UN *(format content — after English chrome)* |
 

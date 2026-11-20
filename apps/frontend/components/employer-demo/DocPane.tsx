@@ -351,7 +351,7 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
           </span>
         )}
         {!draft && sec.edited && <span className="aj-chip">Your text</span>}
-        {job.walk && !job.setup && !reviewing && sec.lines.length > 0 && !job.walk.approved.includes(sec.key) && (
+        {job.walk && !job.setup && !reviewing && !editing && sec.lines.length > 0 && !job.walk.approved.includes(sec.key) && (
           <button type="button" className="aj-pill" style={{ height: 28 }} onClick={() => approveSection(job.id, sec.key)} aria-label={`Approve ${sec.title}`}>
             <Check size={12} strokeWidth={2} aria-hidden /> Approve
           </button>

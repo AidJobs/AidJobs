@@ -1562,6 +1562,15 @@ export function settleQuestion(id: string, what: string) {
   updateJob(id, (j) => (j.walk && !j.walk.settled.includes(what) ? { ...j, walk: { ...j.walk, settled: [...j.walk.settled, what] } } : j));
 }
 
+/**
+ * Drop a section from the walk's approved list after its text changes (R1-06 / English item 5 Step A).
+ * Approving while the pencil is open is blocked in the UI; this covers Save after Approve.
+ */
+export function withoutWalkApproval(j: DemoJob, key: string): DemoJob {
+  if (!j.walk?.approved.includes(key)) return j;
+  return { ...j, walk: { ...j.walk, approved: j.walk.approved.filter((k) => k !== key) } };
+}
+
 /** A section the user is happy with; the chat goes on to the next step. Also from the section's own button. */
 export function approveSection(id: string, key: string, said?: string) {
   if (!ownerOnly()) return;
@@ -2763,7 +2772,7 @@ export function editSection(id: string, key: string, text: string, note = false,
     const sections = inOutlineOrder(existing ? j.sections.map((x) => (x.key === key ? nextSec : x)) : [...j.sections, nextSec], tags);
     const marks = Object.fromEntries(Object.entries(j.toUpdate ?? {}).filter(([k]) => k !== key));
     const base = { ...touched(j), tags, renamed, toUpdate: Object.keys(marks).length ? marks : undefined, sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${title}`, sections }], ...liveEdit(j) };
-    const next: DemoJob = stepped(start ?? j, base, `Edited ${title}`, 'doc', { keys: [key] });
+    const next: DemoJob = withoutWalkApproval(stepped(start ?? j, base, `Edited ${title}`, 'doc', { keys: [key] }), key);
     return note
       ? { ...next, part: `s:${key}`, chat: [...j.chat, msg('ai', `You changed **${title}** by hand. I'll keep your wording; ask me if another section should change to match.`)] }
       : { ...next, part: `s:${key}` };
