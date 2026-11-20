@@ -283,25 +283,53 @@ class GreenhouseFeedReader(Reader):
         return ListingResult.from_report(self.name, jobs, report)
 
 
+def _detail_refusal(answer: Response) -> bool:
+    """True when further Greenhouse detail GETs must stop (401/403/429/challenge/budget)."""
+    if answer.status in (401, 403, 429):
+        return True
+    stop = (answer.stop or "").lower()
+    if not stop:
+        return False
+    return any(
+        marker in stop
+        for marker in (
+            "challenge",
+            "refused",
+            "shared host budget",
+            "request budget",
+            "time budget",
+            "stopped after a refusal",
+            "robots.txt",
+            "host busy",
+        )
+    )
+
+
 async def _fill_greenhouse_posted_on(
     jobs: List[Dict], token: str, fetch: Fetch
 ) -> None:
-    """Fetch single-job bodies for first_published, capped; stop further fetches on refusal."""
+    """Fetch single-job bodies for first_published, capped; stop further fetches on refusal.
+
+    A 404 or malformed body skips that job only; a refusal stops the remainder of the cap.
+    """
     missing = [job for job in jobs if not job.get("posted_on") and job.get("reference")]
     for job in missing[:GREENHOUSE_DETAIL_CAP]:
         answer = await fetch(Request(greenhouse_job_url(token, job["reference"])))
-        if answer.stop or answer.status != 200 or not (answer.body or "").strip():
+        if _detail_refusal(answer):
             logger.info(
-                "Greenhouse single-job fetch stopped (%s); no further detail requests",
+                "Greenhouse single-job fetch refused (%s); no further detail requests",
                 answer.stop or answer.status,
             )
             return
+        if answer.stop or answer.status != 200 or not (answer.body or "").strip():
+            # Missing job or empty answer: skip this id, keep trying within the cap.
+            continue
         try:
             detail = json.loads(answer.body)
         except (TypeError, ValueError):
-            return
+            continue
         if not isinstance(detail, dict):
-            return
+            continue
         merge_greenhouse_detail(job, detail)
 
 

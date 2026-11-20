@@ -9,6 +9,8 @@ import pytest
 
 from contracts.admission import admit_batch
 from contracts.outbound import (
+    HOST_GROUP_BUDGET_REQUESTS,
+    HOST_GROUP_BUDGET_WINDOW_SECONDS,
     HOST_GROUP_LIMITS,
     crawl_budget,
     host_group,
@@ -154,7 +156,7 @@ def test_greenhouse_detail_stops_after_refusal():
 
     async def fetch(request: Request) -> Response:
         calls.append(request.url)
-        return Response(0, "", stop="HTTP 429")
+        return Response(429, "", stop="HTTP 429")
 
     result = asyncio.run(
         GreenhouseFeedReader().read(
@@ -167,8 +169,90 @@ def test_greenhouse_detail_stops_after_refusal():
     assert all(not job.get("posted_on") for job in result.jobs)
 
 
+def test_greenhouse_detail_continues_after_404():
+    record = _record("greenhouse")
+    data = json.loads(_body("greenhouse"))
+    for item in data["jobs"]:
+        item.pop("first_published", None)
+    detail = (_FIXTURES / "greenhouse" / "job_4002.json").read_text(encoding="utf-8")
+    calls: list[str] = []
+
+    async def fetch(request: Request) -> Response:
+        calls.append(request.url)
+        if "4001" in request.url:
+            return Response(404, "", stop="HTTP 404")
+        return Response(200, detail, content_type="application/json")
+
+    result = asyncio.run(
+        GreenhouseFeedReader().read(
+            Response(200, json.dumps(data)),
+            {"careers_url": record["url"]},
+            fetch=fetch,
+        )
+    )
+    assert len(calls) == 2
+    assert "posted_on" not in result.jobs[0]
+    assert result.jobs[1]["posted_on"] == "2026-11-05"
+
+
+def test_greenhouse_detail_cap_limits_fetches():
+    record = _record("greenhouse")
+    jobs = []
+    for index in range(15):
+        jobs.append(
+            {
+                "id": 5000 + index,
+                "title": f"Role {index}",
+                "location": {"name": "Remote"},
+                "absolute_url": (
+                    f"https://job-boards.greenhouse.io/exampleaid/jobs/{5000 + index}"
+                ),
+                "content": "Text",
+            }
+        )
+    data = {"jobs": jobs, "meta": {"total": 15}}
+    calls: list[str] = []
+
+    async def fetch(request: Request) -> Response:
+        calls.append(request.url)
+        job_id = request.url.rstrip("/").rsplit("/", 1)[-1]
+        return Response(
+            200,
+            json.dumps(
+                {
+                    "id": int(job_id),
+                    "title": "Role",
+                    "first_published": "2026-11-01T00:00:00Z",
+                    "absolute_url": request.url,
+                }
+            ),
+        )
+
+    result = asyncio.run(
+        GreenhouseFeedReader().read(
+            Response(200, json.dumps(data)),
+            {"careers_url": record["url"]},
+            fetch=fetch,
+        )
+    )
+    assert len(calls) == GREENHOUSE_DETAIL_CAP
+    filled = sum(1 for job in result.jobs if job.get("posted_on"))
+    assert filled == GREENHOUSE_DETAIL_CAP
+
+
 def test_greenhouse_detail_cap_constant():
     assert GREENHOUSE_DETAIL_CAP == 10
+    assert HOST_GROUP_BUDGET_REQUESTS == 12
+    assert HOST_GROUP_BUDGET_WINDOW_SECONDS == 60.0
+    assert HOST_GROUP_LIMITS["workable"] == (12, 60.0)
+    assert HOST_GROUP_LIMITS["greenhouse"] == (12, 60.0)
+
+
+def test_greenhouse_jobs_admit_with_location():
+    jobs = [dict(job) for job in _record("greenhouse")["jobs"]]
+    admitted, rejected = admit_batch(jobs, "api")
+    assert len(admitted) == 2
+    assert rejected == []
 
 
 def test_simulate_api_names_workable_reader():

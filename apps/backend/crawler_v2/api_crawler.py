@@ -142,15 +142,21 @@ class SimpleAPICrawler:
                     headers=request_headers,
                     timeout=float(self.timeout.connect or 30.0),
                 )
-            if result.status_code != 200 or refusal(
+            refused = refusal(
                 result.status_code, result.headers, result.text
-            ):
+            )
+            if result.status_code != 200 or refused:
                 logger.error("API fetch failed: HTTP %s", result.status_code)
-                stop = (
-                    f"HTTP {result.status_code}"
-                    if result.status_code
-                    else (current_budget().refused if current_budget() else "fetch failed")
-                )
+                if refused:
+                    stop = refused
+                elif result.status_code:
+                    stop = f"HTTP {result.status_code}"
+                else:
+                    stop = (
+                        current_budget().refused
+                        if current_budget() and current_budget().refused
+                        else "fetch failed"
+                    )
                 return Response(result.status_code or 0, "", stop=str(stop or "fetch failed"))
             return Response(
                 result.status_code,
