@@ -299,7 +299,8 @@ export default function SideMenu(props: Props) {
           minWidth: width,
           maxWidth: width,
           background: 'var(--surface)',
-          transition: props.widthLocked ? undefined : 'width 160ms ease',
+          // No ease while dragging or on the collapsed rail — drag-to-close must snap shut, not stall mid-width.
+          transition: props.widthLocked || props.collapsed ? undefined : 'width 160ms ease',
         }}
       >
         <MenuBody props={props} collapsed={props.collapsed} />
