@@ -16,7 +16,7 @@
 1. ~~Progress line / window chrome (U-1)~~ — **Fixed 20 Nov 2026** (user confirmed on preview)  
 2. ~~Undo / remove / walk focus (no Market steal; keep Undo until used)~~ — **Fixed 20 Nov 2026** (U-2; user confirmed on preview, including Removed-note hide)  
 3. ~~About us / Project (U-3)~~ — **Fixed 20 Nov 2026** (Step A + Step B; preview confirmed)  
-4. Grip: Project/Background when relevant; open menu without accidental drag ← **U-4 Step A built; confirm then Step B**  
+4. ~~Grip: Project/Background when relevant; open menu without accidental drag~~ — **U-4 Step A confirmed; Step B shipped (threshold)**  
 
 5. Approve vs unsaved buffers; Add-panel blur/Escape  
 
@@ -27,14 +27,14 @@
 **Agents:** [HR review UN agency](c56d4342-bc46-4b16-a61d-22cccb85cb07), [HR review local NGO](f87e9add-a843-44ea-a3eb-6c534199501a), [HR review INGO](54c43449-021d-4c76-977c-d0b3853bd5c6), [UX chrome audit](b6ab0953-572b-4d59-807e-442ed88e9a17).  
 **Code tip when Round 1 was taken:** polish commits through `13891bb` (later tip may move; re-verify before fixing).
 
-### A. User-reported bugs (confirmed in code) — U-1–U-3 Fixed; U-4 OPEN
+### A. User-reported bugs (confirmed in code) — U-1–U-4 Fixed (U-4 Step B awaiting preview confirm)
 
 | ID | Status | Fault | Evidence |
 | --- | --- | --- | --- |
 | U-1 | **Fixed** (20 Nov 2026) | Progress line on the **job panel** (phase 3), flush under the window header; measure-row bug removed; header and progress hairlines removed; chat in `aj-card` aligned with the progress line; `+N` clear of the connector; side menu resizable (drag open/close) with open/closed remembered. | User confirmed on preview, 20 Nov 2026 |
 | U-2 | **Fixed** (20 Nov 2026) | Undo / remove / walk no longer open Market over the JD; chat undo and `lastChange` pin like icon Undo. Removed note hides after ~2s **without** clearing `undoStep` (polish `3f0f4c4` + R1-05; U-2 had wrongly left the note forever). | User confirmed on preview, 20 Nov 2026 (Market steal + Removed note hide) |
 | U-3 | **Fixed** (20 Nov 2026; Step A/B; JD open→write→Save/Cancel `6670de3`) | Step A/B as before. Follow-up: About us / Project match other sections — pencil opens one box with Save/Cancel; link/Read/Draft/Upload fill that same box (no always-on second pad). Project Save still uses `intoSection` (no heading rename / parent wipe). Chat window PageField still uses draft card Accept. | User confirmed on preview, 20 Nov 2026 |
-| U-4 | Step A built (20 Nov 2026); Step B (drag) pending | One `background` slot: Add uses the format heading (e.g. Project brief / Background); no force-rename to “About the project”; no duplicate Project chip. When the section exists, no second add. | Step A awaiting preview confirm; Step B = raise grip drag threshold |
+| U-4 | **Fixed** (20 Nov 2026; Step A `314a4b0`, Step B grip threshold) | Step A: one `background` slot; Add uses format heading; no force-rename; no duplicate Project chip. Step B: grip drag threshold 3→12px so a normal press opens the menu (R1-10 click part). Rest of R1-10 (fake Moved, group drops) stays open. | Step A user-confirmed on preview; Step B awaiting preview confirm |
 
 ### B. Combined open findings (Round 1)
 
@@ -56,7 +56,7 @@
 | ID | Status | Fault |
 | --- | --- | --- |
 | R1-09 | OPEN (partial) | **U-1 placement Fixed 20 Nov 2026.** Still open: Publish early while Languages/Review in +N; icons hidden until writing; phone parts over icons. |
-| R1-10 | OPEN | Grip: 3px move = drag (menu click swallowed); small drag reorders; Move up/down says “Moved” at ends; no group drop targets; remove group deletes its sections. |
+| R1-10 | OPEN (partial: click/drag Fixed in U-4 Step B) | Grip drag threshold raised 3→12px (menu click). Still open: Move up/down says “Moved” at ends; no group drop targets; remove group deletes its sections. |
 | R1-11 | OPEN | Add panel: blur commits “Add your own” / group; Escape still adds; no Cancel. |
 | R1-12 | OPEN | Section header row: Approve/Undo/Also-in clip; pencil/grip hard on narrow/touch (opacity 0.45). |
 | R1-13 | OPEN | Preview Eye vanishes while Preview tab stays after picking a progress part. |

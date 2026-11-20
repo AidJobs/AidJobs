@@ -8,7 +8,16 @@ import { placeFor } from './MenuButton';
 /** One entry of a grip's menu; `items` opens a short list in its place ("Move to group…"); `off`: shown, with why it cannot be used. */
 export type GripAction = { label: string; run?: () => void; items?: GripAction[]; danger?: boolean; off?: string; current?: boolean };
 
-const DRAG = 3;
+/**
+ * Pixels of pointer travel before a press becomes a drag (U-4 Step B). Was 3 — a normal click/tap wobble swallowed the menu (R1-10).
+ * Below this threshold, pointer-up still opens the menu.
+ */
+export const GRIP_DRAG_PX = 12;
+
+/** True when the pointer has moved far enough to start a drag instead of a menu click. */
+export function gripMovedEnough(dx: number, dy: number, threshold = GRIP_DRAG_PX): boolean {
+  return Math.hypot(dx, dy) >= threshold;
+}
 
 /**
  * The grip (section 19, phase 6, B and C): one meaning in the outline and in the draft. Dragged, it moves its row or section; pressed
@@ -63,7 +72,7 @@ export default function Grip({ label, tip, actions, onKey, onDrag, onDrop, class
   const pointerMove = (e: PointerEvent<HTMLButtonElement>) => {
     const p = press.current;
     if (!p || !onDrag) return;
-    if (!p.dragging && Math.hypot(e.clientX - p.x, e.clientY - p.y) < DRAG) return;
+    if (!p.dragging && !gripMovedEnough(e.clientX - p.x, e.clientY - p.y)) return;
     if (!p.dragging) {
       p.dragging = true;
       try {
