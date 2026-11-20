@@ -3,7 +3,7 @@
 import { AlertCircle, Check, CheckCircle2, ChevronUp, Info, Lock, MessageSquare, Pencil, Plus, Settings2, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import Tip from '@/components/site/Tip';
-import { addRemark, alsoIn, answerFact, approveSection, bringBackFixed, changedSinceLastRound, dismissChange, editSection, formatOf, groupingOf, markGenuine, outlineOp, renameSection, sendChat, setApply, setFacts, setMethod, settleRemark, subId, undoLastChange, undoStep, versionOp } from './actions';
+import { addRemark, alsoIn, answerFact, approveSection, bringBackFixed, changedSinceLastRound, editSection, formatOf, groupingOf, markGenuine, outlineOp, renameSection, sendChat, setApply, setFacts, setMethod, settleRemark, subId, undoLastChange, undoStep, versionOp } from './actions';
 import type { OpenTarget } from './aiActions';
 import Grip, { dropAt, type GripAction } from './Grip';
 import FixedBlock from './FixedBlock';
@@ -22,15 +22,6 @@ import type { ApplySettings, ChatMsg, DemoJob, Facts, GroupKey, JobLang, Section
 import { RevealBlock } from './Reveal';
 import { getState } from './store';
 import { Dialog, Field, inputStyle } from './ui';
-
-/** Auto-hide only the “Removed …” note after ~2s; edit/Undo notes stay until Undo. */
-export function useRemovedNoteDismiss(id: string, removedKey: string | undefined) {
-  useEffect(() => {
-    if (!removedKey) return;
-    const t = window.setTimeout(() => dismissChange(id), 2000);
-    return () => clearTimeout(t);
-  }, [id, removedKey]);
-}
 
 export function rich(text: string): ReactNode {
   return text.split(/(\*\*[^*]+\*\*)/g).map((p, i) => (p.startsWith('**') ? <strong key={i}>{p.slice(2, -2)}</strong> : <Fragment key={i}>{p}</Fragment>));
@@ -850,7 +841,7 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
   );
 }
 
-/** A section removed with the grip or the outline leaves a one-line note where it was, with its Undo. */
+/** A section removed with the grip or the outline leaves a one-line note where it was, with its Undo — stays until Undo or the next outline change (U-2; no timed dismiss). */
 function RemovedNote({ job }: { job: DemoJob }) {
   const r = job.undoStep?.removed;
   if (!r) return null;
@@ -870,7 +861,6 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inW
   const [flag, setFlag] = useState<Flag | null>(null);
   const [since] = useState(() => Date.now());
   const [adding, setAdding] = useState<{ after: string | null; anchor: HTMLElement; end: boolean } | null>(null);
-  useRemovedNoteDismiss(job.id, job.undoStep?.removed && !job.undoStep.writing ? job.undoStep.removed.key : undefined);
   const [dropAfter, setDropAfter] = useState<string | null | undefined>(undefined);
   const root = useRef<HTMLElement>(null);
   const live = s.jobs.filter((j) => j.id !== job.id && (j.status === 'live' || j.status === 'scheduled')).map((j) => j.facts.title);

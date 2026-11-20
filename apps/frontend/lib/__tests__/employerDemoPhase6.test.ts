@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { addTranslation, alsoIn, applyFormat, applyOutline, applyTemplate, approveFixed, approveSection, bringBackFixed, chooseStyle, createFormat, editFixed, editSection, editVersionSection, goOn, hireAgain, keepForAll, keepWordingForAll, leaveOutFixed, leavePoint, moveFixed, NEXT_QUESTION, outlineOp, publish, publishBlock, publishNow, removeVersionSection, resetFixed, restoreVersion, reviewTranslation, sendChat, setApply, setFacts, setJobLang, setLinked, setPace, settleQuestion, startJob, toggleCommitment, toggleSection, translateFixed, undoStep, unparkPart, USE_WORDINGS, versionOp } from '../../components/employer-demo/actions';
+import { addTranslation, alsoIn, applyFormat, applyOutline, applyTemplate, approveFixed, approveSection, bringBackFixed, chooseStyle, createFormat, editFixed, editSection, editVersionSection, goOn, hireAgain, keepForAll, keepWordingForAll, leaveOutFixed, leavePoint, moveFixed, NEXT_QUESTION, outlineOp, publish, publishBlock, publishNow, removeVersionSection, resetFixed, restoreVersion, reviewTranslation, sendChat, setApply, setFacts, setJobLang, setLinked, setPace, setPart, settleQuestion, startJob, toggleCommitment, toggleSection, translateFixed, undoLastChange, undoStep, unparkPart, USE_WORDINGS, versionOp } from '../../components/employer-demo/actions';
 import { fixedShown, fixedWordingNow } from '../../components/employer-demo/fixed';
 import { FlyerNotice } from '../../components/employer-demo/Flyer';
 import { createElement } from 'react';
@@ -9,12 +9,14 @@ import { stale, untranslated } from '../../components/employer-demo/translate';
 import { applyAiTurn, type OpenTarget } from '../../components/employer-demo/aiActions';
 import { contextFor, resetAi } from '../../components/employer-demo/ai';
 import { inOutlineOrder, outlineOrder, SECTION_BY_KEY } from '../../components/employer-demo/engine';
-import { checkPoints, nextStep, type Step } from '../../components/employer-demo/flow';
+import { checkPoints, nextStep, walkAutoOpen, type Step } from '../../components/employer-demo/flow';
 import { grouped, groupingFrom, groupOrderOf, moveAfter, moveBy, moveGroupBy, moveInReading } from '../../components/employer-demo/outline';
-import { partsOf } from '../../components/employer-demo/parts';
+import { currentPart, keepJdPart, partsOf } from '../../components/employer-demo/parts';
 import { getState, normalise, resetDemo, update } from '../../components/employer-demo/store';
 import { readAnswer } from '../../components/employer-demo/walkChat';
 import type { DemoJob, Format } from '../../components/employer-demo/types';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const job = (id: string) => getState().jobs.find((j) => j.id === id)!;
 const step = (id: string) => nextStep(job(id), getState());
@@ -878,11 +880,148 @@ describe('add your own group, section, and sub-section (section 19, phase 6 amen
     outlineOp('job-comms', { op: 'addGroup', label: 'Should not land' });
     expect(job('job-comms').customGroups).toBeUndefined();
     update((s) => ({ ...s, reviewerAs: null }));
-    const fs = require('fs') as typeof import('fs');
-    const path = require('path') as typeof import('path');
     for (const f of ['outline.ts', 'OutlineEditor.tsx', 'DocPane.tsx']) {
       const src = fs.readFileSync(path.join(__dirname, '../../components/employer-demo', f), 'utf8');
       expect({ f, fetch: /\bfetch\s*\(/.test(src) }).toEqual({ f, fetch: false });
     }
+  });
+});
+
+describe('U-2: Undo / remove / walk stay on the JD (no Market steal; Undo until used)', () => {
+  const ASKS_SETTLED = ['title', 'place', 'contract', 'grade', 'eligibility', 'languages', 'safeguarding', 'salary', 'deadline', 'method'];
+
+  /** Amplify past plan so Market is first unfinished later part; JD sections remain on the line. */
+  function amplifyReady(id: string, onSection: string) {
+    update((s) => ({
+      ...s,
+      org: { ...s.org, verified: true },
+      jobs: s.jobs.map((j) =>
+        j.id === id
+          ? {
+              ...j,
+              choice: 'amplify' as const,
+              part: `s:${onSection}`,
+              walk: j.walk
+                ? { ...j.walk, settled: Array.from(new Set([...(j.walk.settled ?? []), 'plan', ...ASKS_SETTLED, 'details', 'sdgs', 'fixed', 'suggest'])) }
+                : { pace: 'all' as const, approved: j.tags, settled: ['plan', 'details', 'sdgs', 'fixed', 'suggest'] },
+            }
+          : j,
+      ),
+    }));
+  }
+
+  it('keepJdPart never returns an orphan or invents Market', () => {
+    expect(keepJdPart(['about', 'apply'], 's:gone', 'about')).toBe('s:about');
+    expect(keepJdPart(['about', 'apply'], 's:about')).toBe('s:about');
+    expect(keepJdPart(['about'], 'market')).toBe('s:about');
+    expect(keepJdPart([], 's:gone')).toBeUndefined();
+  });
+
+  it('removing the open section retargets part; currentPart does not fall through to Market', () => {
+    const id = 'job-comms';
+    const key = job(id).tags.find((k) => k !== 'apply')!;
+    amplifyReady(id, key);
+    expect(partsOf(job(id), getState()).some((p) => p.key === 'market')).toBe(true);
+    outlineOp(id, { op: 'remove', key });
+    expect(job(id).tags).not.toContain(key);
+    expect(job(id).part?.startsWith('s:')).toBe(true);
+    expect(job(id).tags).toContain(job(id).part!.slice(2));
+    expect(currentPart(job(id), getState())).not.toBe('market');
+    expect(job(id).undoStep?.removed?.key).toBe(key);
+  });
+
+  it('toggleSection remove retargets part the same way', () => {
+    const id = 'job-comms';
+    const key = job(id).tags.find((k) => k !== 'apply' && !['about'].includes(k)) ?? job(id).tags.find((k) => k !== 'apply')!;
+    setPart(id, `s:${key}`);
+    toggleSection(id, key);
+    expect(job(id).tags).not.toContain(key);
+    expect(job(id).part && job(id).tags.includes(job(id).part!.slice(2))).toBe(true);
+  });
+
+  it('Undo after adding a section restores tags and stays on a live JD section', () => {
+    const id = 'job-comms';
+    const before = job(id).tags;
+    amplifyReady(id, before[0]);
+    const add = before.includes('offer') ? 'competencies' : 'offer';
+    if (!SECTION_BY_KEY[add]) return;
+    outlineOp(id, { op: 'add', key: add, group: SECTION_BY_KEY[add].group });
+    expect(job(id).tags).toContain(add);
+    expect(job(id).part).toBe(`s:${add}`);
+    undoStep(id);
+    expect(job(id).tags).toEqual(before);
+    expect(job(id).undoStep).toBeUndefined();
+    expect(job(id).part?.startsWith('s:')).toBe(true);
+    expect(job(id).tags).toContain(job(id).part!.slice(2));
+    expect(currentPart(job(id), getState())).not.toBe('market');
+  });
+
+  it('chat “undo” after an outline add pins part like undoStep', () => {
+    const id = 'job-comms';
+    const before = job(id).tags;
+    amplifyReady(id, before[0]);
+    const add = before.includes('offer') ? 'competencies' : 'offer';
+    if (!SECTION_BY_KEY[add]) return;
+    outlineOp(id, { op: 'add', key: add, group: SECTION_BY_KEY[add].group });
+    sendChat(id, 'undo');
+    expect(job(id).tags).toEqual(before);
+    expect(job(id).undoStep).toBeUndefined();
+    expect(job(id).lastChange).toBeUndefined();
+    expect(job(id).part?.startsWith('s:') && job(id).tags.includes(job(id).part!.slice(2))).toBe(true);
+    expect(currentPart(job(id), getState())).not.toBe('market');
+  });
+
+  it('undoLastChange clears lastChange and pins part so the changeKey effect cannot re-open a gone section', () => {
+    const id = 'job-comms';
+    const key = job(id).tags[0];
+    const before = job(id);
+    update((s) => ({
+      ...s,
+      jobs: s.jobs.map((j) =>
+        j.id === id
+          ? {
+              ...j,
+              part: `s:${key}`,
+              sections: j.sections.map((x) => (x.key === key ? { ...x, lines: [...x.lines, '- Extra for chat undo'] } : x)),
+              lastChange: { keys: [key], text: 'Edited', before: before.sections, beforeTags: before.tags, beforeFacts: before.facts, beforeTone: before.tone },
+              undoStep: undefined,
+            }
+          : j,
+      ),
+    }));
+    expect(job(id).lastChange?.keys).toContain(key);
+    undoLastChange(id);
+    expect(job(id).lastChange).toBeUndefined();
+    expect(job(id).undoStep).toBeUndefined();
+    expect(job(id).part?.startsWith('s:') && job(id).tags.includes(job(id).part!.slice(2))).toBe(true);
+  });
+
+  it('Removed note is not auto-dismissed: DocPane and LangDoc no longer call dismissChange on a timer', () => {
+    for (const f of ['DocPane.tsx', 'LangDoc.tsx']) {
+      const src = fs.readFileSync(path.join(__dirname, '../../components/employer-demo', f), 'utf8');
+      expect(src).not.toMatch(/useRemovedNoteDismiss/);
+      expect(src).not.toMatch(/dismissChange/);
+      expect(src).not.toMatch(/setTimeout\(\s*\(\)\s*=>\s*dismissChange/);
+    }
+    const id = 'job-comms';
+    const key = job(id).tags.find((k) => k !== 'apply')!;
+    outlineOp(id, { op: 'remove', key });
+    expect(job(id).undoStep?.removed?.key).toBe(key);
+    undoStep(id);
+    expect(job(id).tags).toContain(key);
+  });
+
+  it('walkAutoOpen: edit holds Market; clearing skips that suppressed step; a walk already on details still follows Market', () => {
+    const id = 'job-comms';
+    amplifyReady(id, job(id).tags[0]);
+    const j = job(id);
+    const marketStep = nextStep(j, getState());
+    // Force a market-shaped step object when thin samples skip it.
+    const step = marketStep?.kind === 'market' ? marketStep : ({ kind: 'market', point: { key: 'years', ok: false, title: 'Years' } } as Step);
+    const stepNow = 'market:years';
+    expect(walkAutoOpen({ ...j, undoStep: { text: 'Added x', tab: 'doc', before: { tags: j.tags, sections: j.sections, groupOrder: j.groupOrder, groupOf: j.groupOf, customGroups: j.customGroups, renamed: j.renamed, subsPlan: j.subsPlan, commitments: j.commitments, fixed: j.fixed, translations: j.translations, linked: j.linked, toUpdate: j.toUpdate }, keys: ['x'] } }, step, stepNow, null)).toBe('hold');
+    expect(walkAutoOpen({ ...j, part: 's:about', lastChange: undefined, undoStep: undefined }, step, stepNow, null)).toBe('hold');
+    expect(walkAutoOpen({ ...j, part: 'details', lastChange: undefined, undoStep: undefined }, step, stepNow, stepNow)).toBe('skip-suppressed');
+    expect(walkAutoOpen({ ...j, part: 'details', lastChange: undefined, undoStep: undefined }, step, stepNow, null)).toBe('follow');
   });
 });

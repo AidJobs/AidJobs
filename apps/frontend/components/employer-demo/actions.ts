@@ -69,6 +69,7 @@ import {
 } from './outline';
 import { canWord, fixedLabel, fixedList, fixedMarked, fixedShown, fixedStore, fixedWordingNow, isLocked, offeredFixed, ORG_LANG, orgWording } from './fixed';
 import { diffViews, isEmpty, langsOf, linkedTo, mirror, viewOf, withView, type Diff, type LangView } from './langs';
+import { keepJdPart } from './parts';
 import type { ApplySettings, AskKind, ChatMsg, Content, CustomGroup, DeletedJob, Delivery, DemoJob, Facts, FixedOwn, Format, Grouping, JobLang, Pace, PayRequest, Person, Plan, ReachPlan, Recipient, Review, Section, State, Tone, Translation, UndoStep } from './types';
 
 /** A job's or a version's grouping (section 19, phase 6, B), with any added groups. */
@@ -2175,7 +2176,12 @@ function chatTurn(id: string, text: string, focus?: string) {
       // The widened Undo step (icons, outline, version editor) and the chat's lastChange replace each other: try the step first.
       const steppedBack = fromUndoStep(x);
       if (steppedBack) return { ...steppedBack, chat: [...x.chat, userMsg, msg('ai', `Undone: ${x.undoStep!.text}.`)] };
-      if (x.lastChange) return { ...undone(x), chat: [...x.chat, userMsg, msg('ai', 'Undone: the job description is back as it was.')] };
+      if (x.lastChange) {
+        const keys = x.lastChange.keys;
+        const back = undone(x);
+        const part = keepJdPart(back.tags, x.part, keys[0] ?? null);
+        return { ...back, ...(part ? { part } : {}), chat: [...x.chat, userMsg, msg('ai', 'Undone: the job description is back as it was.')] };
+      }
       const prev = x.versions[x.versions.length - 2];
       return prev
         ? { ...atVersion(x, prev.sections, `Back to version ${prev.n}`), chat: [...x.chat, userMsg, msg('ai', `Back to version ${prev.n}.`)] }
@@ -2222,11 +2228,20 @@ function changedKeys(before: DemoJob['sections'], after: DemoJob['sections']): s
   return after.filter((a) => JSON.stringify(before.find((b) => b.key === a.key)?.lines) !== JSON.stringify(a.lines)).map((a) => a.key);
 }
 
-/** The job as it was before the last change asked for in the chat: text, outline, facts, and tone. */
+/** The job as it was before the last change asked for in the chat: text, outline, facts, and tone. Clears both Undo offers (U-2). */
 function undone(x: DemoJob): DemoJob {
   if (!x.lastChange) return x;
   const { before, beforeTags, beforeFacts, beforeTone } = x.lastChange;
-  return { ...touched(x), sections: before, tags: beforeTags, facts: beforeFacts, tone: beforeTone, versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note: 'Undid the last change', sections: before }] };
+  return {
+    ...touched(x),
+    sections: before,
+    tags: beforeTags,
+    facts: beforeFacts,
+    tone: beforeTone,
+    lastChange: undefined,
+    undoStep: undefined,
+    versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note: 'Undid the last change', sections: before }],
+  };
 }
 
 /** The job with an earlier version's text; the outline follows the text, so the two never disagree. */
@@ -2241,7 +2256,13 @@ function atVersion(x: DemoJob, sections: DemoJob['sections'], note: string): Dem
 /** Puts back the sections as they were before the last change asked for in the chat. */
 export function undoLastChange(id: string) {
   if (!ownerOnly()) return;
-  updateJob(id, (x) => (x.lastChange ? { ...undone(x), chat: [...x.chat, msg('ai', 'Undone: the job description is back as it was.')] } : x));
+  updateJob(id, (x) => {
+    if (!x.lastChange) return x;
+    const keys = x.lastChange.keys;
+    const back = undone(x);
+    const part = keepJdPart(back.tags, x.part, keys[0] ?? null);
+    return { ...back, ...(part ? { part } : {}), chat: [...x.chat, msg('ai', 'Undone: the job description is back as it was.')] };
+  });
   ensureAsk(id);
 }
 
@@ -2249,12 +2270,19 @@ export function dismissChange(id: string) {
   updateJob(id, (x) => ({ ...x, lastChange: undefined, undoStep: undefined }));
 }
 
-/** Restores the widened Undo step, or null when there is none or a linked translation is still being written. */
+/**
+ * Restores the widened Undo step, or null when there is none or a linked translation is still being written.
+ * Pins `part` to a section still on the job so Market/Review cannot mount from an orphan key (U-2).
+ */
 function fromUndoStep(x: DemoJob): DemoJob | null {
   const st = x.undoStep;
   if (!st || st.writing) return null;
   const back: DemoJob = { ...touched(x), ...st.before, ...liveEdit(x), lastChange: undefined, undoStep: undefined, wordingOffer: undefined };
-  return { ...back, versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note: `Undid: ${st.text}`, sections: back.sections }] };
+  const restored: DemoJob = { ...back, versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note: `Undid: ${st.text}`, sections: back.sections }] };
+  // Prefer the restored removed section when undoing a remove; otherwise a live neighbour; never the added key that is gone after undoing an add.
+  const neighbour = st.removed?.key && restored.tags.includes(st.removed.key) ? st.removed.key : st.removed?.after ?? null;
+  const part = keepJdPart(restored.tags, x.part, neighbour);
+  return { ...restored, ...(part ? { part } : {}) };
 }
 
 /**
@@ -2264,13 +2292,7 @@ function fromUndoStep(x: DemoJob): DemoJob | null {
  */
 export function undoStep(id: string) {
   if (!ownerOnly()) return;
-  updateJob(id, (x) => {
-    const back = fromUndoStep(x);
-    if (!back) return x;
-    // Keep the panel on a JD section after undoing an outline/edit change (do not open Market check etc.).
-    const keep = x.part?.startsWith('s:') && (back.tags.includes(x.part.slice(2)) || x.undoStep?.removed) ? x.part : back.tags[0] ? `s:${back.tags[0]}` : x.part;
-    return { ...back, part: keep };
-  });
+  updateJob(id, (x) => fromUndoStep(x) ?? x);
 }
 
 export function setFacts(id: string, patch: Partial<Facts>) {
@@ -2307,7 +2329,9 @@ export function toggleSection(id: string, key: string) {
       if (!j.sections.length) return next;
       const sections = has ? j.sections.filter((x) => x.key !== key) : inOutlineOrder([...j.sections, withTemplateSubs(s, j, built(key, ctxFor(s, next), j))], tags);
       const title = has ? j.sections.find((x) => x.key === key)?.title : sections.find((x) => x.key === key)?.title;
-      return { ...next, sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `${has ? 'Removed' : 'Added'} ${title ?? key}`, sections }] };
+      // Add opens the new section; remove retargets so currentPart cannot fall through to Market (U-2).
+      const part = has ? keepJdPart(tags, j.part) : `s:${key}`;
+      return { ...next, sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `${has ? 'Removed' : 'Added'} ${title ?? key}`, sections }], ...(part ? { part } : {}) };
     }),
   }));
 }
@@ -2427,7 +2451,9 @@ export function outlineOp(id: string, op: OutlineOp) {
         const sections = j.sections.filter((x) => !drop.includes(x.key));
         const base = { ...touched(j), ...liveEdit(j), customGroups: customGroups.length ? customGroups : undefined, groupOrder: groupOrder.length ? groupOrder : undefined, groupOf: Object.keys(groupOf).length ? groupOf : undefined };
         const next = regrouped(base, groupingOf({ ...base, customGroups }), tags);
-        return stepped(j, { ...next, sections: inOutlineOrder(sections, next.tags) }, opNote(next, s, op, j), 'doc');
+        const out = stepped(j, { ...next, sections: inOutlineOrder(sections, next.tags) }, opNote(next, s, op, j), 'doc');
+        const part = keepJdPart(out.tags, j.part);
+        return part ? { ...out, part } : out;
       }
 
       if (op.op === 'addCustom') {
@@ -2461,7 +2487,11 @@ export function outlineOp(id: string, op: OutlineOp) {
         const { [op.key]: _r, ...renamed } = moved.renamed ?? {};
         void _r;
         const next = { ...moved, renamed: Object.keys(renamed).length ? renamed : undefined, sections, versions: j.sections.some((x) => x.key === op.key) ? [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Removed ${title}`, sections }] : j.versions };
-        return stepped(j, next, opNote(next, s, op, j), 'doc', { removed: { key: op.key, title, after: at > 0 ? read[at - 1] : null } });
+        const after = at > 0 ? read[at - 1] : null;
+        const out = stepped(j, next, opNote(next, s, op, j), 'doc', { removed: { key: op.key, title, after } });
+        // Retarget before currentPart can fall through to Market (U-2); do not leave `s:removed`.
+        const part = keepJdPart(out.tags, j.part, after ?? out.tags[0] ?? null);
+        return part ? { ...out, part } : out;
       }
       if (moved.tags.join() === j.tags.join() && JSON.stringify(groupingOf(moved)) === JSON.stringify(groupingOf(j))) return j;
       return stepped(j, moved, opNote(moved, s, op, j), 'doc', { keys: 'key' in op ? [op.key] : [] });

@@ -4,7 +4,7 @@ import { ChevronUp, Pencil, Plus, X } from 'lucide-react';
 import { Fragment, useRef, useState } from 'react';
 import Tip from '@/components/site/Tip';
 import { dismissToUpdate, editVersionSection, keepTranslation, refreshTranslation, reviewTranslation, subId, undoStep, versionOp } from './actions';
-import { AddPanel, StepNote, useRemovedNoteDismiss } from './DocPane';
+import { AddPanel, StepNote } from './DocPane';
 import FixedBlock from './FixedBlock';
 import Grip, { dropAt, type GripAction } from './Grip';
 import { groupLabelOf, groupOfKey, groupOrderOf, KEPT } from './outline';
@@ -224,7 +224,6 @@ export function LangDoc({ job, s, lang, readOnly = false }: { job: DemoJob; s: S
   const [adding, setAdding] = useState<{ after: string | null; anchor: HTMLElement; end: boolean } | null>(null);
   const [dropAfter, setDropAfter] = useState<string | null | undefined>(undefined);
   const t = job.translations?.[lang];
-  useRemovedNoteDismiss(job.id, job.undoStep?.removed && !job.undoStep.writing && job.undoStep.tab === lang ? job.undoStep.removed.key : undefined);
   if (!t) return null;
   const info = langOf(lang);
   const own = langOf(jobLang(job));

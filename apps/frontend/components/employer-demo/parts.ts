@@ -19,6 +19,16 @@ export function sectionOf(part: string): string | null {
 }
 
 /**
+ * A JD section part that is still on the job (U-2). Never returns an orphan `s:gone` key, and never invents Market/Review/Publish.
+ * `neighbour` is a section key still in `tags` (e.g. the one before a remove); preferred only when it is still present.
+ */
+export function keepJdPart(tags: string[], part?: string | null, neighbour?: string | null): string | undefined {
+  if (part?.startsWith('s:') && tags.includes(part.slice(2))) return part;
+  if (neighbour && tags.includes(neighbour)) return sectionPart(neighbour);
+  return tags[0] ? sectionPart(tags[0]) : undefined;
+}
+
+/**
  * The parts in the line's order: the sections first, then the details, the fixed text, the check, and publishing. A job written step by
  * step ticks a section off when it is approved, and the details, the fixed text, and the check when their steps are answered.
  */
@@ -69,6 +79,11 @@ export function partsOf(job: DemoJob, s: State): Part[] {
 export function currentPart(job: DemoJob, s: State, parts = partsOf(job, s)): string {
   if (job.setup) return 'outline';
   if (job.part && parts.some((p) => p.key === job.part)) return job.part;
+  // Orphan `s:gone` after a remove/undo: stay on a remaining JD section — never fall through to Market/Review/Publish (U-2).
+  if (job.part?.startsWith('s:')) {
+    const pinned = keepJdPart(job.tags, job.part);
+    if (pinned && parts.some((p) => p.key === pinned)) return pinned;
+  }
   const last = job.chat[job.chat.length - 1];
   if (last?.from === 'ai' && last.ask) return 'details';
   return parts.find((p) => !p.done)?.key ?? 'publish';

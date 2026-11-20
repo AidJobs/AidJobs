@@ -19,7 +19,7 @@ import { planCount } from './invites';
 import { ReviewForm, ReviewPanel } from './Review';
 import type { ChatMsg } from './types';
 import { aiOn, askAi, carryMessage, GO_ON, probeAi, useAi, whenAnswered, writeVersion } from './ai';
-import { amplifying, FIXED_SECTIONS, flyerStale, nextStep, partOfStep, reachOpen, stepKey } from './flow';
+import { amplifying, FIXED_SECTIONS, flyerStale, nextStep, outlineEditOpen, partOfStep, reachOpen, stepKey, walkAutoOpen } from './flow';
 import { readJobFile } from './readFile';
 import { CHOOSE_SDGS, INVITE, OTHER_WORDING, SHOW_FLYER, SKIP_APPROVAL, stateOffer } from './walkChat';
 import { STATE_DIALOGS, type OpenTarget } from './aiActions';
@@ -1010,6 +1010,8 @@ function JobWindow({ id }: { id: string }) {
   const step = nextStep(job, s);
   const stepNow = stepKey(step);
   const seenStep = useRef(stepNow);
+  // Step key held back while an outline edit/Undo was open; that same key is not auto-opened when the guard clears (U-2).
+  const suppressedStep = useRef<string | null>(null);
   const [versionShown, setVersionShown] = useState('');
   if (step?.kind === 'version' && versionShown !== stepNow && !reading) {
     setVersionShown(stepNow);
@@ -1017,18 +1019,20 @@ function JobWindow({ id }: { id: string }) {
   }
   useEffect(() => {
     if (stepNow === seenStep.current || reading) return;
-    // A hand edit, add, remove, or its Undo can change the walk step (e.g. to Market check). Stay on the JD; do not open that part card.
-    if (job.lastChange?.keys.length || job.undoStep?.keys?.length || job.undoStep?.removed) {
+    const decision = walkAutoOpen(job, step, stepNow, suppressedStep.current);
+    if (decision === 'hold') {
+      // Remember the blocked step; do not mark it seen, so a later different step can still follow.
+      if (stepNow && (outlineEditOpen(job) || job.part?.startsWith('s:'))) suppressedStep.current = stepNow;
+      return;
+    }
+    if (decision === 'skip-suppressed') {
+      suppressedStep.current = null;
       seenStep.current = stepNow;
       return;
     }
+    suppressedStep.current = null;
     const p = partOfStep(step, job);
     if (!p || s.reviewerAs) {
-      seenStep.current = stepNow;
-      return;
-    }
-    // While the user is in a JD section, only follow writing/approve/ask steps — not Market, Languages, etc.
-    if (job.part?.startsWith('s:') && step && !['write', 'approve', 'ask'].includes(step.kind)) {
       seenStep.current = stepNow;
       return;
     }

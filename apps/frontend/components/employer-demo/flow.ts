@@ -420,6 +420,30 @@ export function partOfStep(step: Step | null, job: DemoJob): string | null {
   }
 }
 
+/** A hand edit, add, remove, or offered Undo is in hand — the walk must not steal the panel away (U-2). */
+export function outlineEditOpen(job: DemoJob): boolean {
+  return Boolean(job.lastChange?.keys.length || job.undoStep);
+}
+
+/**
+ * While the user is in a JD section, only writing / approve / ask steps may auto-open a part; Market and the later cards wait
+ * (commit `13891bb`, kept by U-2). Details / plan / market still follow when `job.part` is not a section.
+ */
+export function walkHoldsOnJd(job: DemoJob, step: Step | null): boolean {
+  return Boolean(job.part?.startsWith('s:') && step && !['write', 'approve', 'ask'].includes(step.kind));
+}
+
+/**
+ * Whether the window's step effect may call `setPart` for `stepNow` (U-2). Pure so tests can lock the policy without rendering.
+ * `suppressed` is a step key remembered while an outline edit held the panel; that same key is not opened when the guard clears.
+ */
+export function walkAutoOpen(job: DemoJob, step: Step | null, stepNow: string | null, suppressed: string | null): 'follow' | 'hold' | 'skip-suppressed' {
+  if (!step || !stepNow) return 'hold';
+  if (outlineEditOpen(job) || walkHoldsOnJd(job, step)) return 'hold';
+  if (suppressed === stepNow) return 'skip-suppressed';
+  return 'follow';
+}
+
 /**
  * A job written before the window (the sample jobs, and jobs saved by earlier versions), brought forward when the demo loads (section 19,
  * phase 4): its written sections approved and its questions settled, so the window takes it on from where it stands. A fact it still
