@@ -101,7 +101,8 @@ export function clearPageIntake(id: string, kind?: 'about' | 'project') {
 }
 
 /**
- * Compact PageField Save (U-3): write intake through `intoSection` (exact "About the project" sub), never rename the heading, clear intake.
+ * Write About/Project text through `intoSection` (exact "About the project" sub), never rename the heading, clear intake.
+ * Kept for tests / intoSection path; the compact PageField no longer exposes Save (pencil edits the body; U-3 follow-up).
  * Does not update the context pack — that stays for Accept.
  */
 export function savePageFieldText(id: string, kind: 'about' | 'project', raw: string) {

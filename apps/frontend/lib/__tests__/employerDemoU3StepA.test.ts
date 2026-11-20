@@ -1,11 +1,11 @@
 /**
- * U-3 Step A (20 November 2026): About us / Project display, intake-only Save, project yes, paste draft.
- * Accept Undo / auto-approve is Step B — not covered here.
+ * U-3 Step A (20 November 2026): About us / Project display, intoSection write path, project yes, paste draft.
+ * Compact PageField Save/Cancel removed (follow-up): intake clear must not wipe saved body. Accept Undo is Step B.
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { applyTemplate, editSection, sendChat, startJob, toggleSection } from '../../components/employer-demo/actions';
 import { resetAi } from '../../components/employer-demo/ai';
-import { acceptPageDraft, extractDraft, savePageFieldText, setPageIntake, showPageDraft } from '../../components/employer-demo/context';
+import { acceptPageDraft, clearPageIntake, extractDraft, savePageFieldText, setPageIntake, showPageDraft } from '../../components/employer-demo/context';
 import { draftFromPage } from '../../components/employer-demo/pages';
 import { getState, resetDemo, update } from '../../components/employer-demo/store';
 import type { OpenTarget } from '../../components/employer-demo/aiActions';
@@ -79,5 +79,13 @@ describe('U-3 Step A: About us / Project Save and paste', () => {
     acceptPageDraft('job-comms');
     expect(sec('job-comms', 'about').lines).toEqual(['Accepted About us from the page.']);
     expect(job('job-comms').pageIntake?.about).toBeUndefined();
+  });
+
+  it('clearing intake does not remove saved About us body (ex-Cancel pad must not wipe the section)', () => {
+    editSection('job-comms', 'about', 'Saved About us stays.');
+    setPageIntake('job-comms', 'about', 'Scratch that looked like the body');
+    clearPageIntake('job-comms', 'about');
+    expect(job('job-comms').pageIntake?.about).toBeUndefined();
+    expect(sec('job-comms', 'about').lines).toEqual(['Saved About us stays.']);
   });
 });

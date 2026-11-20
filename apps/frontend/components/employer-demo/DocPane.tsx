@@ -503,7 +503,7 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
           </div>
         </div>
       ) : (
-        // About us / Project: show saved lines and subs like Preview (U-3). PageField above is intake only, not a second copy of the body.
+        // About us / Project: show saved lines and subs like Preview (U-3). PageField above is intake (Draft tools only); body edit is the pencil.
         <SectionText job={job} sec={sec} since={since}>
           <Lines lines={sec.lines} job={job} section={sec.key} onFlag={onFlag} />
           {sec.subs?.map((sb) => (

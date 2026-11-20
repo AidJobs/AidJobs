@@ -33,7 +33,7 @@
 | --- | --- | --- | --- |
 | U-1 | **Fixed** (20 Nov 2026) | Progress line on the **job panel** (phase 3), flush under the window header; measure-row bug removed; header and progress hairlines removed; chat in `aj-card` aligned with the progress line; `+N` clear of the connector; side menu resizable (drag open/close) with open/closed remembered. | User confirmed on preview, 20 Nov 2026 |
 | U-2 | **Fixed** (20 Nov 2026) | Undo / remove / walk no longer open Market over the JD; chat undo and `lastChange` pin like icon Undo. Removed note hides after ~2s **without** clearing `undoStep` (polish `3f0f4c4` + R1-05; U-2 had wrongly left the note forever). | User confirmed on preview, 20 Nov 2026 (Market steal + Removed note hide) |
-| U-3 | **Fixed** (20 Nov 2026; Step A `2d325cc`, Step B `38812b0`) | Step A: lines + intake Save, no rename, project yes, paste draft. Step B: Accept no longer appends `walk.approved`; Undo restores pack + draft card (not `stepped`/`afterChange`); Background sub-insert unchanged. | Preview confirmed in Cursor browser, 20 Nov 2026 (Accept left Approve available; Undo restored pack + pageDraft) |
+| U-3 | **Fixed** (20 Nov 2026; Step A `2d325cc`, Step B `38812b0`; compact Save/Cancel removed same day) | Step A: lines + intake, no rename, project yes, paste draft. Step B: Accept no longer appends `walk.approved`; Undo restores pack + draft card (not `stepped`/`afterChange`); Background sub-insert unchanged. Follow-up: compact About/Project PageField no longer has Save/Cancel (intake = URL/Read/Draft/Upload; body edit = pencil only). | Preview confirmed Step A/B 20 Nov 2026; Save/Cancel removal awaiting preview confirm |
 | U-4 | OPEN | Grip ⋯ has no Project / Background when that section already exists under another heading (e.g. Local NGO “Project brief”). “Add About the project” only when `background` missing. Three names for one key. | User; NGO |
 
 ### B. Combined open findings (Round 1)
@@ -43,7 +43,7 @@
 | ID | Status | Fault | Who |
 | --- | --- | --- | --- |
 | R1-01 | **Fixed** (U-3 Step A, 20 Nov 2026) | About/Background reading view shows parent lines + subs; intake box no longer mirrors the body. Form (URL/Read/Draft/Upload) remains for new intake by design. | NGO, chrome |
-| R1-02 | **Fixed** (U-3 Step A, 20 Nov 2026; card Save/Cancel still out of scope) | Project yes/ok/sure no longer skips; bullet / short paste drafts via `you told us`. Setup card still has no Save/Cancel (Phase 5: nothing on the job until Accept). | NGO, INGO |
+| R1-02 | **Fixed** (U-3 Step A, 20 Nov 2026; JD compact Save/Cancel removed same day) | Project yes/ok/sure no longer skips; bullet / short paste drafts via `you told us`. Setup card and compact JD field have no Save/Cancel (draft until Accept; body edit = pencil). | NGO, INGO |
 | R1-03 | OPEN | “Use our About us as it is” on Local NGO concise adds no About us section (template starts at Project brief); chat says kept. | NGO |
 | R1-04 | **Fixed** (with U-2, 20 Nov 2026) | Undo / remove / walk: focus steal to Market; remove can mount Market without scroll; lingering `lastChange`/`undoStep` permanently skips later Market open; chat Undo may not pin part. | Chrome, INGO, U-2 |
 | R1-05 | **Fixed** (U-2 + note-hide follow-up, 20 Nov 2026) | Removed note auto-dismiss (~2s) called `dismissChange` and deleted Undo. Now the note hides in the UI only; `undoStep` stays for chat Undo until the next change. | Chrome |

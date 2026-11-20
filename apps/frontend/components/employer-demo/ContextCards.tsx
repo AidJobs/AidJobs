@@ -2,7 +2,7 @@
 
 import { FileUp, Link2 } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { acceptPageDraft, acceptSuggestion, addOrgSocial, canEditOrgSocial, clearPageIntake, rejectPageDraft, rejectSuggestion, removeOrgSocial, savePageFieldText, setPageIntake, socialLabel, toggleJobSocial } from './context';
+import { acceptPageDraft, acceptSuggestion, addOrgSocial, canEditOrgSocial, rejectPageDraft, rejectSuggestion, removeOrgSocial, setPageIntake, socialLabel, toggleJobSocial } from './context';
 import { draftFromPage, MAX_TEXT, readPageVia } from './pages';
 import { ACCEPTED, readJobFile } from './readFile';
 import type { OpenTarget } from './aiActions';
@@ -11,8 +11,8 @@ import { inputStyle } from './ui';
 
 /**
  * The website field (About us) or the project field (About the project), section 19, phase 5, A: one https page, read by the demo's page
- * route; or the text pasted; or a file, read in the browser. In the JD (compact), Save writes intake through intoSection and does not rename
- * the heading; Cancel discards intake only. The box is intake, not a second copy of the saved body (U-3).
+ * route; or the text pasted; or a file, read in the browser. The box is intake only (URL / Read / Draft / Upload) — not the section body.
+ * Body edit is the pencil (Save commits, Cancel closes). Compact JD no longer shows Save/Cancel on this pad (U-3 follow-up, 20 Nov 2026).
  */
 export function PageField({ job, s, kind, open, compact }: { job: DemoJob; s: State; kind: 'about' | 'project'; open: (t: OpenTarget) => void; compact?: boolean }) {
   const [url, setUrl] = useState(kind === 'about' ? s.org.website : '');
@@ -22,7 +22,6 @@ export function PageField({ job, s, kind, open, compact }: { job: DemoJob; s: St
   const ro = Boolean(s.reviewerAs);
   const what = kind === 'about' ? 'About us' : 'About the project';
   const text = job.pageIntake?.[kind] ?? '';
-  const dirty = text.trim().length > 0;
   const setText = (v: string) => setPageIntake(job.id, kind, v.slice(0, MAX_TEXT));
   const makeDraft = async (t: string, source: 'your website' | 'the project page' | 'you told us', social: string[] = []) => {
     setBusy(true);
@@ -41,15 +40,6 @@ export function PageField({ job, s, kind, open, compact }: { job: DemoJob; s: St
     setBusy(false);
     if (!r.ok) return setNote(`${r.reason.charAt(0).toUpperCase()}${r.reason.slice(1)}: paste its text below, or upload the file.`);
     await makeDraft(r.text, kind === 'about' ? 'your website' : 'the project page', r.social);
-  };
-  const saveText = () => {
-    if (ro || !compact || !dirty) return;
-    savePageFieldText(job.id, kind, text.slice(0, MAX_TEXT));
-    setNote('');
-  };
-  const cancelText = () => {
-    clearPageIntake(job.id, kind);
-    setNote('');
   };
   return (
     <div className="flex flex-col gap-2" role="group" aria-label={kind === 'about' ? 'Draft About us from your organisation’s page' : 'The project this job is for'}>
@@ -80,28 +70,14 @@ export function PageField({ job, s, kind, open, compact }: { job: DemoJob; s: St
         style={{ ...inputStyle, minHeight: compact ? 96 : 64 }}
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder={compact ? `Paste or write ${what} here, then Save` : 'Or paste the text here'}
+        placeholder={compact ? `Paste or write ${what} here, then Draft` : 'Or paste the text here'}
         aria-label={`Text for ${what}`}
         disabled={ro}
       />
       <div className="flex flex-wrap items-center gap-1.5">
-        {compact ? (
-          <>
-            <button type="button" className="aj-ink-btn" style={{ height: 30 }} disabled={busy || ro || !dirty} onClick={saveText}>
-              Save
-            </button>
-            <button type="button" className="aj-pill" style={{ height: 30 }} disabled={busy || ro || !dirty} onClick={cancelText}>
-              Cancel
-            </button>
-            <button type="button" className="aj-text-btn" style={{ height: 30 }} disabled={busy || ro || !text.trim()} onClick={() => makeDraft(text, 'you told us')}>
-              Draft from this text
-            </button>
-          </>
-        ) : (
-          <button type="button" className="aj-pill" style={{ height: 30 }} disabled={busy || ro || !text.trim()} onClick={() => makeDraft(text, 'you told us')}>
-            Draft from this text
-          </button>
-        )}
+        <button type="button" className={compact ? 'aj-text-btn' : 'aj-pill'} style={{ height: 30 }} disabled={busy || ro || !text.trim()} onClick={() => makeDraft(text, 'you told us')}>
+          Draft from this text
+        </button>
         <button type="button" className="aj-text-btn ej-upload-btn" style={{ height: 30 }} disabled={busy || ro} onClick={() => file.current?.click()}>
           <FileUp size={13} strokeWidth={1.8} aria-hidden />
           <span>Upload a file</span>
