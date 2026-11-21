@@ -20,6 +20,8 @@
 
 5. ~~Approve vs unsaved buffers; Add-panel blur/Escape~~ — **Fixed 20 Nov 2026** (Step A R1-06; Step B R1-11; user confirmed on preview)
 
+**Next (21 Nov 2026, after fake “Moved” confirmed on preview):** finish **R1-10 / R2-P1-4** — group drop targets (visible drop while dragging a group; draft/outline honesty) and **remove-group must not delete its sections** (rehome or refuse; Undo). Then **R2-P1-6** (opening brief pay/date on AI path). Phase 7 held. Tip when this next was set: `a5a3db4`.
+
 ---
 
 ## Round 1 — 15 November 2026 (recorded from chat + four independent agents)
@@ -323,7 +325,8 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 ## How the next chat should use this file
 
 1. Read this file and `employer-side-plan.md` Phase 6 / polish status.  
-2. Confirm `demo/employer` tip and that English-first still holds.  
-3. Take the recommended fix order (or the user’s new priority).  
+2. Confirm `demo/employer` tip (`a5a3db4` or later) and that English-first still holds.  
+3. **Default next:** R1-10 / R2-P1-4 leftover — group drop targets + remove-group must not delete sections (see “Next” under Recommended fix order). Then R2-P1-6. Or the user’s new priority.  
 4. Mark IDs Fixed in the tables and add a Fix log row in the same commit as the code.  
-5. Do not close Phase 7 until the user says English chrome is good enough.
+5. Do not close Phase 7 until the user says English chrome is good enough.  
+6. Never stage leftover `apps/frontend/lib/__tests__/employerDemoPhase6Review.test.ts` or `apps/frontend/AGENTS.md` unless the user asks.
