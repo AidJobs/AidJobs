@@ -315,7 +315,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 21 Nov 2026 | R2-P0-2 | `b7a1787` | Tumaini Community Trust sample preset (local NGO); demo chrome switch; template `others` prefer org-type family; apply email / Tumaini commitments / AI `orgType: ngo` / Google title. User confirmed on preview the same day (preset switch, Local NGO concise path, live Key responsibilities without cluster/Sphere/donor/MEAL). |
 | 21 Nov 2026 | R2-P0-3, R1-03 | `cb78694` (+ `aa3a008` Use-as-it-is) | `keepProfileAbout` sets `pack.about`; setup About/Project chips/sticky card; user confirmed on preview (incl. Urmul Read this page → Accept). |
 | 21 Nov 2026 | R2-P0-4 | `b4a4185` | Project pencil Save no longer renames the Background/Project brief heading (body via `savePageFieldText` / `intoSection` only; Heading hidden in project editor). Grip offers **Add About the project** when `background` exists without that sub. Confirm on preview. |
-| 21 Nov 2026 | R2-P0-5, R1-19 | *(this commit)* | Section header shows **Approved** chip after Approve while walk is active; R1-06 already hid Approve during pencil and cleared approval on Save. Confirm on preview. |
+| 21 Nov 2026 | R2-P0-5, R1-19 | `2f17568` | Section header shows **Approved** chip after Approve while walk is active; R1-06 already hid Approve during pencil and cleared approval on Save. Confirm on preview. |
 
 ---
 
