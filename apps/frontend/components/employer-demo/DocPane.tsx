@@ -3,7 +3,7 @@
 import { AlertCircle, Check, CheckCircle2, ChevronUp, Info, Lock, MessageSquare, Pencil, Plus, Settings2, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import Tip from '@/components/site/Tip';
-import { addRemark, alsoIn, answerFact, approveSection, bringBackFixed, changedSinceLastRound, editSection, formatOf, groupingOf, markGenuine, outlineOp, renameSection, sendChat, setApply, setFacts, setMethod, settleRemark, subId, undoLastChange, undoStep, versionOp } from './actions';
+import { addRemark, alsoIn, answerFact, approveSection, bringBackFixed, changeSub, changedSinceLastRound, editSection, formatOf, groupingOf, markGenuine, outlineOp, sendChat, setApply, setFacts, setMethod, settleRemark, subId, undoLastChange, undoStep, versionOp } from './actions';
 import type { OpenTarget } from './aiActions';
 import Grip, { dropAt, type GripAction } from './Grip';
 import FixedBlock from './FixedBlock';
@@ -453,23 +453,28 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
               <ApplyFields job={job} />
             </div>
           )}
-          <label className="flex flex-col gap-1">
-            <span className="aj-faint" style={{ fontSize: 11.5 }}>
-              Heading
-            </span>
-            <input style={inputStyle} value={title} onChange={(e) => setTitle(e.target.value)} aria-label={`Heading of ${sec.title}`} />
-          </label>
-          {others.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Other titles">
-              <span className="aj-faint" style={{ fontSize: 11.5 }}>
-                Other titles:
-              </span>
-              {others.map((t) => (
-                <button key={t} type="button" className="aj-pill" style={{ height: 26 }} onClick={() => setTitle(t)}>
-                  {t}
-                </button>
-              ))}
-            </div>
+          {/* R2-P0-4: project editor writes the About the project body only; parent heading stays the format name (outline rename). */}
+          {pageKind !== 'project' && (
+            <>
+              <label className="flex flex-col gap-1">
+                <span className="aj-faint" style={{ fontSize: 11.5 }}>
+                  Heading
+                </span>
+                <input style={inputStyle} value={title} onChange={(e) => setTitle(e.target.value)} aria-label={`Heading of ${sec.title}`} />
+              </label>
+              {others.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Other titles">
+                  <span className="aj-faint" style={{ fontSize: 11.5 }}>
+                    Other titles:
+                  </span>
+                  {others.map((t) => (
+                    <button key={t} type="button" className="aj-pill" style={{ height: 26 }} onClick={() => setTitle(t)}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
           )}
           {pageKind && <PageFillTools kind={pageKind} website={s.org.website} text={text} onText={(t) => setText(t.slice(0, MAX_TEXT))} disabled={reviewing} />}
           <textarea style={{ ...inputStyle, minHeight: 140, lineHeight: 1.6 }} value={text} onChange={(e) => setText(e.target.value)} aria-label={`${sec.title} text`} autoFocus placeholder={pageKind ? `Write ${sec.title} here` : undefined} />
@@ -503,8 +508,6 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
               className="aj-ink-btn"
               onClick={() => {
                 if (pageKind === 'project') {
-                  const nextTitle = title.trim();
-                  if (nextTitle && nextTitle !== sec.title) renameSection(job.id, sec.key, nextTitle);
                   if (text.trim()) savePageFieldText(job.id, 'project', text);
                   setEditing(false);
                   return;
@@ -953,7 +956,7 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inW
           { label: 'Move down', run: () => (outlineOp(job.id, { op: 'by', key: sec.key, by: 1, reading: true }), focusGrip(sec.key)) },
           { label: 'Move to group…', items: groupOrderOf(g).filter((x) => x !== groupOfKey(g, sec.key)).map((x) => ({ label: groupLabelOf(x, job.customGroups), run: () => (outlineOp(job.id, { op: 'toGroup', key: sec.key, group: x }), focusGrip(sec.key)) })) },
           { label: 'Add a section below', run: () => openAdd(sec.key, document.querySelector<HTMLElement>(`[data-grip-key="${sec.key}"]`), false) },
-          // U-4 Step A: when background is missing, offer Add with this format's heading; never force-rename to "About the project".
+          // U-4 / R2-P0-4: missing background → Add format heading; background without "About the project" sub → add that sub only.
           ...(!keys.includes(PROJECT_SECTION)
             ? [
                 {
@@ -964,7 +967,20 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inW
                   },
                 },
               ]
-            : []),
+            : (() => {
+                const bg = job.sections.find((x) => x.key === PROJECT_SECTION);
+                if (!bg || bg.subs?.some((sb) => sb.title === PROJECT_SUB)) return [];
+                return [
+                  {
+                    label: `Add ${PROJECT_SUB}`,
+                    run: () => {
+                      changeSub(job.id, PROJECT_SECTION, { add: PROJECT_SUB });
+                      document.getElementById(`ej-sec-${PROJECT_SECTION}`)?.scrollIntoView({ block: 'nearest' });
+                      focusGrip(PROJECT_SECTION);
+                    },
+                  },
+                ];
+              })()),
           ...(KEPT.includes(sec.key) ? [] : [{ label: 'Remove', danger: true, run: () => outlineOp(job.id, { op: 'remove', key: sec.key }) }]),
           ...(sec.key === 'about' && s.me.role === 'owner' && sec.lines.length > 0 && sec.lines.join('\n').trim() !== s.org.about.trim() ? [{ label: 'Save as our About us', run: () => saveAboutForOrg(job.id) }] : []),
         ],

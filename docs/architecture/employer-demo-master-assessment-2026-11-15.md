@@ -238,8 +238,8 @@ Full **icon inventory table** (Eye, History, progress, tabs, X, Approve, pencil,
 | --- | --- | --- |
 | R2-P0-1 | ~~**Free publish with empty / placeholder sections**~~ **Fixed 21 Nov 2026** (user confirmed on preview) | [Novice NGO R2](8442906c-3d03-4b4a-8a45-575f31966a17) #6 |
 | R2-P0-2 | ~~**Sample org (Riverstone) on local NGO path**~~ **Fixed 21 Nov 2026** (Tumaini preset + recommendation ranking; user confirmed on preview, including live Key responsibilities local-scale) | Novice #1,5,7,14 |
-| R2-P0-3 | ~~**About/Project setup leftovers**~~ **Fixed 21 Nov 2026** (`keepProfileAbout` → pack; About yes+paste guard; setup chips always rules; sticky about/project card; “Already kept” on empty intake). Confirm on preview. ~~Absorbed earlier by U-3:~~ project yes/ok paste wipe; Accept auto-approve + Undo; JD parent+sub / open→write | Design, Chat, Chrome, Novice, Sam; R1-03 |
-| R2-P0-4 | **Project Save renames heading; grip has no Project when `background` exists** | U-4, all persona chrome |
+| R2-P0-3 | ~~**About/Project setup leftovers**~~ **Fixed 21 Nov 2026** (user confirmed on preview, including Urmul **Read this page** → Accept → `pack.about`) | Design, Chat, Chrome, Novice, Sam; R1-03 |
+| R2-P0-4 | ~~**Project Save renames heading; grip has no Project when `background` exists**~~ **Fixed 21 Nov 2026** (project Save body-only / no Heading rename; grip **Add About the project** when background exists without that sub). Confirm on preview. | U-4, all persona chrome |
 | R2-P0-5 | **Approve ignores pencil / PageField; section Approve vanishes with no mark** | Chrome, Design, Sam, Novice |
 | R2-P0-6 | ~~**Remove Undo deleted at 2s** (`dismissChange`)~~ **Fixed with U-2 (20 Nov 2026)** | Chrome, Chat, Design, UN, Novice |
 | R2-P0-7 | ~~**Undo / chat undo / `lastChange` → Market or stuck progress line**~~ **Fixed with U-2 (20 Nov 2026)** | U-2, Chat #7, Sam #9 |
@@ -313,7 +313,8 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 20–21 Nov 2026 | R1-28 | `97e7fde` | Pencil Save on How to apply no longer opens the fields card at the top of the JD. User confirmed on preview, 21 Nov 2026. |
 | 21 Nov 2026 | R2-P0-1 | `9fb0b76` | Empty / unfinished outline sections block every publish route (`sectionPublishBlock`); Publish CTA shows the reason. User confirmed on preview (empty + `[Duty station]` + clear after fill). |
 | 21 Nov 2026 | R2-P0-2 | `b7a1787` | Tumaini Community Trust sample preset (local NGO); demo chrome switch; template `others` prefer org-type family; apply email / Tumaini commitments / AI `orgType: ngo` / Google title. User confirmed on preview the same day (preset switch, Local NGO concise path, live Key responsibilities without cluster/Sphere/donor/MEAL). |
-| 21 Nov 2026 | R2-P0-3, R1-03 | `cb78694` | `keepProfileAbout` sets `pack.about` (+ About section when tagged); About yes with paste does not advance; setup About/Project chips always rules even if `last.ai`; sticky website/project card while setup open; PageField “Already kept” when intake empty; write-all not blocked by setup-kept About. Confirm on preview. |
+| 21 Nov 2026 | R2-P0-3, R1-03 | `cb78694` (+ `aa3a008` Use-as-it-is) | `keepProfileAbout` sets `pack.about`; setup About/Project chips/sticky card; user confirmed on preview (incl. Urmul Read this page → Accept). |
+| 21 Nov 2026 | R2-P0-4 | *(this commit)* | Project pencil Save no longer renames the Background/Project brief heading (body via `savePageFieldText` / `intoSection` only; Heading hidden in project editor). Grip offers **Add About the project** when `background` exists without that sub. Confirm on preview. |
 
 ---
 
