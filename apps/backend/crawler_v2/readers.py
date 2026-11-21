@@ -17,6 +17,7 @@ stay where they are (contract §11) and a test that replaces one of those method
 """
 from __future__ import annotations
 
+import asyncio
 import contextvars
 import json
 import logging
@@ -59,6 +60,76 @@ logger = logging.getLogger(__name__)
 
 # Cap on Greenhouse single-job GETs for first_published when the list omits it (W-38 plan).
 GREENHOUSE_DETAIL_CAP = 10
+
+
+def _rss_feed_jobs(body: str, careers_url: str) -> List[Dict]:
+    feed = feedparser.parse(body)
+    base = careers_url or ""
+    jobs = []
+    for entry in getattr(feed, "entries", None) or []:
+        job = job_from_rss_entry(entry, base)
+        if job:
+            jobs.append(job)
+    return jobs
+
+
+def _json_api_jobs(body: str, careers_url: str):
+    data = json.loads(body)
+    base = careers_url or ""
+    jobs = []
+    for item in jobs_array(data):
+        job = job_from_json_item(item, base)
+        if job:
+            jobs.append(job)
+    return jobs, json_listing_report(jobs, data)
+
+
+def _workable_feed_jobs(body: str, careers_url: str) -> Optional[List[Dict]]:
+    data = json.loads(body)
+    if not looks_like_workable(data):
+        return None
+    account = workable_account(careers_url) or "unknown"
+    return jobs_from_workable(data, account)
+
+
+def _greenhouse_list_jobs(body: str, token: str):
+    data = json.loads(body)
+    if not looks_like_greenhouse(data):
+        return None, None
+    return jobs_from_greenhouse(data, token)
+
+
+def _greenhouse_merge_detail(job: Dict, body: str) -> None:
+    try:
+        detail = json.loads(body)
+    except (TypeError, ValueError):
+        return
+    if not isinstance(detail, dict):
+        return
+    merge_greenhouse_detail(job, detail)
+
+
+def _teamtailor_feed_jobs(body: str) -> List[Dict]:
+    # looks_like parses XML; keep it in the worker with jobs_from_* (A2 review).
+    if not looks_like_teamtailor(body):
+        return []
+    return jobs_from_teamtailor(body)
+
+
+def _lever_feed_jobs(body: str) -> List[Dict]:
+    data = json.loads(body)
+    if not isinstance(data, list):
+        return []
+    if data and not looks_like_lever(data):
+        return []
+    return jobs_from_lever(data)
+
+
+def _personio_feed_jobs(body: str, account: str, tld: str) -> List[Dict]:
+    if not looks_like_personio(body):
+        return []
+    return jobs_from_personio(body, account, tld)
+
 
 # The reader and the general reader's strategy for the current crawl, recorded on its extraction
 # log. Task-local: one crawler instance serves concurrent crawls.
@@ -147,9 +218,14 @@ class GeneralReader(Reader):
 
     async def read(self, first: Response, source: Dict, fetch: Optional[Fetch] = None):
         del fetch
+        # Clear before the worker runs so a second listing in the same task does not
+        # keep the previous strategy if extract leaves it unset.
         LISTING_STRATEGY.set(None)
-        jobs = self._crawler.extract_jobs_from_html(first.body, source["careers_url"])
-        return ListingResult(self.name, jobs, strategy=LISTING_STRATEGY.get())
+        jobs, strategy = await asyncio.to_thread(
+            self._crawler._extract_jobs_sync, first.body, source["careers_url"]
+        )
+        LISTING_STRATEGY.set(strategy)
+        return ListingResult(self.name, jobs, strategy=strategy)
 
 
 def html_readers(crawler) -> List[Reader]:
@@ -169,13 +245,8 @@ class RssFeedReader(Reader):
         del fetch
         if first.stop or first.status != 200 or not (first.body or "").strip():
             return ListingResult(self.name)
-        feed = feedparser.parse(first.body)
         base = source.get("careers_url") or ""
-        jobs = []
-        for entry in getattr(feed, "entries", None) or []:
-            job = job_from_rss_entry(entry, base)
-            if job:
-                jobs.append(job)
+        jobs = await asyncio.to_thread(_rss_feed_jobs, first.body, base)
         logger.info("RSS feed reader found %s jobs", len(jobs))
         return ListingResult(self.name, jobs)
 
@@ -197,17 +268,13 @@ class JsonApiReader(Reader):
         if first.stop or first.status != 200 or not (first.body or "").strip():
             return ListingResult(self.name)
         try:
-            data = json.loads(first.body)
+            jobs, report = await asyncio.to_thread(
+                _json_api_jobs, first.body, source.get("careers_url") or ""
+            )
         except (TypeError, ValueError) as exc:
             raise ValueError("API body is not JSON") from exc
-        base = source.get("careers_url") or ""
-        jobs = []
-        for item in jobs_array(data):
-            job = job_from_json_item(item, base)
-            if job:
-                jobs.append(job)
         logger.info("JSON API reader found %s jobs", len(jobs))
-        return ListingResult.from_report(self.name, jobs, json_listing_report(jobs, data))
+        return ListingResult.from_report(self.name, jobs, report)
 
 
 class WorkableFeedReader(Reader):
@@ -241,13 +308,13 @@ class WorkableFeedReader(Reader):
         if first.stop or first.status != 200 or not (first.body or "").strip():
             return ListingResult(self.name)
         try:
-            data = json.loads(first.body)
+            jobs = await asyncio.to_thread(
+                _workable_feed_jobs, first.body, source.get("careers_url") or ""
+            )
         except (TypeError, ValueError):
             return None
-        if not looks_like_workable(data):
+        if jobs is None:
             return None
-        account = workable_account(source.get("careers_url") or "") or "unknown"
-        jobs = jobs_from_workable(data, account)
         logger.info("Workable feed reader found %s jobs", len(jobs))
         # Widget has no catalogue total; multi-location rows inflate raw counts.
         return ListingResult(self.name, jobs)
@@ -282,14 +349,13 @@ class GreenhouseFeedReader(Reader):
     async def read(self, first: Response, source: Dict, fetch: Optional[Fetch] = None):
         if first.stop or first.status != 200 or not (first.body or "").strip():
             return ListingResult(self.name)
+        token = greenhouse_token(source.get("careers_url") or "") or "unknown"
         try:
-            data = json.loads(first.body)
+            jobs, report = await asyncio.to_thread(_greenhouse_list_jobs, first.body, token)
         except (TypeError, ValueError):
             return None
-        if not looks_like_greenhouse(data):
+        if jobs is None:
             return None
-        token = greenhouse_token(source.get("careers_url") or "") or "unknown"
-        jobs, report = jobs_from_greenhouse(data, token)
         if fetch is not None and token != "unknown":
             await _fill_greenhouse_posted_on(jobs, token, fetch)
         logger.info("Greenhouse feed reader found %s jobs", len(jobs))
@@ -349,13 +415,7 @@ async def _fill_greenhouse_posted_on(
         if answer.stop or answer.status != 200 or not (answer.body or "").strip():
             # Missing job or empty answer: skip this id, keep trying within the cap.
             continue
-        try:
-            detail = json.loads(answer.body)
-        except (TypeError, ValueError):
-            continue
-        if not isinstance(detail, dict):
-            continue
-        merge_greenhouse_detail(job, detail)
+        await asyncio.to_thread(_greenhouse_merge_detail, job, answer.body)
 
 
 class TeamtailorFeedReader(Reader):
@@ -390,9 +450,7 @@ class TeamtailorFeedReader(Reader):
             return None
         if first.stop or first.status != 200 or not (first.body or "").strip():
             return ListingResult(self.name)
-        if not looks_like_teamtailor(first.body):
-            return ListingResult(self.name)
-        jobs = jobs_from_teamtailor(first.body)
+        jobs = await asyncio.to_thread(_teamtailor_feed_jobs, first.body)
         logger.info("Teamtailor feed reader found %s jobs", len(jobs))
         return ListingResult(self.name, jobs)
 
@@ -431,14 +489,9 @@ class LeverFeedReader(Reader):
         if first.stop or first.status != 200 or not (first.body or "").strip():
             return ListingResult(self.name)
         try:
-            data = json.loads(first.body)
+            jobs = await asyncio.to_thread(_lever_feed_jobs, first.body)
         except (TypeError, ValueError):
             return ListingResult(self.name)
-        if not isinstance(data, list):
-            return ListingResult(self.name)
-        if data and not looks_like_lever(data):
-            return ListingResult(self.name)
-        jobs = jobs_from_lever(data)
         logger.info("Lever feed reader found %s jobs", len(jobs))
         return ListingResult(self.name, jobs)
 
@@ -472,13 +525,11 @@ class PersonioFeedReader(Reader):
             return None
         if first.stop or first.status != 200 or not (first.body or "").strip():
             return ListingResult(self.name)
-        if not looks_like_personio(first.body):
-            return ListingResult(self.name)
         parsed = personio_account(source.get("careers_url") or "")
         if not parsed:
             return ListingResult(self.name)
         account, tld = parsed
-        jobs = jobs_from_personio(first.body, account, tld)
+        jobs = await asyncio.to_thread(_personio_feed_jobs, first.body, account, tld)
         logger.info("Personio feed reader found %s jobs", len(jobs))
         return ListingResult(self.name, jobs)
 

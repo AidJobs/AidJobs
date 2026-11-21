@@ -10,6 +10,8 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urljoin
 
+from crawler_v2.parse_lock import DATEPARSER_LOCK
+
 # ISO calendar day (optional time/zone ignored), same idea as the HTML crawler's check.
 _ISO_DAY = re.compile(r"^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$")
 _HAS_DIGIT = re.compile(r"\d")
@@ -75,25 +77,26 @@ def iso_day(value: Any) -> Optional[str]:
         return None
     # Prefer year-month-day so a feed's ISO-like strings stay correct; ambiguous numeric
     # dates still become an ISO day before the shared save (plan: never hand US dates to DMY).
-    parsed = dateparser.parse(
-        text,
-        languages=["en"],
-        settings={
-            "DATE_ORDER": "YMD",
-            "PREFER_DATES_FROM": "future",
-            "RETURN_AS_TIMEZONE_AWARE": False,
-        },
-    )
-    if parsed is None:
+    with DATEPARSER_LOCK:
         parsed = dateparser.parse(
             text,
             languages=["en"],
             settings={
-                "DATE_ORDER": "DMY",
+                "DATE_ORDER": "YMD",
                 "PREFER_DATES_FROM": "future",
                 "RETURN_AS_TIMEZONE_AWARE": False,
             },
         )
+        if parsed is None:
+            parsed = dateparser.parse(
+                text,
+                languages=["en"],
+                settings={
+                    "DATE_ORDER": "DMY",
+                    "PREFER_DATES_FROM": "future",
+                    "RETURN_AS_TIMEZONE_AWARE": False,
+                },
+            )
     if parsed is None:
         return None
     return parsed.date().isoformat()

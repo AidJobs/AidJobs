@@ -8,16 +8,31 @@ Design principles:
 4. Direct database operations - no complex abstractions
 """
 
-import logging
 import asyncio
 import contextvars
+import logging
 import re
-import threading
-from typing import Any, Dict, List, Optional, Tuple
 from datetime import date, datetime, timezone
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import parse_qs, parse_qsl, urlencode, urljoin, urlparse, urlunparse
 
+import httpx
+import psycopg2
+from bs4 import BeautifulSoup
+
+from app.log_safety import redact_exception, stored_text
+from app.search_projection import commit_and_schedule
 from contracts.admission import admit_batch, log_admission_rejections, page_verdicts, too_thin
+from contracts.canary import (
+    append_message as canary_append_message,
+)
+from contracts.canary import (
+    evaluate as canary_evaluate,
+)
+from contracts.canary import (
+    previous_kept_from_logs,
+    previous_reader_from_logs,
+)
 from contracts.captured import (
     clean_description,
     clean_locations,
@@ -39,30 +54,19 @@ from contracts.outbound import (
 )
 from contracts.persist import persist_candidate
 from contracts.persist import created_ids, observable_jobs, observe_known
+from contracts.reader import Response
 from contracts.refusal import refusal
 from contracts.run_ownership import OwnershipLost, confirm_running, save_failure_outcome
-from contracts.canary import (
-    append_message as canary_append_message,
-    evaluate as canary_evaluate,
-    previous_kept_from_logs,
-    previous_reader_from_logs,
-)
 from crawler_v2.job_pages import SavedJob, choose_pages, link_key, saved_job
+from crawler_v2.parse_lock import DATEPARSER_LOCK
 from crawler_v2.readers import LISTING_READER, LISTING_STRATEGY, html_readers, read_listing
-from contracts.reader import Response
-from app.log_safety import redact_exception, stored_text
-from app.search_projection import commit_and_schedule
-import httpx
-from bs4 import BeautifulSoup
-import psycopg2
-from psycopg2.extras import RealDictCursor
 
 logger = logging.getLogger(__name__)
 
 # The crawl's source id for log lines. One crawler instance serves concurrent crawls, so this
 # is task-local rather than an attribute.
 _SOURCE_FOR_LOGS: contextvars.ContextVar = contextvars.ContextVar("crawl_source_id", default=None)
-_DATEPARSER_LOCK = threading.Lock()
+_DATEPARSER_LOCK = DATEPARSER_LOCK
 
 
 def _first_row_per_link(jobs: List[Dict]) -> List[Dict]:
@@ -285,6 +289,43 @@ def _more_jobs_remaining(html: str) -> Optional[int]:
     return int(digits[-1]) if digits else None
 
 
+def _pageup_first_page_sync(html: str, careers_url: str):
+    from crawler.plugins.pageup import PageUpListingReader
+
+    reader = PageUpListingReader()
+    jobs = _first_row_per_link(reader.read_job_cards(html, careers_url))
+    if not jobs:
+        return [], None, None, None, False, False
+    remaining = _more_jobs_remaining(html)
+    expected = len(jobs) + remaining if remaining is not None else None
+    ends = remaining == 0
+    next_url = None if ends else _resized_listing_page(html, careers_url)
+    resized = next_url is not None
+    more_blocked = False
+    if not resized and not ends:
+        next_url = _next_listing_page(html, careers_url, careers_url)
+        if next_url is None and _has_more_link(html):
+            more_blocked = True
+    return jobs, expected, next_url, resized, ends, more_blocked
+
+
+def _pageup_follow_page_sync(html: str, page_url: str, careers_url: str):
+    from crawler.plugins.pageup import PageUpListingReader
+
+    reader = PageUpListingReader()
+    page_jobs = _first_row_per_link(reader.read_job_cards(html, page_url))
+    left = _more_jobs_remaining(html)
+    ends = left == 0
+    following = None if ends else _next_listing_page(html, page_url, careers_url)
+    return page_jobs, left, ends, following, _has_more_link(html)
+
+
+def _sites_page_sync(html: str, page_url: str):
+    from crawler.plugins.sites_engine import SitesListingReader
+
+    return SitesListingReader().read_page(html, page_url)
+
+
 class SimpleCrawler:
     """
     Simple crawler that fetches HTML, extracts jobs, and saves to database.
@@ -305,11 +346,13 @@ class SimpleCrawler:
         
         if self.use_global_heuristics:
             try:
-                from core.extraction_heuristics import (
-                    filter_and_score_job_links, normalize_url,
-                    get_canonical_hash, is_mailto_link
-                )
                 from core.domain_config import get_domain_config
+                from core.extraction_heuristics import (
+                    filter_and_score_job_links,
+                    get_canonical_hash,
+                    is_mailto_link,
+                    normalize_url,
+                )
                 self._filter_and_score_job_links = filter_and_score_job_links
                 self._normalize_url = normalize_url
                 self._get_canonical_hash = get_canonical_hash
@@ -560,6 +603,12 @@ class SimpleCrawler:
         logger.warning("No extraction strategy found jobs")
         LISTING_STRATEGY.set('none')
         return []
+
+    def _extract_jobs_sync(self, html: str, base_url: str) -> Tuple[List[Dict], Optional[str]]:
+        # Worker ContextVar is a copy; clear so a stub extract cannot return a prior strategy.
+        LISTING_STRATEGY.set(None)
+        jobs = self.extract_jobs_from_html(html, base_url)
+        return jobs, LISTING_STRATEGY.get()
     
     def _extract_from_tables(self, soup: BeautifulSoup, base_url: str) -> List[Dict]:
         """Extract jobs from HTML tables (UNESCO-style)"""
@@ -1359,8 +1408,9 @@ class SimpleCrawler:
         
         # Try dateparser first (handles many formats automatically)
         try:
-            import dateparser
             from datetime import datetime
+
+            import dateparser
             
             # Parse with dateparser (handles many locales and formats). Saves run in worker
             # threads, and dateparser's thread safety is not established.
@@ -1893,7 +1943,7 @@ class SimpleCrawler:
         
         # Update metrics for monitoring
         try:
-            from metrics import incr_inserted, incr_updated, incr_skipped, incr_failed
+            from metrics import incr_failed, incr_inserted, incr_skipped, incr_updated
             incr_inserted(inserted)
             incr_updated(updated)
             incr_skipped(skipped)
@@ -1944,6 +1994,218 @@ class SimpleCrawler:
         finally:
             conn.close()
 
+    def _enrich_job_from_detail_sync(self, job: Dict, html: str) -> Dict:
+        """Parse a fetched detail page (worker thread)."""
+        job['page_read'] = True
+
+        soup = BeautifulSoup(html, 'html.parser')
+        
+        # UNICEF-specific extraction patterns
+        if 'unicef.org' in job['apply_url'].lower():
+            # Extract from detail page structure
+            # Look for structured fields: Job no, Contract type, Duty Station, Level, Location, Categories
+            
+            # Extract Location (preferred: Duty Station, fallback: Location)
+            location_found = False
+            
+            # Approach 1: Look for "Duty Station:" (preferred)
+            duty_station_elem = soup.find(string=re.compile(r'Duty Station[:\s]*', re.IGNORECASE))
+            if duty_station_elem:
+                parent = duty_station_elem.parent
+                # Get next sibling or parent text
+                if parent:
+                    next_sibling = parent.find_next_sibling()
+                    if next_sibling:
+                        location_text = next_sibling.get_text().strip()
+                    else:
+                        # Try to find the value in the same parent
+                        location_text = parent.get_text().replace('Duty Station:', '').replace('Duty Station', '').strip()
+                    
+                    if location_text and len(location_text) >= 3 and len(location_text) < 100:
+                        # Clean up
+                        location_text = re.sub(r'<[^>]+>', '', location_text).strip()
+                        location_text = re.sub(r'\s+', ' ', location_text)
+                        if location_text.lower() not in ['n/a', 'na', 'tbd']:
+                            job['location_raw'] = location_text
+                            location_found = True
+            
+            # Approach 2: Look for "Location:" field
+            if not location_found:
+                location_elem = soup.find(string=re.compile(r'^Location[:\s]*', re.IGNORECASE))
+                if location_elem:
+                    parent = location_elem.parent
+                    if parent:
+                        next_sibling = parent.find_next_sibling()
+                        if next_sibling:
+                            location_text = next_sibling.get_text().strip()
+                        else:
+                            location_text = parent.get_text().replace('Location:', '').replace('Location', '').strip()
+                        
+                        if location_text and len(location_text) >= 3 and len(location_text) < 100:
+                            location_text = re.sub(r'<[^>]+>', '', location_text).strip()
+                            location_text = re.sub(r'\s+', ' ', location_text)
+                            if location_text.lower() not in ['n/a', 'na', 'tbd']:
+                                job['location_raw'] = location_text
+                                location_found = True
+            
+            # Extract Deadline
+            deadline_found = False
+            
+            # Look for "Deadline:" in detail page
+            deadline_elem = soup.find(string=re.compile(r'Deadline[:\s]*', re.IGNORECASE))
+            if deadline_elem:
+                parent = deadline_elem.parent
+                if parent:
+                    # Get deadline text
+                    deadline_text = parent.get_text()
+                    # Extract date pattern: "10 Dec 2025 11:55 PM" or "10 Dec 2025"
+                    deadline_match = re.search(r'(\d{1,2}\s+\w{3}\s+\d{4})', deadline_text, re.IGNORECASE)
+                    if deadline_match:
+                        deadline_cleaned = self._parse_deadline(deadline_match.group(1))
+                        if deadline_cleaned:
+                            job['deadline'] = deadline_cleaned
+                            deadline_found = True
+            
+            # Also check for deadline in structured data fields
+            if not deadline_found:
+                # Look for "Closing date" or similar
+                closing_elem = soup.find(string=re.compile(r'Closing[:\s]*|Apply by[:\s]*', re.IGNORECASE))
+                if closing_elem:
+                    parent = closing_elem.parent
+                    if parent:
+                        deadline_text = parent.get_text()
+                        deadline_match = re.search(r'(\d{1,2}\s+\w{3}\s+\d{4})', deadline_text, re.IGNORECASE)
+                        if deadline_match:
+                            deadline_cleaned = self._parse_deadline(deadline_match.group(1))
+                            if deadline_cleaned:
+                                job['deadline'] = deadline_cleaned
+                                deadline_found = True
+        
+        # UNDP-specific extraction patterns
+        elif 'undp.org' in job['apply_url'].lower():
+            # Pattern 1: Consultancies page structure
+            # Look for "DEADLINE:" label - try multiple approaches
+            deadline_found = False
+            
+            # Approach 1: Find text node with "DEADLINE:"
+            deadline_elem = soup.find(string=re.compile(r'DEADLINE:', re.IGNORECASE))
+            if deadline_elem:
+                parent = deadline_elem.parent
+                # Try to find next sibling or parent's next sibling
+                next_sibling = parent.find_next_sibling() if parent else None
+                if next_sibling:
+                    deadline_text = next_sibling.get_text()
+                else:
+                    deadline_text = parent.get_text() if parent else ''
+                
+                # Extract date part (e.g., "03-Dec-25" or "03-Dec-25 @ 03:00 PM")
+                deadline_match = re.search(r'(\d{1,2}[-/]\w{3}[-/]\d{2,4})', deadline_text, re.IGNORECASE)
+                if deadline_match:
+                    deadline_cleaned = self._parse_deadline(deadline_match.group(1))
+                    if deadline_cleaned:
+                        job['deadline'] = deadline_cleaned
+                        deadline_found = True
+            
+            # Approach 2: Look for "Apply Before:" (regular jobs)
+            if not deadline_found:
+                apply_before = soup.find(string=re.compile(r'Apply Before:', re.IGNORECASE))
+                if apply_before:
+                    parent = apply_before.parent
+                    if parent:
+                        deadline_text = parent.get_text()
+                        # Extract date (e.g., "12/04/2025")
+                        deadline_match = re.search(r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', deadline_text)
+                        if deadline_match:
+                            deadline_cleaned = self._parse_deadline(deadline_match.group(1))
+                            if deadline_cleaned:
+                                job['deadline'] = deadline_cleaned
+                                deadline_found = True
+            
+            # Location extraction
+            location_found = False
+            
+            # Approach 1: Look for "OFFICE:" (consultancies)
+            office_elem = soup.find(string=re.compile(r'OFFICE:', re.IGNORECASE))
+            if office_elem:
+                parent = office_elem.parent
+                next_sibling = parent.find_next_sibling() if parent else None
+                if next_sibling:
+                    office_text = next_sibling.get_text()
+                else:
+                    office_text = parent.get_text() if parent else ''
+                
+                # Extract location (e.g., "UNDP-COL - COLOMBIA" -> "COLOMBIA")
+                # Try pattern: "UNDP-XXX - COUNTRY" or just "COUNTRY"
+                location_match = re.search(r'OFFICE:\s*[^-]*-?\s*([A-Z][A-Z\s]+)', office_text, re.IGNORECASE)
+                if location_match:
+                    location = location_match.group(1).strip()
+                    if location and len(location) >= 3:
+                        job['location_raw'] = location
+                        location_found = True
+            
+            # Approach 2: Look for "Locations:" (regular jobs)
+            if not location_found:
+                locations_elem = soup.find(string=re.compile(r'Locations?:', re.IGNORECASE))
+                if locations_elem:
+                    parent = locations_elem.parent
+                    next_sibling = parent.find_next_sibling() if parent else None
+                    if next_sibling:
+                        location_text = next_sibling.get_text()
+                    else:
+                        location_text = parent.get_text() if parent else ''
+                    
+                    # Extract location (e.g., "Kyiv, Ukraine")
+                    location_match = re.search(r'Locations?:\s*([^\n\r<]+)', location_text, re.IGNORECASE)
+                    if location_match:
+                        location = location_match.group(1).strip()
+                        # Clean up any HTML or extra text
+                        location = re.sub(r'<[^>]+>', '', location).strip()
+                        if location and len(location) >= 3 and len(location) < 100:
+                            job['location_raw'] = location
+                            location_found = True
+            
+            # Approach 3: Look for location in title area (e.g., "DS - Kyiv")
+            if not location_found and job.get('title'):
+                title_location_match = re.search(r'DS\s*-\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)', job['title'], re.IGNORECASE)
+                if title_location_match:
+                    job['location_raw'] = title_location_match.group(1).strip()
+                    location_found = True
+            
+            # Look for "Grade:" (e.g., "NPSA-9")
+            grade_elem = soup.find(string=re.compile(r'Grade:', re.IGNORECASE))
+            if grade_elem:
+                parent = grade_elem.parent
+                next_sibling = parent.find_next_sibling() if parent else None
+                if next_sibling:
+                    grade_text = next_sibling.get_text()
+                else:
+                    grade_text = parent.get_text() if parent else ''
+                grade_match = re.search(r'Grade:\s*([^\n\r<]+)', grade_text, re.IGNORECASE)
+                if grade_match:
+                    grade = grade_match.group(1).strip()
+                    if grade:
+                        job['grade'] = grade
+        
+        else:
+            try:
+                listing_deadline = job.get('deadline')
+                results, captured = read_detail_fields(html)
+                job = apply_captured_fields(apply_detail_reading(job, results), captured)
+                read_deadline = job.get('deadline')
+                # Day-first, the order the save step uses for every deadline.
+                if read_deadline and read_deadline != listing_deadline:
+                    parsed_deadline = self._parse_deadline(read_deadline)
+                    if parsed_deadline:
+                        job['deadline'] = parsed_deadline
+            except Exception as reader_error:
+                logger.warning(
+                    "Detail reader left %s unchanged: %s",
+                    job.get("apply_url"),
+                    reader_error,
+                )
+        
+        return job
+
     async def enrich_job_from_detail_page(self, job: Dict, base_url: str) -> Dict:
         """
         Enrich job data by fetching and parsing the detail page.
@@ -1953,224 +2215,15 @@ class SimpleCrawler:
         """
         if not job.get('apply_url'):
             return job
-        
+
         try:
-            # Fetch detail page. A refusal or a challenge is not read: the row keeps its fields.
             status, html, stop = await self._fetch_page(job['apply_url'])
             if stop or status != 200:
                 logger.warning(
                     "Detail page not read: %s (%s)", job['apply_url'], stop or f"HTTP {status}"
                 )
                 return job
-            # Read: the crawl lifts its listing-only mark (crawler_v2/job_pages.py).
-            job['page_read'] = True
-            
-            soup = BeautifulSoup(html, 'html.parser')
-            
-            # UNICEF-specific extraction patterns
-            if 'unicef.org' in job['apply_url'].lower():
-                # Extract from detail page structure
-                # Look for structured fields: Job no, Contract type, Duty Station, Level, Location, Categories
-                
-                # Extract Location (preferred: Duty Station, fallback: Location)
-                location_found = False
-                
-                # Approach 1: Look for "Duty Station:" (preferred)
-                duty_station_elem = soup.find(string=re.compile(r'Duty Station[:\s]*', re.IGNORECASE))
-                if duty_station_elem:
-                    parent = duty_station_elem.parent
-                    # Get next sibling or parent text
-                    if parent:
-                        next_sibling = parent.find_next_sibling()
-                        if next_sibling:
-                            location_text = next_sibling.get_text().strip()
-                        else:
-                            # Try to find the value in the same parent
-                            location_text = parent.get_text().replace('Duty Station:', '').replace('Duty Station', '').strip()
-                        
-                        if location_text and len(location_text) >= 3 and len(location_text) < 100:
-                            # Clean up
-                            location_text = re.sub(r'<[^>]+>', '', location_text).strip()
-                            location_text = re.sub(r'\s+', ' ', location_text)
-                            if location_text.lower() not in ['n/a', 'na', 'tbd']:
-                                job['location_raw'] = location_text
-                                location_found = True
-                
-                # Approach 2: Look for "Location:" field
-                if not location_found:
-                    location_elem = soup.find(string=re.compile(r'^Location[:\s]*', re.IGNORECASE))
-                    if location_elem:
-                        parent = location_elem.parent
-                        if parent:
-                            next_sibling = parent.find_next_sibling()
-                            if next_sibling:
-                                location_text = next_sibling.get_text().strip()
-                            else:
-                                location_text = parent.get_text().replace('Location:', '').replace('Location', '').strip()
-                            
-                            if location_text and len(location_text) >= 3 and len(location_text) < 100:
-                                location_text = re.sub(r'<[^>]+>', '', location_text).strip()
-                                location_text = re.sub(r'\s+', ' ', location_text)
-                                if location_text.lower() not in ['n/a', 'na', 'tbd']:
-                                    job['location_raw'] = location_text
-                                    location_found = True
-                
-                # Extract Deadline
-                deadline_found = False
-                
-                # Look for "Deadline:" in detail page
-                deadline_elem = soup.find(string=re.compile(r'Deadline[:\s]*', re.IGNORECASE))
-                if deadline_elem:
-                    parent = deadline_elem.parent
-                    if parent:
-                        # Get deadline text
-                        deadline_text = parent.get_text()
-                        # Extract date pattern: "10 Dec 2025 11:55 PM" or "10 Dec 2025"
-                        deadline_match = re.search(r'(\d{1,2}\s+\w{3}\s+\d{4})', deadline_text, re.IGNORECASE)
-                        if deadline_match:
-                            deadline_cleaned = self._parse_deadline(deadline_match.group(1))
-                            if deadline_cleaned:
-                                job['deadline'] = deadline_cleaned
-                                deadline_found = True
-                
-                # Also check for deadline in structured data fields
-                if not deadline_found:
-                    # Look for "Closing date" or similar
-                    closing_elem = soup.find(string=re.compile(r'Closing[:\s]*|Apply by[:\s]*', re.IGNORECASE))
-                    if closing_elem:
-                        parent = closing_elem.parent
-                        if parent:
-                            deadline_text = parent.get_text()
-                            deadline_match = re.search(r'(\d{1,2}\s+\w{3}\s+\d{4})', deadline_text, re.IGNORECASE)
-                            if deadline_match:
-                                deadline_cleaned = self._parse_deadline(deadline_match.group(1))
-                                if deadline_cleaned:
-                                    job['deadline'] = deadline_cleaned
-                                    deadline_found = True
-            
-            # UNDP-specific extraction patterns
-            elif 'undp.org' in job['apply_url'].lower():
-                # Pattern 1: Consultancies page structure
-                # Look for "DEADLINE:" label - try multiple approaches
-                deadline_found = False
-                
-                # Approach 1: Find text node with "DEADLINE:"
-                deadline_elem = soup.find(string=re.compile(r'DEADLINE:', re.IGNORECASE))
-                if deadline_elem:
-                    parent = deadline_elem.parent
-                    # Try to find next sibling or parent's next sibling
-                    next_sibling = parent.find_next_sibling() if parent else None
-                    if next_sibling:
-                        deadline_text = next_sibling.get_text()
-                    else:
-                        deadline_text = parent.get_text() if parent else ''
-                    
-                    # Extract date part (e.g., "03-Dec-25" or "03-Dec-25 @ 03:00 PM")
-                    deadline_match = re.search(r'(\d{1,2}[-/]\w{3}[-/]\d{2,4})', deadline_text, re.IGNORECASE)
-                    if deadline_match:
-                        deadline_cleaned = self._parse_deadline(deadline_match.group(1))
-                        if deadline_cleaned:
-                            job['deadline'] = deadline_cleaned
-                            deadline_found = True
-                
-                # Approach 2: Look for "Apply Before:" (regular jobs)
-                if not deadline_found:
-                    apply_before = soup.find(string=re.compile(r'Apply Before:', re.IGNORECASE))
-                    if apply_before:
-                        parent = apply_before.parent
-                        if parent:
-                            deadline_text = parent.get_text()
-                            # Extract date (e.g., "12/04/2025")
-                            deadline_match = re.search(r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})', deadline_text)
-                            if deadline_match:
-                                deadline_cleaned = self._parse_deadline(deadline_match.group(1))
-                                if deadline_cleaned:
-                                    job['deadline'] = deadline_cleaned
-                                    deadline_found = True
-                
-                # Location extraction
-                location_found = False
-                
-                # Approach 1: Look for "OFFICE:" (consultancies)
-                office_elem = soup.find(string=re.compile(r'OFFICE:', re.IGNORECASE))
-                if office_elem:
-                    parent = office_elem.parent
-                    next_sibling = parent.find_next_sibling() if parent else None
-                    if next_sibling:
-                        office_text = next_sibling.get_text()
-                    else:
-                        office_text = parent.get_text() if parent else ''
-                    
-                    # Extract location (e.g., "UNDP-COL - COLOMBIA" -> "COLOMBIA")
-                    # Try pattern: "UNDP-XXX - COUNTRY" or just "COUNTRY"
-                    location_match = re.search(r'OFFICE:\s*[^-]*-?\s*([A-Z][A-Z\s]+)', office_text, re.IGNORECASE)
-                    if location_match:
-                        location = location_match.group(1).strip()
-                        if location and len(location) >= 3:
-                            job['location_raw'] = location
-                            location_found = True
-                
-                # Approach 2: Look for "Locations:" (regular jobs)
-                if not location_found:
-                    locations_elem = soup.find(string=re.compile(r'Locations?:', re.IGNORECASE))
-                    if locations_elem:
-                        parent = locations_elem.parent
-                        next_sibling = parent.find_next_sibling() if parent else None
-                        if next_sibling:
-                            location_text = next_sibling.get_text()
-                        else:
-                            location_text = parent.get_text() if parent else ''
-                        
-                        # Extract location (e.g., "Kyiv, Ukraine")
-                        location_match = re.search(r'Locations?:\s*([^\n\r<]+)', location_text, re.IGNORECASE)
-                        if location_match:
-                            location = location_match.group(1).strip()
-                            # Clean up any HTML or extra text
-                            location = re.sub(r'<[^>]+>', '', location).strip()
-                            if location and len(location) >= 3 and len(location) < 100:
-                                job['location_raw'] = location
-                                location_found = True
-                
-                # Approach 3: Look for location in title area (e.g., "DS - Kyiv")
-                if not location_found and job.get('title'):
-                    title_location_match = re.search(r'DS\s*-\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)', job['title'], re.IGNORECASE)
-                    if title_location_match:
-                        job['location_raw'] = title_location_match.group(1).strip()
-                        location_found = True
-                
-                # Look for "Grade:" (e.g., "NPSA-9")
-                grade_elem = soup.find(string=re.compile(r'Grade:', re.IGNORECASE))
-                if grade_elem:
-                    parent = grade_elem.parent
-                    next_sibling = parent.find_next_sibling() if parent else None
-                    if next_sibling:
-                        grade_text = next_sibling.get_text()
-                    else:
-                        grade_text = parent.get_text() if parent else ''
-                    grade_match = re.search(r'Grade:\s*([^\n\r<]+)', grade_text, re.IGNORECASE)
-                    if grade_match:
-                        grade = grade_match.group(1).strip()
-                        if grade:
-                            job['grade'] = grade
-            
-            else:
-                try:
-                    listing_deadline = job.get('deadline')
-                    results, captured = read_detail_fields(html)
-                    job = apply_captured_fields(apply_detail_reading(job, results), captured)
-                    read_deadline = job.get('deadline')
-                    # Day-first, the order the save step uses for every deadline.
-                    if read_deadline and read_deadline != listing_deadline:
-                        parsed_deadline = self._parse_deadline(read_deadline)
-                        if parsed_deadline:
-                            job['deadline'] = parsed_deadline
-                except Exception as reader_error:
-                    logger.warning(
-                        "Detail reader left %s unchanged: %s",
-                        job.get("apply_url"),
-                        reader_error,
-                    )
-            
+            return await asyncio.to_thread(self._enrich_job_from_detail_sync, job, html)
         except Exception as e:
             logger.warning(f"Error enriching job from detail page {job.get('apply_url')}: {e}")
         
@@ -2208,10 +2261,9 @@ class SimpleCrawler:
         stated total is complete; no stated total is partial. Later pages come from `fetch`
         (url -> (status, html, stop)), or this crawler's `_fetch_listing_page` when None.
         """
-        from crawler.plugins.sites_engine import SitesListingReader, resized_url
+        from crawler.plugins.sites_engine import resized_url
         fetch_page = fetch or self._fetch_listing_page
-        reader = SitesListingReader()
-        first = reader.read_page(first_html, careers_url)
+        first = await asyncio.to_thread(_sites_page_sync, first_html, careers_url)
         if not first.is_sites or not first.jobs:
             return [], None
         jobs = _first_row_per_link(first.jobs)
@@ -2237,7 +2289,7 @@ class SimpleCrawler:
                 stop = f'HTTP {status} on {next_url}'
                 break
             pages += 1
-            page = reader.read_page(page_html, next_url)
+            page = await asyncio.to_thread(_sites_page_sync, page_html, next_url)
             new_jobs = [job for job in _first_row_per_link(page.jobs)
                         if job.get('apply_url') not in seen]
             if not new_jobs and not (resized and page.jobs and page.next_url):
@@ -2287,26 +2339,23 @@ class SimpleCrawler:
         in its links skips jobs while still running out of links. Later pages come from `fetch`
         (url -> (status, html, stop)), or this crawler's `_fetch_listing_page` when None.
         """
-        from crawler.plugins.pageup import PageUpListingReader
         fetch_page = fetch or self._fetch_listing_page
-        reader = PageUpListingReader()
-        jobs = _first_row_per_link(reader.read_job_cards(first_html, careers_url))
+        (
+            jobs,
+            expected,
+            next_url,
+            resized,
+            ends,
+            more_blocked,
+        ) = await asyncio.to_thread(_pageup_first_page_sync, first_html, careers_url)
         if not jobs:
             return [], None
         seen = {job.get('apply_url') for job in jobs}
-        remaining = _more_jobs_remaining(first_html)
-        expected = len(jobs) + remaining if remaining is not None else None
         pages = 1
         stop = _LISTING_COMPLETE_STOP
         retry_used = False
-        # The last page may keep its More Jobs link, hidden, counting 0.
-        ends = remaining == 0
-        next_url = None if ends else _resized_listing_page(first_html, careers_url)
-        resized = next_url is not None
-        if not resized and not ends:
-            next_url = _next_listing_page(first_html, careers_url, careers_url)
-            if next_url is None and _has_more_link(first_html):
-                stop = f'More Jobs link not followed on {careers_url}'
+        if more_blocked:
+            stop = f'More Jobs link not followed on {careers_url}'
         while next_url is not None:
             if pages >= _PAGEUP_PAGE_CAP:
                 stop = f'page cap {_PAGEUP_PAGE_CAP}'
@@ -2333,11 +2382,10 @@ class SimpleCrawler:
                     stop += ' after one retry'
                 break
             pages += 1
-            page_jobs = _first_row_per_link(reader.read_job_cards(page_html, next_url))
+            page_jobs, left, ends, following, has_more = await asyncio.to_thread(
+                _pageup_follow_page_sync, page_html, next_url, careers_url
+            )
             new_jobs = [job for job in page_jobs if job.get('apply_url') not in seen]
-            left = _more_jobs_remaining(page_html)
-            ends = left == 0
-            following = None if ends else _next_listing_page(page_html, next_url, careers_url)
             if resized:
                 if left is not None and page_jobs:
                     expected = len(page_jobs) + left
@@ -2346,7 +2394,7 @@ class SimpleCrawler:
                 break
             seen.update(job.get('apply_url') for job in new_jobs)
             jobs.extend(new_jobs)
-            if following is None and not ends and _has_more_link(page_html):
+            if following is None and not ends and has_more:
                 stop = f'More Jobs link not followed on {next_url}'
                 break
             next_url, resized = following, False
@@ -2476,7 +2524,8 @@ class SimpleCrawler:
                     logger.warning(f"Error checking rollout config: {e}, using default extraction")
                 
                 if use_new_extractor:
-                    # Use new pipeline extractor
+                    # Dormant rollout path (W-23). A2 does not offload its BeautifulSoup/
+                    # classifier work; when this path is live again, wrap it like _listing_jobs.
                     try:
                         from pipeline.integration import PipelineAdapter
                         pipeline_adapter = PipelineAdapter(
