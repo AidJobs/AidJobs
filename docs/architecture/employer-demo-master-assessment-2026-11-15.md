@@ -67,7 +67,7 @@
 | R1-18 | OPEN | Free plan hides Languages; Amplify/market/Reach sit in front of a small NGO post. |
 | R1-19 | OPEN | Approve vanishes with no “Approved” mark on the section. |
 | R1-20 | OPEN | Phone: template picker has no Cancel during first template choice; parts button label paints over Eye/History. |
-| R1-28 | **Fixed** (20 Nov 2026; awaiting preview) | Pencil Save on How to apply no longer opens the How to apply fields card (`editSection` leaves `part` alone when that part has fields). Other sections still pin the progress line when the chat notices the edit. | User, 20 Nov 2026; English chrome |
+| R1-28 | **Fixed** (20–21 Nov 2026; `97e7fde`) | Pencil Save on How to apply no longer opens the How to apply fields card (`editSection` leaves `part` alone when that part has fields). Other sections still pin the progress line when the chat notices the edit. | User confirmed on preview, 21 Nov 2026 |
 
 #### P2 — Languages / Amplify / UN policy (after English)
 
@@ -310,7 +310,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 20 Nov 2026 | R1-05 / R2-P0-6 follow-up | `f34eb92` | U-2 left the Removed note forever (wrong). Restore polish `3f0f4c4`: hide Removed note after ~2s via `useRemovedNoteHidden` **without** `dismissChange`, so chat Undo still works. User confirmed on preview same day. |
 | 20 Nov 2026 | R1-06 (item 5 Step A) | `eccb4a7` | Approve hidden while pencil open; Save that changes text clears that section’s approval. User confirmed on preview. |
 | 20 Nov 2026 | R1-11 (item 5 Step B) | `732a06f`…`9e4ae13` | Add panel: Enter commits; Escape/blur cancel; Add your own under every group; Enter-add keeps JD scroll (`9e4ae13`). User confirmed on preview. |
-| 20 Nov 2026 | R1-28 | `97e7fde` | Pencil Save on How to apply no longer opens the fields card at the top of the JD. Confirm on preview. |
+| 20–21 Nov 2026 | R1-28 | `97e7fde` | Pencil Save on How to apply no longer opens the fields card at the top of the JD. User confirmed on preview, 21 Nov 2026. |
 
 ---
 
