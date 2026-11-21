@@ -48,6 +48,7 @@ import { PUBLIC_SAMPLES } from './sample';
 import BeforePublish, { checkSummary, checksToLook, type RowKey } from './Checks';
 import { ArchivedBanner } from './Archive';
 import { socialLabel, socialOf } from './context';
+import { sectionPublishBlock } from './flow';
 import { deliveryText, planCount } from './invites';
 import { ReachRow } from './Reach';
 import { AmplifyIncludes, Checkout, FreeTerms } from './Pricing';
@@ -952,7 +953,20 @@ function PublishPage({ id }: { id?: string }) {
   const blocked = !upgrade && approvalRequired(s, job) && !approvedFor(s, job);
   const request = job.payRequest;
   const dateBlock = upgrade ? null : scheduleBlock(s, job, schedule);
-  const reason = s.reviewerAs ? 'Reviewers cannot publish' : blocked ? 'Waiting for approval' : dateBlock ? dateBlock : chosen === 'free' && !freeOk ? 'Your free standard listing is used' : chosen === 'amplify' && !s.org.verified ? 'Verify your organisation to amplify' : null;
+  const sectionBlock = upgrade ? null : sectionPublishBlock(job);
+  const reason = s.reviewerAs
+    ? 'Reviewers cannot publish'
+    : blocked
+      ? 'Waiting for approval'
+      : dateBlock
+        ? dateBlock
+        : sectionBlock
+          ? sectionBlock
+          : chosen === 'free' && !freeOk
+            ? 'Your free standard listing is used'
+            : chosen === 'amplify' && !s.org.verified
+              ? 'Verify your organisation to amplify'
+              : null;
   const when = schedule ? ` for ${longDate(schedule)}` : '';
   const invites = chosen === 'amplify' ? planCount(job, job.reachPlan) : 0;
   const inviting = invites ? ` · invite ${invites} ${invites === 1 ? 'person' : 'people'} ${upgrade && job.status === 'live' ? 'now' : 'when live'}` : '';

@@ -45,7 +45,7 @@ import { canReopen, isPublished } from './lifecycle';
 import { advancedSource, detectLang, draftTranslation, draftVersionSection, headingIn, inLanguage, jobLang, keptTranslation, langOf, redraftTranslation, sourceOf, versionChoices, versionsOf } from './translate';
 import { contentOf, describeStyle, proposedStyle, recommendation, styleFromReply, styleWords, toneOf, TYPE_REASONS, usualTemplate, wordsFor } from './setup';
 import { profileFor, profileName, profileOf } from './profiles';
-import { aiWrites, ASKS, asksOf, checkPoints, contentPrint, essentials, ESSENTIAL_WORDS, FIXED_SECTIONS, isSettled, isWritten, nextStep, parkedIn, parkKey, stepKey, type Step } from './flow';
+import { aiWrites, ASKS, asksOf, checkPoints, contentPrint, essentials, ESSENTIAL_WORDS, FIXED_SECTIONS, isSettled, isWritten, nextStep, parkedIn, parkKey, sectionPublishBlock, stepKey, type Step } from './flow';
 import { AGAIN_DATE, AGAIN_PLACE, AGAIN_POSITIONS, INVITE, KEEP_ALL, KEEP_AS_IS, MARK_REVIEWED, NO_MORE_LANGS, NO_REVIEW, NOT_NOW, NOTHING_ELSE, REMIND, SEND_REVIEW, SHOW_FLYER, stateMessage, THIS_JOB } from './walkChat';
 import { ALL_GOOD, ABOUT_QUICK, APPROVE_FIXED, ASK_TEXT as WALK_ASK, CHANGE_NO, DISMISS_MARK, CHANGE_YES, CHOOSE_SDGS, fixedNamed, NO_SDGS, orgGoalsAnswer, GENUINE, GOOD, KEEP_FIXED, LEAVE_IT, NO_THANKS, NONE_OF_THESE, OTHER_WORDING, overview, paceIn, PACE_QUICK, PROJECT_QUICK, promptFor, readAnswer, readDetails, STYLE_QUICK, styleQuestion } from './walkChat';
 import {
@@ -3513,6 +3513,9 @@ export function publishBlock(s: State, id: string, o: PublishOptions): string | 
   // What a job cannot go out without (section 19, phase 6, A), by every route: the card, the Publish part, and scheduling.
   const missing = essentials(j);
   if (missing.length) return `Missing: ${missing.map((k) => ESSENTIAL_WORDS[k]).join(', ')}`;
+  // Empty / unfinished outline sections must not go live (R2-P0-1), Free or Amplify.
+  const sections = sectionPublishBlock(j);
+  if (sections) return sections;
   if (approvalRequired(s, j) && !approvedFor(s, j)) return 'Waiting for approval';
   const block = scheduleBlock(s, j, o.schedule);
   if (block) return block;
@@ -3797,6 +3800,11 @@ export function publishNow(id: string): boolean {
   const missing = essentials(j);
   if (missing.length) {
     update((st) => ({ ...st, notice: { text: `Missing: ${missing.map((k) => ESSENTIAL_WORDS[k]).join(', ')}` } }));
+    return false;
+  }
+  const sections = sectionPublishBlock(j);
+  if (sections) {
+    update((st) => ({ ...st, notice: { text: sections } }));
     return false;
   }
   if ((j.plan === 'free' && !canGoFree(s, j.id)) || (j.plan === 'amplify' && j.paidVia === 'free' && s.free?.amplify && s.free.amplify !== j.id)) return false;

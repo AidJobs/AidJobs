@@ -29,7 +29,7 @@ import {
 } from './actions';
 import { approvalRequired, approvedFor } from './approval';
 import { addDays, longDate, shortDate } from './engine';
-import { fullPoints, marketPoints, reviewDone } from './flow';
+import { fullPoints, marketPoints, reviewDone, sectionPublishBlock } from './flow';
 import { deliveryText, planCount } from './invites';
 import { isPublished } from './lifecycle';
 import { jobUrl } from './links';
@@ -376,17 +376,20 @@ export function PublishCard({ job, s, open, payment = false, compact = false }: 
   const blocked = !upgrade && approvalRequired(s, job) && !approvedFor(s, job);
   const request = job.payRequest;
   const dateBlock = upgrade ? null : scheduleBlock(s, job, schedule);
+  const sectionBlock = upgrade ? null : sectionPublishBlock(job);
   const reason = s.reviewerAs
     ? 'Reviewers cannot publish'
     : blocked
       ? 'Waiting for approval'
       : dateBlock
         ? dateBlock
-        : chosen === 'free' && !free
-          ? 'Your free standard listing is used'
-          : chosen === 'amplify' && !s.org.verified
-            ? 'Verify your organisation to amplify'
-            : null;
+        : sectionBlock
+          ? sectionBlock
+          : chosen === 'free' && !free
+            ? 'Your free standard listing is used'
+            : chosen === 'amplify' && !s.org.verified
+              ? 'Verify your organisation to amplify'
+              : null;
   const when = schedule ? ` for ${longDate(schedule)}` : '';
   const invites = chosen === 'amplify' ? planCount(job, job.reachPlan) : 0;
   const inviting = invites ? ` · invite ${invites} ${invites === 1 ? 'person' : 'people'} ${upgrade && job.status === 'live' ? 'now' : 'when live'}` : '';

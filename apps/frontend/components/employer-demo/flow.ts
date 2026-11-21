@@ -1,5 +1,5 @@
 import { approvalRequired, approvedFor, isApproved } from './approval';
-import { addSuggestions, SECTION_BY_KEY } from './engine';
+import { addSuggestions, allLines, SECTION_BY_KEY } from './engine';
 import { isPublished } from './lifecycle';
 import { basicAdvertCheck, fullAdvertCheck, marketCheck, type Point } from './market';
 import { inferSdgs } from './setup';
@@ -268,6 +268,43 @@ export function parkedIn(part: string, job: DemoJob): string[] {
 
 export function isWritten(job: DemoJob, key: string): boolean {
   return job.sections.some((x) => x.key === key && x.lines.length > 0);
+}
+
+/** True when section wording still has a fact slot, template brace, or bracket fill-in (same patterns as `quality`). */
+function unfinishedWording(text: string): boolean {
+  if (/\[(?:Duty station|Closing date)\]/.test(text)) return true;
+  if (/\{[^}]{0,40}\}/.test(text)) return true;
+  if (/\[(?!Duty station\]|Closing date\])[^\]\n]{2,40}\]/.test(text)) return true;
+  return false;
+}
+
+/**
+ * Outline sections that must not go live empty or unfinished (R2-P0-1): each tag needs real lines, with no leftover placeholders.
+ * Returns section titles for the publish block message. Inclusive-language / thin-duties stay Check-only.
+ */
+export function sectionPublishGaps(job: DemoJob): string[] {
+  const gaps: string[] = [];
+  for (const key of job.tags) {
+    const sec = job.sections.find((x) => x.key === key);
+    const title = sec?.title ?? job.renamed?.[key] ?? SECTION_BY_KEY[key]?.label ?? key;
+    if (!sec || sec.lines.length === 0) {
+      gaps.push(title);
+      continue;
+    }
+    if (unfinishedWording(allLines(sec).join('\n'))) gaps.push(title);
+  }
+  return gaps;
+}
+
+const GAP_LIST = 4;
+
+/** Publish-block wording when sections are empty or unfinished; null when clear. */
+export function sectionPublishBlock(job: DemoJob): string | null {
+  const gaps = sectionPublishGaps(job);
+  if (!gaps.length) return null;
+  const shown = gaps.slice(0, GAP_LIST);
+  const more = gaps.length > GAP_LIST ? ` (+${gaps.length - GAP_LIST} more)` : '';
+  return `Sections still empty or unfinished: ${shown.join(', ')}${more}`;
 }
 
 /**
