@@ -319,7 +319,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 21 Nov 2026 | R2-P0-4 | `b4a4185` | Project pencil Save no longer renames the Background/Project brief heading (body via `savePageFieldText` / `intoSection` only; Heading hidden in project editor). Grip offers **Add About the project** when `background` exists without that sub. Confirm on preview. |
 | 21 Nov 2026 | R2-P0-5, R1-19 | `2f17568` | Section header shows **Approved** chip after Approve while walk is active; R1-06 already hid Approve during pencil and cleared approval on Save. Confirm on preview. |
 | 21 Nov 2026 | R1-10 / R2-P1-4 (fake Moved) | `7475fda` | Move up on first / Move down on last: no “Moved” announce, menu items disabled (`off`), `outlineOp`/`versionOp` leave tags and undoStep unchanged. Confirmed on preview (first Move up disabled + empty status; last Move down disabled). |
-| 21 Nov 2026 | R1-10 / R2-P1-4 (group drop + remove-group) | `d77138e` | Outline: string `data-group-drop` + sage insertion bar while dragging a group; keyboard `groupBy` unchanged. `removeCustomGroup` / `rehomeTarget`: remove empty custom group only, rehome sections (catalog → own; custom → prev/next/`job`); `outlineOp` / `versionOp` / `applyToEntries` / AI `remove_group`. Undo restores. Confirm on preview. |
+| 21 Nov 2026 | R1-10 / R2-P1-4 (group drop + remove-group) | `d77138e`…`3f53f82` | Outline: string `data-group-drop` + sage insertion bar while dragging a group; keyboard `groupBy` unchanged. `removeCustomGroup` / `rehomeTarget`: remove empty custom group only, rehome sections (catalog → own; custom → prev/next/`job`); `outlineOp` / `versionOp` / `applyToEntries` / AI `remove_group`. Undo restores. Confirm on preview. |
 
 ---
 
