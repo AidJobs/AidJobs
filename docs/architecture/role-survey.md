@@ -1201,3 +1201,19 @@ Sealed sets are never edited. Packets, answers, disagreements and seals stay in 
 **Out of scope (deferred):** duty-bank best-quarter phrasing / `template-lines.csv` prose; reference job descriptions and blind scoring; Phase 5 / vault key / OpenRouter; Option B; more families; Ashby; production crawls; generator wiring into the employer demo.
 
 **Next:** duty-bank phrasing and reference JDs (questions/checks first are now in the library); or crawl A2 if the user wants the mainline crawler step next.
+
+### 19.24 Stage 3b: duty-bank phrasing and reference JDs (wave 1a)
+
+**Verified first:** `origin/main` at `4ee1495` (PR #183); open PRs only demos #22 and #96; survey worktree on `w54/stage3-phrasing`; no other chat building W-54. Stage 2 seals intact (PM `cfc5a6058309…`, ML `cc3f7f7e7711…`, CA `707a745d6cd2…`, FN `ea5ecc373c70…`); Phase 0 seals intact (`0e068308fdcf…`, `d35e4ecf5a85…`; guide `8f9ad292…`). No `adverts.py measure`; no production crawl; sealed archive files not edited. Ledger tip/Done for #183 folded in this PR.
+
+**Standards reopened before drafting** (19.21 / 19.14 / `normative-sources.csv`). No standards re-downloaded. No CIPD. Finance lines carry no invented ACCA competencies. Templates still do not insert standard names by default.
+
+**Duty-bank phrasing** (`role-survey/duty-phrasing.csv`). One row per named group (98). Seven noise/catch-all groups skipped (`skip=noise_or_catchall`; phrasing empty): CPS/Sana’a/heading/assigned-duties. Ninety-one AidJobs-owned best-quarter lines (EN+FR) with slots and weak-pattern notes. `library.py` emits additive `duty_bank.phrasing_lines` (schema `0.3.0`); `groups[].phrasing` stays null. `deep_fields_ready.duty_bank_phrasing` flips only when every named group is covered and non-skip rows have EN+FR.
+
+**Reference JDs** (`library/reference/{family}-{format}.{en|fr}.md`). Four families at modal level (programme management `coordinator_manager`; MEAL, communications and advocacy, finance `officer`). Two formats (lean 19.9 item 7): **INGO role profile** and **local NGO concise**, English and French — sixteen files. Written by the agent for AidJobs; org boilerplate as placeholders. Kept only after blind scoring places each in the family’s best quarter (Option A sealed totals, sum of non-null dimensions) and forced-choice passes (section 10); front matter uses `aidjobs-reference-status: kept` only then. `deep_fields_ready.reference_jds` flips only when all sixteen are kept.
+
+**Library tooling.** Schema `0.3.0` (minor, additive `phrasing_lines` and richer `reference_jds` entries). Deterministic rebuild; LF-normalised hashes for committed inputs; raw-byte seals for archive. Self-review + CI for schema/tooling; independent blind scorers for references (`review-14` / blind notes).
+
+**Out of scope (deferred):** Phase 5 / vault key / OpenRouter US$5; Option B; more families; Ashby; production crawls; generator wiring into the employer demo; A2 / W-39 / W-40 / UX public site.
+
+**Next:** Phase 5 US$5 stop when phrasing and kept references are on `main`; or crawl A2 if the user wants the mainline crawler step next.
