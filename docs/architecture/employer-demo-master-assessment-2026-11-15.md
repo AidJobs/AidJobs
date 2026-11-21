@@ -313,7 +313,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 20–21 Nov 2026 | R1-28 | `97e7fde` | Pencil Save on How to apply no longer opens the fields card at the top of the JD. User confirmed on preview, 21 Nov 2026. |
 | 21 Nov 2026 | R2-P0-1 | `9fb0b76` | Empty / unfinished outline sections block every publish route (`sectionPublishBlock`); Publish CTA shows the reason. User confirmed on preview (empty + `[Duty station]` + clear after fill). |
 | 21 Nov 2026 | R2-P0-2 | `b7a1787` | Tumaini Community Trust sample preset (local NGO); demo chrome switch; template `others` prefer org-type family; apply email / Tumaini commitments / AI `orgType: ngo` / Google title. User confirmed on preview the same day (preset switch, Local NGO concise path, live Key responsibilities without cluster/Sphere/donor/MEAL). |
-| 21 Nov 2026 | R2-P0-3, R1-03 | (this push) | `keepProfileAbout` sets `pack.about` (+ About section when tagged); About yes with paste does not advance; setup About/Project chips always rules even if `last.ai`; sticky website/project card while setup open; PageField “Already kept” when intake empty; write-all not blocked by setup-kept About. Confirm on preview. |
+| 21 Nov 2026 | R2-P0-3, R1-03 | `cb78694` | `keepProfileAbout` sets `pack.about` (+ About section when tagged); About yes with paste does not advance; setup About/Project chips always rules even if `last.ai`; sticky website/project card while setup open; PageField “Already kept” when intake empty; write-all not blocked by setup-kept About. Confirm on preview. |
 
 ---
 
