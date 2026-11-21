@@ -329,6 +329,26 @@ def deep_scores_ok_for_ready(family_id: str) -> bool:
     return prefix is not None and prefix == expected
 
 
+def live_seal_problems() -> list[str]:
+    """When the archive is present, every family seal must match or build/check fail."""
+    if not archive_available():
+        return []
+    problems = []
+    for fid in WAVE_1A_FAMILIES:
+        prefix = deep_reconciled_seal_prefix(fid)
+        expected = DEEP_SEAL_PREFIX[fid]
+        if prefix is None:
+            problems.append(
+                f"{fid}: archive reconciled.json does not match reconciled.sha256 "
+                f"(raw-byte seal; expected prefix {expected})"
+            )
+        elif prefix != expected:
+            problems.append(
+                f"{fid}: archive seal prefix {prefix!r} != DEEP_SEAL_PREFIX {expected!r}"
+            )
+    return problems
+
+
 def deep_scores_sealed_in_archive(family_id: str) -> bool:
     prefix = deep_reconciled_seal_prefix(family_id)
     return prefix is not None and prefix == DEEP_SEAL_PREFIX[family_id]
@@ -567,6 +587,23 @@ def build_family_files(
         named = [g for g in duty_groups if g["family_id"] == fid and g["named"]]
         if not named:
             raise ValueError(f"{fid}: duty-group-names.csv has no named groups")
+        family_groups = [g for g in duty_groups if g["family_id"] == fid]
+        reported = ((measured.get("duty_grouping") or {}).get(fid) or {}).get("n_groups_reported")
+        if reported is not None and len(family_groups) != reported:
+            raise ValueError(
+                f"{fid}: duty-group-names.csv has {len(family_groups)} groups, "
+                f"measured n_groups_reported is {reported}"
+            )
+        for g in family_groups:
+            should_name = g["advert_count"] >= DUTY_NAME_ADVERT_FLOOR
+            if g["named"] != should_name:
+                raise ValueError(
+                    f"{fid} group {g['group_id']}: named={g['named']} but "
+                    f"advert_count={g['advert_count']} (floor {DUTY_NAME_ADVERT_FLOOR})"
+                )
+    seal_problems = live_seal_problems()
+    if seal_problems:
+        raise ValueError("; ".join(seal_problems))
     return {
         fid: build_family(
             fid, norm_rows, measured, built_from, built_at, signature_facts, duty_groups
@@ -600,60 +637,227 @@ def build_index(family_docs: dict[str, dict], measured: dict) -> dict:
     }
 
 
-def schema_document() -> dict:
-    """Minimal JSON Schema (Draft 2020-12 subset) for wave-1a library files."""
+def _ready_schema() -> dict:
     ready_props = {k: {"type": "boolean"} for k in DEEP_FIELDS_READY_KEYS}
+    return {
+        "type": "object",
+        "required": list(DEEP_FIELDS_READY_KEYS),
+        "properties": ready_props,
+        "additionalProperties": False,
+    }
+
+
+def _group_schema() -> dict:
+    return {
+        "type": "object",
+        "required": [
+            "group_id",
+            "heuristic_name",
+            "named",
+            "line_count",
+            "advert_count",
+            "organisation_count",
+            "label",
+            "phrasing",
+        ],
+        "properties": {
+            "group_id": {"type": "integer"},
+            "heuristic_name": {"type": "string"},
+            "stable_id": {"type": ["string", "null"]},
+            "name_en": {"type": ["string", "null"]},
+            "name_fr": {"type": ["string", "null"]},
+            "named": {"type": "boolean"},
+            "line_count": {"type": "integer"},
+            "advert_count": {"type": "integer"},
+            "organisation_count": {"type": "integer"},
+            "label": {"type": "string"},
+            "phrasing": {"type": "null"},
+        },
+        "additionalProperties": False,
+    }
+
+
+def family_schema() -> dict:
+    ready_schema = _ready_schema()
+    return {
+        "type": "object",
+        "required": [
+            "schema_version",
+            "wave",
+            "family_id",
+            "name_en",
+            "built_at",
+            "built_from",
+            "normative_sources",
+            "measured_broad",
+            "duty_bank",
+            "signature_fact_questions",
+            "reference_jds",
+            "deep_fields_ready",
+            "deep_option_a_scores",
+        ],
+        "properties": {
+            "schema_version": {"type": "string", "const": SCHEMA_VERSION},
+            "wave": {"type": "string", "const": WAVE},
+            "built_at": {
+                "type": "string",
+                "description": "Deterministic id wave1a-{schema}-{hash12}, not a timestamp.",
+            },
+            "family_id": {"type": "string"},
+            "name_en": {"type": "string"},
+            "built_from": {"type": "object"},
+            "normative_sources": {
+                "type": "object",
+                "required": ["default_source_ids", "default", "variants"],
+                "properties": {
+                    "default_source_ids": {"type": "array", "items": {"type": "string"}},
+                    "default": {"type": "array"},
+                    "variants": {"type": "object"},
+                },
+                "additionalProperties": False,
+            },
+            "measured_broad": {
+                "type": "object",
+                "description": "Broad measured block; left open in this stage.",
+            },
+            "duty_bank": {
+                "type": "object",
+                "required": ["groups", "phrasing", "naming_ready", "deep_fields_ready"],
+                "properties": {
+                    "deep_fields_ready": {"type": "boolean"},
+                    "naming_ready": {"type": "boolean"},
+                    "archive_measured_pointer": {"type": "string"},
+                    "grouping_counts": {"type": ["object", "null"]},
+                    "groups": {"type": "array", "items": _group_schema()},
+                    "phrasing": {"type": "null"},
+                    "naming_note": {"type": "string"},
+                },
+                "additionalProperties": False,
+            },
+            "signature_fact_questions": {"type": "array"},
+            "reference_jds": {"type": "array"},
+            "recognition": {"type": "object"},
+            "requirements_by_level": {"type": "object"},
+            "standards_application": {"type": "object"},
+            "deep_option_a_scores": {"type": "object"},
+            "deep_fields_ready": ready_schema,
+        },
+        "additionalProperties": False,
+    }
+
+
+def index_schema() -> dict:
+    ready_schema = _ready_schema()
+    return {
+        "type": "object",
+        "required": ["schema_version", "wave", "built_at", "families", "inputs"],
+        "properties": {
+            "schema_version": {"type": "string", "const": SCHEMA_VERSION},
+            "wave": {"type": "string", "const": WAVE},
+            "built_at": {
+                "type": "string",
+                "description": "Deterministic id wave1a-{schema}-{hash12}, not a timestamp.",
+            },
+            "families": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["family_id", "file", "name_en", "deep_fields_ready"],
+                    "properties": {
+                        "family_id": {"type": "string"},
+                        "file": {"type": "string"},
+                        "name_en": {"type": "string"},
+                        "deep_fields_ready": ready_schema,
+                    },
+                    "additionalProperties": False,
+                },
+            },
+            "inputs": {"type": "object"},
+        },
+        "additionalProperties": False,
+    }
+
+
+def schema_document() -> dict:
+    """JSON Schema document committed as library/schema.json (family + index shapes)."""
     return {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": "https://aidjobs.app/role-survey/library/schema.json",
         "title": "AidJobs role library (wave 1a)",
         "description": (
-            "Schema for docs/architecture/role-survey/library/{family}.json and index.json. "
-            f"schema_version {SCHEMA_VERSION}."
+            "Family files use $defs.family; index.json uses $defs.index. "
+            f"schema_version {SCHEMA_VERSION}. built_at is a deterministic id from input hashes, "
+            "not an ISO timestamp. CI walks type/required/const/items/additionalProperties:false."
         ),
         "schema_version": SCHEMA_VERSION,
-        "type": "object",
-        "required": ["schema_version", "wave"],
-        "properties": {
-            "schema_version": {"type": "string", "const": SCHEMA_VERSION},
-            "wave": {"type": "string", "const": WAVE},
-            "built_at": {"type": "string"},
-            "family_id": {"type": "string"},
-            "name_en": {"type": "string"},
-            "families": {"type": "array"},
-            "inputs": {"type": "object"},
-            "deep_fields_ready": {
-                "type": "object",
-                "required": list(DEEP_FIELDS_READY_KEYS),
-                "properties": ready_props,
-                "additionalProperties": False,
-            },
-            "signature_fact_questions": {"type": "array"},
-            "duty_bank": {"type": "object"},
-            "reference_jds": {"type": "array"},
-            "measured_broad": {"type": "object"},
-            "normative_sources": {"type": "object"},
-            "built_from": {"type": "object"},
-            "recognition": {"type": "object"},
-            "requirements_by_level": {"type": "object"},
-            "standards_application": {"type": "object"},
-            "deep_option_a_scores": {"type": "object"},
+        "$defs": {
+            "family": family_schema(),
+            "index": index_schema(),
+            "deep_fields_ready": _ready_schema(),
+            "duty_group": _group_schema(),
         },
-        "additionalProperties": True,
     }
+
+
+def _type_ok(value: object, expected: object) -> bool:
+    if expected == "null":
+        return value is None
+    if expected == "string":
+        return isinstance(value, str)
+    if expected == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if expected == "boolean":
+        return isinstance(value, bool)
+    if expected == "array":
+        return isinstance(value, list)
+    if expected == "object":
+        return isinstance(value, dict)
+    return False
+
+
+def validate_schema_subset(doc: object, schema: dict, path: str = "$") -> list[str]:
+    """Stated JSON Schema subset: type, required, const, items, additionalProperties false."""
+    problems: list[str] = []
+    expected_type = schema.get("type")
+    if expected_type is not None:
+        if isinstance(expected_type, list):
+            if not any(_type_ok(doc, t) for t in expected_type):
+                problems.append(f"{path}: type must be one of {expected_type}")
+                return problems
+        elif not _type_ok(doc, expected_type):
+            problems.append(f"{path}: type must be {expected_type}")
+            return problems
+    if "const" in schema and doc != schema["const"]:
+        problems.append(f"{path}: const {schema['const']!r} required")
+    if isinstance(doc, dict):
+        for key in schema.get("required") or []:
+            if key not in doc:
+                problems.append(f"{path}: missing required {key}")
+        props = schema.get("properties") or {}
+        if schema.get("additionalProperties") is False:
+            for key in doc:
+                if key not in props:
+                    problems.append(f"{path}: unexpected property {key}")
+        for key, child_schema in props.items():
+            if key in doc:
+                problems += validate_schema_subset(doc[key], child_schema, f"{path}.{key}")
+    if isinstance(doc, list) and "items" in schema:
+        for i, item in enumerate(doc):
+            problems += validate_schema_subset(item, schema["items"], f"{path}[{i}]")
+    return problems
 
 
 def write_schema(dest: Path = SCHEMA_PATH) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(canonical_json(schema_document()), encoding="utf-8")
+    dest.write_text(canonical_json(schema_document()), encoding="utf-8", newline="\n")
 
 
 def write_library(family_docs: dict[str, dict], index: dict, dest: Path = LIBRARY) -> None:
     dest.mkdir(parents=True, exist_ok=True)
     write_schema(dest / "schema.json")
-    (dest / "index.json").write_text(canonical_json(index), encoding="utf-8")
+    (dest / "index.json").write_text(canonical_json(index), encoding="utf-8", newline="\n")
     for fid, doc in family_docs.items():
-        (dest / f"{fid}.json").write_text(canonical_json(doc), encoding="utf-8")
+        (dest / f"{fid}.json").write_text(canonical_json(doc), encoding="utf-8", newline="\n")
 
 
 def load_committed_library(dest: Path = LIBRARY) -> tuple[dict, dict[str, dict]]:
@@ -733,18 +937,20 @@ def validate_deep_fields_ready(doc: dict, family_id: str) -> list[str]:
         for g in named:
             if not g.get("stable_id") or not g.get("name_en") or not g.get("name_fr"):
                 problems.append(f"{family_id}: named group missing id or names")
-            if g.get("phrasing") is not None:
-                problems.append(f"{family_id}: named group must keep phrasing null")
             if int(g.get("advert_count") or 0) < DUTY_NAME_ADVERT_FLOOR:
                 problems.append(
                     f"{family_id}: named group advert_count below {DUTY_NAME_ADVERT_FLOOR}"
                 )
+    for g in groups:
+        if g.get("phrasing") is not None:
+            problems.append(f"{family_id}: group {g.get('group_id')} must keep phrasing null")
     return problems
 
 
 def check_problems(dest: Path | None = None) -> list[str]:
     dest = LIBRARY if dest is None else dest
     problems = []
+    problems += live_seal_problems()
     if list(WAVE_1A_FAMILIES) != [
         "programme_management",
         "meal",
@@ -780,6 +986,7 @@ def check_problems(dest: Path | None = None) -> list[str]:
         problems.append(f"index.json schema_version must be {SCHEMA_VERSION}")
     if committed_index != fresh_index:
         problems.append("index.json out of date; run library.py build")
+    problems += validate_schema_subset(committed_index, index_schema(), "index")
     for fid in WAVE_1A_FAMILIES:
         path = dest / f"{fid}.json"
         if not path.is_file():
@@ -787,8 +994,12 @@ def check_problems(dest: Path | None = None) -> list[str]:
             continue
         if committed[fid] != built[fid]:
             problems.append(f"{fid}.json out of date; run library.py build")
+        problems += validate_schema_subset(committed[fid], family_schema(), fid)
         problems += validate_normative_citations(committed[fid], fid)
         problems += validate_deep_fields_ready(committed[fid], fid)
+        default_ids = (committed[fid].get("normative_sources") or {}).get("default_source_ids") or []
+        if UN_VARIANT_SOURCE_ID in default_ids:
+            problems.append(f"{fid}: {UN_VARIANT_SOURCE_ID} must not be in default_source_ids (19.21)")
     return problems
 
 

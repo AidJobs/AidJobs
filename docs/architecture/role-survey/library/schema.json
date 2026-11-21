@@ -1,15 +1,5 @@
 {
-  "$id": "https://aidjobs.app/role-survey/library/schema.json",
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "additionalProperties": true,
-  "description": "Schema for docs/architecture/role-survey/library/{family}.json and index.json. schema_version 0.2.0.",
-  "properties": {
-    "built_at": {
-      "type": "string"
-    },
-    "built_from": {
-      "type": "object"
-    },
+  "$defs": {
     "deep_fields_ready": {
       "additionalProperties": false,
       "properties": {
@@ -34,59 +24,349 @@
       ],
       "type": "object"
     },
-    "deep_option_a_scores": {
+    "duty_group": {
+      "additionalProperties": false,
+      "properties": {
+        "advert_count": {
+          "type": "integer"
+        },
+        "group_id": {
+          "type": "integer"
+        },
+        "heuristic_name": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "line_count": {
+          "type": "integer"
+        },
+        "name_en": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name_fr": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "named": {
+          "type": "boolean"
+        },
+        "organisation_count": {
+          "type": "integer"
+        },
+        "phrasing": {
+          "type": "null"
+        },
+        "stable_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "group_id",
+        "heuristic_name",
+        "named",
+        "line_count",
+        "advert_count",
+        "organisation_count",
+        "label",
+        "phrasing"
+      ],
       "type": "object"
     },
-    "duty_bank": {
+    "family": {
+      "additionalProperties": false,
+      "properties": {
+        "built_at": {
+          "description": "Deterministic id wave1a-{schema}-{hash12}, not a timestamp.",
+          "type": "string"
+        },
+        "built_from": {
+          "type": "object"
+        },
+        "deep_fields_ready": {
+          "additionalProperties": false,
+          "properties": {
+            "duty_bank_naming": {
+              "type": "boolean"
+            },
+            "duty_bank_phrasing": {
+              "type": "boolean"
+            },
+            "reference_jds": {
+              "type": "boolean"
+            },
+            "signature_fact_questions": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "duty_bank_naming",
+            "duty_bank_phrasing",
+            "signature_fact_questions",
+            "reference_jds"
+          ],
+          "type": "object"
+        },
+        "deep_option_a_scores": {
+          "type": "object"
+        },
+        "duty_bank": {
+          "additionalProperties": false,
+          "properties": {
+            "archive_measured_pointer": {
+              "type": "string"
+            },
+            "deep_fields_ready": {
+              "type": "boolean"
+            },
+            "grouping_counts": {
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "groups": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "advert_count": {
+                    "type": "integer"
+                  },
+                  "group_id": {
+                    "type": "integer"
+                  },
+                  "heuristic_name": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "line_count": {
+                    "type": "integer"
+                  },
+                  "name_en": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "name_fr": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "named": {
+                    "type": "boolean"
+                  },
+                  "organisation_count": {
+                    "type": "integer"
+                  },
+                  "phrasing": {
+                    "type": "null"
+                  },
+                  "stable_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "group_id",
+                  "heuristic_name",
+                  "named",
+                  "line_count",
+                  "advert_count",
+                  "organisation_count",
+                  "label",
+                  "phrasing"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "naming_note": {
+              "type": "string"
+            },
+            "naming_ready": {
+              "type": "boolean"
+            },
+            "phrasing": {
+              "type": "null"
+            }
+          },
+          "required": [
+            "groups",
+            "phrasing",
+            "naming_ready",
+            "deep_fields_ready"
+          ],
+          "type": "object"
+        },
+        "family_id": {
+          "type": "string"
+        },
+        "measured_broad": {
+          "description": "Broad measured block; left open in this stage.",
+          "type": "object"
+        },
+        "name_en": {
+          "type": "string"
+        },
+        "normative_sources": {
+          "additionalProperties": false,
+          "properties": {
+            "default": {
+              "type": "array"
+            },
+            "default_source_ids": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "variants": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "default_source_ids",
+            "default",
+            "variants"
+          ],
+          "type": "object"
+        },
+        "recognition": {
+          "type": "object"
+        },
+        "reference_jds": {
+          "type": "array"
+        },
+        "requirements_by_level": {
+          "type": "object"
+        },
+        "schema_version": {
+          "const": "0.2.0",
+          "type": "string"
+        },
+        "signature_fact_questions": {
+          "type": "array"
+        },
+        "standards_application": {
+          "type": "object"
+        },
+        "wave": {
+          "const": "1a",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "wave",
+        "family_id",
+        "name_en",
+        "built_at",
+        "built_from",
+        "normative_sources",
+        "measured_broad",
+        "duty_bank",
+        "signature_fact_questions",
+        "reference_jds",
+        "deep_fields_ready",
+        "deep_option_a_scores"
+      ],
       "type": "object"
     },
-    "families": {
-      "type": "array"
-    },
-    "family_id": {
-      "type": "string"
-    },
-    "inputs": {
+    "index": {
+      "additionalProperties": false,
+      "properties": {
+        "built_at": {
+          "description": "Deterministic id wave1a-{schema}-{hash12}, not a timestamp.",
+          "type": "string"
+        },
+        "families": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "deep_fields_ready": {
+                "additionalProperties": false,
+                "properties": {
+                  "duty_bank_naming": {
+                    "type": "boolean"
+                  },
+                  "duty_bank_phrasing": {
+                    "type": "boolean"
+                  },
+                  "reference_jds": {
+                    "type": "boolean"
+                  },
+                  "signature_fact_questions": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "duty_bank_naming",
+                  "duty_bank_phrasing",
+                  "signature_fact_questions",
+                  "reference_jds"
+                ],
+                "type": "object"
+              },
+              "family_id": {
+                "type": "string"
+              },
+              "file": {
+                "type": "string"
+              },
+              "name_en": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "family_id",
+              "file",
+              "name_en",
+              "deep_fields_ready"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "inputs": {
+          "type": "object"
+        },
+        "schema_version": {
+          "const": "0.2.0",
+          "type": "string"
+        },
+        "wave": {
+          "const": "1a",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "wave",
+        "built_at",
+        "families",
+        "inputs"
+      ],
       "type": "object"
-    },
-    "measured_broad": {
-      "type": "object"
-    },
-    "name_en": {
-      "type": "string"
-    },
-    "normative_sources": {
-      "type": "object"
-    },
-    "recognition": {
-      "type": "object"
-    },
-    "reference_jds": {
-      "type": "array"
-    },
-    "requirements_by_level": {
-      "type": "object"
-    },
-    "schema_version": {
-      "const": "0.2.0",
-      "type": "string"
-    },
-    "signature_fact_questions": {
-      "type": "array"
-    },
-    "standards_application": {
-      "type": "object"
-    },
-    "wave": {
-      "const": "1a",
-      "type": "string"
     }
   },
-  "required": [
-    "schema_version",
-    "wave"
-  ],
+  "$id": "https://aidjobs.app/role-survey/library/schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Family files use $defs.family; index.json uses $defs.index. schema_version 0.2.0. built_at is a deterministic id from input hashes, not an ISO timestamp. CI walks type/required/const/items/additionalProperties:false.",
   "schema_version": "0.2.0",
-  "title": "AidJobs role library (wave 1a)",
-  "type": "object"
+  "title": "AidJobs role library (wave 1a)"
 }
