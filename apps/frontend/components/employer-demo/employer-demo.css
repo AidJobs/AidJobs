@@ -2453,18 +2453,36 @@ button.ej-step:hover {
 }
 
 .ej-ol-group {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 2px;
   border-radius: 10px;
 }
 
-.ej-ol-group[data-drop-before='true'] {
-  box-shadow: 0 -2px 0 0 var(--sage-5);
+/*
+ * Group drag drop place (R1-10 / R2-P1-4): string data-group-drop like section data-drop, with a clear
+ * insertion bar across the group — not a faint 2px box-shadow that was easy to miss on tall blocks.
+ */
+.ej-ol-group[data-group-drop='before']::before,
+.ej-ol-group[data-group-drop='end']::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--sage-5);
+  pointer-events: none;
+  z-index: 1;
 }
 
-.ej-ol-group[data-drop-end='true'] {
-  box-shadow: 0 2px 0 0 var(--sage-5);
+.ej-ol-group[data-group-drop='before']::before {
+  top: -8px;
+}
+
+.ej-ol-group[data-group-drop='end']::after {
+  bottom: -8px;
 }
 
 /* Whole group moves together: dim the block being dragged; drop line spans the group. */

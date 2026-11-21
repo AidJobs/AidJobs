@@ -120,7 +120,7 @@ export default function OutlineEditor({ rows, grouping, customGroups, onOp, reco
     else if (op.op === 'add') setSaid(`${heading(op.key)} added: ${placeSaid(next.keys, { ...next.grouping, customGroups }, op.key, heading(op.key))}`);
     else if (op.op === 'addCustom') setSaid(`${op.heading.trim()} added`);
     else if (op.op === 'addGroup') setSaid(`Added the group ${op.label.trim()}`);
-    else if (op.op === 'removeGroup') setSaid(`Removed the group ${groupLabel(op.group)}`);
+    else if (op.op === 'removeGroup') setSaid(`Removed the group ${groupLabel(op.group)}; its sections moved`);
     else if (op.op === 'renameGroup') setSaid(`Renamed the group to ${op.label.trim()}`);
     else if ('key' in op) setSaid(`Moved. ${placeSaid(next.keys, { ...next.grouping, customGroups }, op.key, heading(op.key))}`);
     else setSaid(`Moved the group ${groupLabel(op.group)}: ${groupOrderOf({ ...next.grouping, customGroups }).indexOf(op.group) + 1} of ${order.length}`);
@@ -153,7 +153,13 @@ export default function OutlineEditor({ rows, grouping, customGroups, onOp, reco
         const missing = ro || !isCatalogGroup(g) ? [] : SECTIONS.filter((d) => d.group === g && !keys.includes(d.key));
         const first = drop && drop.after === null && drop.group === g;
         return (
-          <section key={g} className="ej-ol-group" data-group-block={g} data-drop-before={groupDrop?.before === g || undefined} data-drop-end={(groupDrop && groupDrop.before === null && gi === order.length - 1) || undefined} aria-label={groupLabel(g)}>
+          <section
+            key={g}
+            className="ej-ol-group"
+            data-group-block={g}
+            data-group-drop={groupDrop?.before === g ? 'before' : groupDrop && groupDrop.before === null && gi === order.length - 1 ? 'end' : undefined}
+            aria-label={groupLabel(g)}
+          >
             <div className="ej-ol-gtitle" data-drop-group={g} data-drop={first ? 'first' : undefined}>
               {!ro && (
                 <Grip
@@ -167,7 +173,9 @@ export default function OutlineEditor({ rows, grouping, customGroups, onOp, reco
                   onDrag={(y) => {
                     root.current?.querySelectorAll('[data-dragging-group]').forEach((el) => el.removeAttribute('data-dragging-group'));
                     root.current?.querySelector(`[data-group-block="${CSS.escape(g)}"]`)?.setAttribute('data-dragging-group', 'true');
-                    setGroupDrop({ before: groupDropAt(root.current, y, g) });
+                    const before = groupDropAt(root.current, y, g);
+                    setGroupDrop({ before });
+                    setSaid(before ? `Drop before ${groupLabel(before as GroupKey)}` : 'Drop at the end');
                   }}
                   onDrop={(y) => {
                     root.current?.querySelectorAll('[data-dragging-group]').forEach((el) => el.removeAttribute('data-dragging-group'));
@@ -182,8 +190,8 @@ export default function OutlineEditor({ rows, grouping, customGroups, onOp, reco
                 <span>{groupLabel(g)}</span>
               )}
               {isCustomGroup(g) && !ro && (
-                <Tip label="Remove this group; How to apply stays">
-                  <button type="button" className="ej-ol-x" onClick={() => run({ op: 'removeGroup', group: g })} aria-label={`Remove the group ${groupLabel(g)}`}>
+                <Tip label="Remove this group; its sections move to their usual groups">
+                  <button type="button" className="ej-ol-x" onClick={() => run({ op: 'removeGroup', group: g })} aria-label={`Remove the group ${groupLabel(g)}; its sections move`}>
                     <X size={12} strokeWidth={2} />
                   </button>
                 </Tip>

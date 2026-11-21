@@ -742,13 +742,15 @@ describe('add your own group, section, and sub-section (section 19, phase 6 amen
     expect(job('job-comms').customGroups![0].label).toBe('Onboarding');
     const back = normalise({ ...getState() }).jobs.find((j) => j.id === 'job-comms')!;
     expect(back.customGroups?.[0]).toEqual({ id: gid, label: 'Onboarding' });
+    const customBefore = job('job-comms').tags.find((k) => k.startsWith('c-'))!;
     outlineOp('job-comms', { op: 'removeGroup', group: gid });
     expect(job('job-comms').customGroups).toBeUndefined();
-    expect(job('job-comms').tags.some((k) => k.startsWith('c-'))).toBe(false);
+    // R1-10 / R2-P1-4: remove group rehomes sections; it does not delete them.
+    expect(job('job-comms').tags).toContain(customBefore);
     expect(job('job-comms').groupOf?.apply ?? 'apply').toBe('apply');
     undoStep('job-comms');
     expect(job('job-comms').customGroups?.[0].id).toBe(gid);
-    expect(job('job-comms').tags.some((k) => k.startsWith('c-'))).toBe(true);
+    expect(job('job-comms').tags).toContain(customBefore);
     expect(beforeRemove.customGroups?.[0].id).toBe(gid);
   });
 
@@ -842,6 +844,9 @@ describe('add your own group, section, and sub-section (section 19, phase 6 amen
     expect(job('job-comms').customGroups?.[0].id).toBe(gid);
     applyAiTurn('job-comms', 'remove the Field pack group', { reply: 'Removed.', actions: [{ type: 'remove_group', group: gid }] }, open);
     expect(job('job-comms').customGroups).toBeUndefined();
+    // AI remove_group uses the same rehome rule: Kit list stays.
+    expect(job('job-comms').tags).toContain(key);
+    expect(job('job-comms').sections.find((x) => x.key === key)?.title).toBe('Kit list');
   });
 
   it('a catalog add through the chat keeps added groups', () => {

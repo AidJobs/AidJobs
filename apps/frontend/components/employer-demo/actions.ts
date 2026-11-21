@@ -65,6 +65,7 @@ import {
   KEPT,
   mintCustomGroupId,
   mintCustomSectionId,
+  removeCustomGroup,
   type GroupingFull,
   type OutlineOp,
 } from './outline';
@@ -365,21 +366,14 @@ export function versionOp(id: string, lang: JobLang, op: OutlineOp) {
         return stepped(j, next, `Added the group ${label}`, lang);
       }
       if (op.op === 'removeGroup') {
-        if (!isCustomGroup(op.group) || !(t.customGroups ?? []).some((g) => g.id === op.group)) return j;
-        const inG = v.keys.filter((k) => groupOfKey({ ...v.grouping, customGroups: t.customGroups }, k) === op.group);
-        const drop = inG.filter((k) => !KEPT.includes(k));
-        const keys = v.keys.filter((k) => !drop.includes(k));
-        const groupOf = { ...(v.grouping.groupOf ?? {}) };
-        for (const k of drop) delete groupOf[k];
-        for (const k of inG.filter((k) => KEPT.includes(k))) groupOf[k] = 'apply';
-        const customGroups = (t.customGroups ?? []).filter((g) => g.id !== op.group);
-        const groupOrder = groupOrderOf({ ...v.grouping, customGroups: t.customGroups }).filter((g) => g !== op.group);
+        const removed = removeCustomGroup(v.keys, { ...v.grouping, customGroups: t.customGroups }, op.group);
+        if (!removed) return j;
         const next = withView({ ...touched(j), ...liveEdit(j) }, lang, {
           ...v,
-          keys,
-          grouping: { groupOrder, groupOf: Object.keys(groupOf).length ? groupOf : undefined },
-          customGroups: customGroups.length ? customGroups : undefined,
-          sections: v.sections.filter((x) => !drop.includes(x.key)),
+          keys: removed.keys,
+          grouping: removed.grouping,
+          customGroups: removed.customGroups,
+          sections: v.sections,
         });
         return stepped(j, next, `Removed the group ${groupName(op.group, { ...j, customGroups: t.customGroups })}`, lang);
       }
@@ -2537,20 +2531,11 @@ export function outlineOp(id: string, op: OutlineOp) {
       }
 
       if (op.op === 'removeGroup') {
-        if (!isCustomGroup(op.group) || !(j.customGroups ?? []).some((g) => g.id === op.group)) return j;
-        const inGroupKeys = j.tags.filter((k) => groupOfKey(groupingOf(j), k) === op.group);
-        const drop = inGroupKeys.filter((k) => !KEPT.includes(k));
-        const keepApply = inGroupKeys.filter((k) => KEPT.includes(k));
-        const tags = j.tags.filter((k) => !drop.includes(k));
-        const groupOf = { ...(j.groupOf ?? {}) };
-        for (const k of drop) delete groupOf[k];
-        for (const k of keepApply) groupOf[k] = 'apply';
-        const customGroups = (j.customGroups ?? []).filter((g) => g.id !== op.group);
-        const groupOrder = (j.groupOrder ?? groupOrderOf(groupingOf(j))).filter((g) => g !== op.group);
-        const sections = j.sections.filter((x) => !drop.includes(x.key));
-        const base = { ...touched(j), ...liveEdit(j), customGroups: customGroups.length ? customGroups : undefined, groupOrder: groupOrder.length ? groupOrder : undefined, groupOf: Object.keys(groupOf).length ? groupOf : undefined };
-        const next = regrouped(base, groupingOf({ ...base, customGroups }), tags);
-        const out = stepped(j, { ...next, sections: inOutlineOrder(sections, next.tags) }, opNote(next, s, op, j), 'doc');
+        const removed = removeCustomGroup(j.tags, groupingOf(j), op.group);
+        if (!removed) return j;
+        const base = { ...touched(j), ...liveEdit(j), customGroups: removed.customGroups };
+        const next = regrouped(base, { ...removed.grouping, customGroups: removed.customGroups }, removed.keys);
+        const out = stepped(j, { ...next, sections: inOutlineOrder(j.sections, next.tags) }, opNote(next, s, op, j), 'doc');
         const part = keepJdPart(out.tags, j.part);
         return part ? { ...out, part } : out;
       }

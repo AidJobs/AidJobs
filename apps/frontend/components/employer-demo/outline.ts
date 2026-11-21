@@ -254,6 +254,37 @@ export type OutlineOp =
 /** How to apply is part of every job: no route removes it. */
 export const KEPT = ['apply'];
 
+/**
+ * Where a section goes when its custom group is removed (R1-10 / R2-P1-4): catalog sections return to their own
+ * group; custom sections go to the previous group in order, else the next, else The job. How to apply uses Applying.
+ */
+export function rehomeTarget(g: GroupingFull, removedGroup: GroupKey, key: string): GroupKey {
+  if (KEPT.includes(key) || !isCustomSection(key)) return ownGroup(key);
+  const order = groupOrderOf(g);
+  const at = order.indexOf(removedGroup);
+  const rest = order.filter((x) => x !== removedGroup);
+  const prev = at > 0 ? order.slice(0, at).reverse().find((x) => rest.includes(x)) : undefined;
+  const next = order.slice(Math.max(at, 0) + 1).find((x) => rest.includes(x));
+  return prev ?? next ?? 'job';
+}
+
+/**
+ * Remove an added (custom) group only: keep every section, rehome those that sat in it, drop the group from
+ * `customGroups` / `groupOrder`. Catalog groups are refused. Used by outline, draft ops, templates, and AI.
+ */
+export function removeCustomGroup(keys: string[], g: GroupingFull, group: GroupKey): { keys: string[]; grouping: Grouping; customGroups?: CustomGroup[] } | null {
+  if (!isCustomGroup(group) || !(g.customGroups ?? []).some((x) => x.id === group)) return null;
+  const groupOf = { ...(g.groupOf ?? {}) };
+  for (const k of keys) {
+    if (groupOfKey(g, k) !== group) continue;
+    groupOf[k] = rehomeTarget(g, group, k);
+  }
+  const customGroups = (g.customGroups ?? []).filter((x) => x.id !== group);
+  const groupOrder = groupOrderOf(g).filter((x) => x !== group);
+  const cleaned = cleanGrouping({ groupOrder, groupOf, customGroups }, keys);
+  return { keys: grouped(keys, { ...cleaned, customGroups }), grouping: cleaned, customGroups: customGroups.length ? customGroups : undefined };
+}
+
 export function mintCustomSectionId(): string {
   return `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
@@ -308,18 +339,19 @@ export function applyToEntries(
     return { order, groupOrder, customGroups: next };
   }
   if (op.op === 'removeGroup') {
-    if (!isCustomGroup(op.group) || !(customGroups ?? []).some((g) => g.id === op.group)) return { order, groupOrder, customGroups };
     const g0: GroupingFull = { ...formatGrouping({ order, groupOrder }), customGroups };
-    const drop = order.map((o) => o.key).filter((k) => groupOfKey(g0, k) === op.group && !KEPT.includes(k));
-    const keepApply = order.map((o) => o.key).filter((k) => groupOfKey(g0, k) === op.group && KEPT.includes(k));
-    const nextOrder = order.filter((o) => !drop.includes(o.key));
-    const groupOf = { ...(g0.groupOf ?? {}) };
-    for (const k of drop) delete groupOf[k];
-    for (const k of keepApply) groupOf[k] = 'apply';
-    const nextCustom = (customGroups ?? []).filter((g) => g.id !== op.group);
-    const next: GroupingFull = { groupOrder: (groupOrder ?? groupOrderOf(g0)).filter((g) => g !== op.group), groupOf, customGroups: nextCustom };
-    const cleaned = cleanGrouping(next, nextOrder.map((o) => o.key));
-    return { order: groupedEntries(nextOrder, { ...cleaned, customGroups: nextCustom }), groupOrder: cleaned.groupOrder, customGroups: nextCustom.length ? nextCustom : undefined };
+    const removed = removeCustomGroup(
+      order.map((o) => o.key),
+      g0,
+      op.group,
+    );
+    if (!removed) return { order, groupOrder, customGroups };
+    const entries = removed.keys.map((k) => order.find((o) => o.key === k)!);
+    return {
+      order: groupedEntries(entries, { ...removed.grouping, customGroups: removed.customGroups }),
+      groupOrder: removed.grouping.groupOrder,
+      customGroups: removed.customGroups,
+    };
   }
   if (op.op === 'addCustom') {
     const heading = op.heading.trim();

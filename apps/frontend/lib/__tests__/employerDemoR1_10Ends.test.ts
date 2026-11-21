@@ -1,6 +1,6 @@
 /**
  * R1-10 leftover (21 November 2026): Move up on the first / Move down on the last section must not
- * change tags or create an undoStep (no fake “Moved”). Group drop targets stay open.
+ * change tags or create an undoStep (no fake “Moved”). Group drops / remove-group: employerDemoR1_10Groups.test.ts.
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { groupingOf, outlineOp } from '../../components/employer-demo/actions';
