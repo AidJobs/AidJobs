@@ -9,14 +9,35 @@ import { broughtForward } from './flow';
 import { formatForward, jobGrouped } from './outline';
 import { fixedWordingNow } from './fixed';
 import { profilesFromJobs } from './profiles';
-import { initialState } from './sample';
+import { initialState, type DemoPreset } from './sample';
 import type { DemoJob, Recipient, State } from './types';
 
 /** Everything the demo keeps lives in this browser only, under its own keys, apart from the public site's. */
 export const STORAGE_KEY = 'aidjobs.employerDemo.v4';
 
+/** Which sample organisation to load on reset / empty storage (R2-P0-2). */
+export const PRESET_KEY = 'aidjobs.employerDemo.preset';
+
 /** The job just started with Enter: its window opens at once and shows "Reading your role…" before the first replies. */
 export const READING_KEY = 'aidjobs.employerDemo.reading';
+
+export function readPreset(): DemoPreset {
+  try {
+    const p = localStorage.getItem(PRESET_KEY);
+    if (p === 'tumaini' || p === 'riverstone') return p;
+  } catch {
+    /* storage unavailable */
+  }
+  return 'riverstone';
+}
+
+function writePreset(preset: DemoPreset) {
+  try {
+    localStorage.setItem(PRESET_KEY, preset);
+  } catch {
+    /* storage unavailable */
+  }
+}
 
 const listeners = new Set<() => void>();
 let current: State | null = null;
@@ -69,8 +90,8 @@ function wordingKept(j: DemoJob, s: State): DemoJob {
 }
 
 /** The sample data as the window takes it on: its jobs brought forward and its published jobs' profiles kept. */
-function sample(today: number): State {
-  const s = initialState(today);
+function sample(today: number, preset: DemoPreset = readPreset()): State {
+  const s = initialState(today, preset);
   return { ...s, jobs: s.jobs.map((j) => wordingKept(broughtForward(j, s), s)), profiles: profilesFromJobs(s.jobs) };
 }
 
@@ -122,15 +143,23 @@ export function update(fn: (s: State) => State, background = false) {
   listeners.forEach((l) => l());
 }
 
-export function resetDemo() {
+/** Resets to sample data. Pass a preset to switch organisation (Riverstone / Tumaini); otherwise keeps the last chosen preset. */
+export function resetDemo(preset?: DemoPreset) {
+  const next = preset ?? readPreset();
+  writePreset(next);
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch {
     /* nothing to remove */
   }
-  current = sample(startOfDay(Date.now()));
+  current = sample(startOfDay(Date.now()), next);
   trail.length = 0;
   listeners.forEach((l) => l());
+}
+
+/** The preset currently stored for reset / empty load (demo chrome). */
+export function currentPreset(): DemoPreset {
+  return readPreset();
 }
 
 export function nextId(prefix: string): string {

@@ -5,6 +5,14 @@ import type { DemoJob, Facts, Format, InboxItem, Org, Person, Review, State } fr
 
 const DAY = 86_400_000;
 
+/** Which sample organisation the demo loads (R2-P0-2): Riverstone INGO, or Tumaini local NGO. */
+export type DemoPreset = 'riverstone' | 'tumaini';
+
+export const DEMO_PRESETS: { key: DemoPreset; label: string }[] = [
+  { key: 'riverstone', label: 'Riverstone Aid (INGO)' },
+  { key: 'tumaini', label: 'Tumaini Community Trust (local NGO)' },
+];
+
 /** About `days` from today, moved on to the next working day in the country, so the sample draft's checks do not depend on the weekday. */
 function workingDay(today: number, days: number, countryIso: string): string {
   let n = days;
@@ -78,6 +86,63 @@ export const SAMPLE_TEAM: Person[] = [
   { id: 'grace', name: 'Grace Akello', email: 'grace@riverstone.example.org', role: 'member' },
 ];
 
+/**
+ * A fictional national NGO for the local-NGO demo path (R2-P0-2). No house format and no past jobs, so the first create
+ * recommends Local NGO concise; apply defaults to email; commitments name Tumaini, not Riverstone.
+ */
+export const SAMPLE_ORG_NGO: Org = {
+  name: 'Tumaini Community Trust',
+  short: 'Tumaini',
+  type: 'National NGO',
+  orgType: 'ngo',
+  hq: 'Kisumu, Kenya',
+  website: 'https://tumaini.example.org',
+  careersUrl: '',
+  domain: 'tumaini.example.org',
+  about:
+    'Tumaini Community Trust is a sample local NGO in Kisumu, Kenya, working with county communities on water, sanitation, and livelihoods. This organisation is fictional and exists only in this demo.',
+  sectors: ['Water, sanitation and hygiene', 'Livelihoods and food security'],
+  sdgs: [6, 1],
+  countries: ['Kenya'],
+  voice: ['Warm', 'Speaks as "we"', 'Uses "you"'],
+  standard: [
+    {
+      key: 'safeguarding',
+      label: 'Safeguarding',
+      text: 'Tumaini Community Trust is committed to keeping children and adults at risk safe. Every staff member and volunteer follows our code of conduct.',
+      locked: true,
+    },
+    {
+      key: 'fraud',
+      label: 'No fee, fraud warning',
+      text: 'Tumaini Community Trust never charges a fee at any stage of recruitment. Report any request for payment to jobs@tumaini.example.org.',
+      locked: true,
+    },
+    {
+      key: 'equal',
+      label: 'Equal opportunity',
+      text: 'Tumaini Community Trust is an equal opportunity employer. We welcome applications from everyone, and particularly from people from the communities we work with.',
+      locked: false,
+    },
+  ],
+  mdsMember: false,
+  scale: [],
+  learned: null,
+  approval: 'off',
+  approvalRule: 'any',
+  noSkip: false,
+  verified: true,
+  setupDone: true,
+  freeTermsAccepted: false,
+};
+
+export const SAMPLE_ME_NGO: Person = { id: 'me', name: 'Amina Otieno', email: 'amina@tumaini.example.org', role: 'owner' };
+
+export const SAMPLE_TEAM_NGO: Person[] = [
+  SAMPLE_ME_NGO,
+  { id: 'joseph', name: 'Joseph Ochieng', email: 'joseph@tumaini.example.org', role: 'member' },
+];
+
 /** Three days before the start of this month: the sample's free job published last month, whatever today's date. */
 function lastMonth(today: number): number {
   const d = new Date(today);
@@ -88,8 +153,8 @@ function noReview(): Review {
   return { state: 'none', reviewers: [], due: '', round: 0, rule: 'any', remarks: [] };
 }
 
-export function allFormats(): Format[] {
-  return [HOUSE_FORMAT, ...FORMATS];
+export function allFormats(preset: DemoPreset = 'riverstone'): Format[] {
+  return preset === 'tumaini' ? [...FORMATS] : [HOUSE_FORMAT, ...FORMATS];
 }
 
 /** A sample job; `add` puts extra sections in, so that the recent jobs share a pattern the base JD format lacks (the base prompt, plan section 15). */
@@ -234,7 +299,7 @@ export function sampleInbox(today: number): InboxItem[] {
   ];
 }
 
-export function initialState(today: number): State {
+function riverstoneState(today: number): State {
   return {
     v: 4,
     today,
@@ -243,7 +308,7 @@ export function initialState(today: number): State {
     org: SAMPLE_ORG,
     team: SAMPLE_TEAM,
     jobs: sampleJobs(today),
-    formats: allFormats(),
+    formats: allFormats('riverstone'),
     inbox: sampleInbox(today),
     // The sample's jobs use neither free listing, so each offer can be seen once (section 19, phase 5, D).
     free: {},
@@ -254,6 +319,32 @@ export function initialState(today: number): State {
     notice: null,
     seq: 1,
   };
+}
+
+/** Local NGO sample: no past jobs and no house format, so Create starts on Local NGO concise (R2-P0-2). */
+function tumainiState(today: number): State {
+  return {
+    v: 4,
+    today,
+    signedIn: false,
+    me: SAMPLE_ME_NGO,
+    org: SAMPLE_ORG_NGO,
+    team: SAMPLE_TEAM_NGO,
+    jobs: [],
+    formats: allFormats('tumaini'),
+    inbox: [],
+    free: {},
+    packs: [],
+    subscription: null,
+    receipts: [],
+    reviewerAs: null,
+    notice: null,
+    seq: 1,
+  };
+}
+
+export function initialState(today: number, preset: DemoPreset = 'riverstone'): State {
+  return preset === 'tumaini' ? tumainiState(today) : riverstoneState(today);
 }
 
 /** Sample jobs from other fictional organisations, for the public view only. */

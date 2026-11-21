@@ -15,7 +15,8 @@ import Jobs from './Jobs';
 import Public from './Public';
 import Publish from './Publish';
 import { Onboarding, OrgSettings, SignIn, Styles, Team } from './Settings';
-import { go, resetDemo, update, useDemo, useMounted, useRoute } from './store';
+import { DEMO_PRESETS, type DemoPreset } from './sample';
+import { currentPreset, go, resetDemo, update, useDemo, useMounted, useRoute } from './store';
 import { setReviewer } from './Review';
 import MenuButton from './MenuButton';
 import Window from './Window';
@@ -69,9 +70,20 @@ function ModelChoice({ collapsed, inHeader }: { collapsed: boolean; inHeader: bo
   );
 }
 
-/** "View as", the AI model, and "Reset demo": demo-only controls, at the bottom of the side menu. */
-function DemoControls({ collapsed, onReset, inHeader = false }: { collapsed: boolean; onReset: () => void; inHeader?: boolean }) {
+/** "View as", sample organisation, the AI model, and "Reset demo": demo-only controls, at the bottom of the side menu. */
+function DemoControls({
+  collapsed,
+  onReset,
+  onPreset,
+  inHeader = false,
+}: {
+  collapsed: boolean;
+  onReset: () => void;
+  onPreset: (preset: DemoPreset) => void;
+  inHeader?: boolean;
+}) {
   const s = useDemo();
+  const preset = currentPreset();
   const reviewers = s.team.filter((p) => p.role === 'reviewer');
   const pick = (id: string | null) => {
     setReviewer(id);
@@ -99,6 +111,13 @@ function DemoControls({ collapsed, onReset, inHeader = false }: { collapsed: boo
     return (
       <>
         <MenuButton
+          label="Sample organisation"
+          trigger={<Building2 size={15} strokeWidth={1.8} />}
+          align={inHeader ? 'right' : 'left'}
+          up={!inHeader}
+          actions={DEMO_PRESETS.map((p) => ({ label: p.label, current: preset === p.key, run: () => onPreset(p.key) }))}
+        />
+        <MenuButton
           label="View the demo as"
           trigger={<Eye size={15} strokeWidth={1.8} />}
           align={inHeader ? 'right' : 'left'}
@@ -113,6 +132,22 @@ function DemoControls({ collapsed, onReset, inHeader = false }: { collapsed: boo
   return (
     <>
       <DemoMark />
+      <span className="flex w-full items-center gap-1.5">
+        <Building2 size={14} strokeWidth={1.8} className="aj-faint shrink-0" />
+        <select
+          className="aj-pill min-w-0 flex-1"
+          style={{ height: 32, paddingRight: 6 }}
+          value={preset}
+          onChange={(e) => onPreset(e.target.value as DemoPreset)}
+          aria-label="Sample organisation"
+        >
+          {DEMO_PRESETS.map((p) => (
+            <option key={p.key} value={p.key}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+      </span>
       <span className="flex w-full items-center gap-1.5">
         <Eye size={14} strokeWidth={1.8} className="aj-faint shrink-0" />
         <select className="aj-pill min-w-0 flex-1" style={{ height: 32, paddingRight: 6 }} value={s.reviewerAs ?? ''} onChange={(e) => pick(e.target.value || null)} aria-label="View the demo as">
@@ -136,6 +171,8 @@ export default function EmployerDemo() {
   const [collapsed, setCollapsed] = usePersistentState(MENU_COLLAPSED_KEY, false);
   const [drawer, setDrawer] = useState(false);
   const [resetting, setResetting] = useState(false);
+  /** When set, the reset dialog will switch to this sample organisation (R2-P0-2). */
+  const [pendingPreset, setPendingPreset] = useState<DemoPreset | null>(null);
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
   const [menuW, setMenuW] = usePersistentState(MENU_W_KEY, MENU_W_DEFAULT);
   const [menuDragging, setMenuDragging] = useState(false);
@@ -271,7 +308,18 @@ export default function EmployerDemo() {
         widthLocked={menuDragging}
         footer={(isCollapsed) => (
           <>
-            <DemoControls collapsed={isCollapsed} onReset={() => setResetting(true)} />
+            <DemoControls
+              collapsed={isCollapsed}
+              onReset={() => {
+                setPendingPreset(null);
+                setResetting(true);
+              }}
+              onPreset={(p) => {
+                if (p === currentPreset()) return;
+                setPendingPreset(p);
+                setResetting(true);
+              }}
+            />
             {!isCollapsed && <LegalLine year={new Date(s.today).getFullYear()} className="px-2.5 pt-2" />}
           </>
         )}
@@ -325,7 +373,19 @@ export default function EmployerDemo() {
           </span>
           <div ref={setSlot} className="flex min-w-0 flex-1 items-center justify-end gap-2" />
           <span className="flex items-center gap-2 lg:hidden">
-            <DemoControls collapsed inHeader onReset={() => setResetting(true)} />
+            <DemoControls
+              collapsed
+              inHeader
+              onReset={() => {
+                setPendingPreset(null);
+                setResetting(true);
+              }}
+              onPreset={(p) => {
+                if (p === currentPreset()) return;
+                setPendingPreset(p);
+                setResetting(true);
+              }}
+            />
           </span>
         </header>
         {s.reviewerAs && (
@@ -343,29 +403,44 @@ export default function EmployerDemo() {
       <NoticeBar />
       {resetting && (
         <Dialog
-          title="Reset the demo?"
-          onClose={() => setResetting(false)}
+          title={pendingPreset ? 'Switch sample organisation?' : 'Reset the demo?'}
+          onClose={() => {
+            setResetting(false);
+            setPendingPreset(null);
+          }}
           footer={
             <div className="flex justify-end gap-2">
-              <button type="button" className="aj-pill" onClick={() => setResetting(false)}>
+              <button
+                type="button"
+                className="aj-pill"
+                onClick={() => {
+                  setResetting(false);
+                  setPendingPreset(null);
+                }}
+              >
                 Cancel
               </button>
               <button
                 type="button"
                 className="aj-ink-btn"
                 onClick={() => {
-                  resetDemo();
+                  resetDemo(pendingPreset ?? undefined);
                   setResetting(false);
+                  setPendingPreset(null);
                   update((st) => ({ ...st, signedIn: true }));
                   go('create');
                 }}
               >
-                Reset
+                {pendingPreset ? 'Switch' : 'Reset'}
               </button>
             </div>
           }
         >
-          <p style={{ margin: 0 }}>Everything you created in this browser goes back to the sample data. Nothing outside this browser is affected.</p>
+          <p style={{ margin: 0 }}>
+            {pendingPreset
+              ? `This browser’s demo data is replaced with ${DEMO_PRESETS.find((p) => p.key === pendingPreset)?.label ?? 'that sample'}. Nothing outside this browser is affected.`
+              : 'Everything you created in this browser goes back to the sample data. Nothing outside this browser is affected.'}
+          </p>
         </Dialog>
       )}
     </div>

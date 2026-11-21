@@ -116,15 +116,31 @@ export function styleWords(style: string[]): string {
   return style.map((x) => (x === 'Plain English' ? 'plain English' : `${x.charAt(0).toLowerCase()}${x.slice(1)}`)).join(', ');
 }
 
+/** Catalog family that matches the organisation type (R2-P0-2: local NGO must not lead with UN chips). */
+const FAMILY_FOR_TYPE: Record<State['org']['orgType'], Format['family']> = {
+  un: 'UN and multilateral',
+  ingo: 'INGO and humanitarian',
+  ngo: 'National NGOs and charities',
+  charity: 'National NGOs and charities',
+  donor: 'Donors, foundations and contractors',
+  contractor: 'Donors, foundations and contractors',
+};
+
 /** The template the chat recommends, with its reason, and the close matches it offers next. */
 export function recommendation(s: State, defaultKey: string): { key: string; reason: string; others: string[] } {
   const usable = s.formats.filter((f) => !f.key.startsWith('pasted-'));
   const rec = usable.find((f) => f.key === defaultKey) ?? usable[0];
   const usual = usualTemplate(s);
   const reason = usual?.key === rec.key ? `your usual template, used for ${usual.count} of your jobs` : rec.family === 'Your organisation' ? 'your own format' : `the format most organisations like yours use`;
-  const family = usable.find((f) => f.family !== 'Your organisation' && f.key !== rec.key && f.family === rec.family)?.family ?? 'INGO and humanitarian';
-  const others = [...usable.filter((f) => f.key !== rec.key && f.family === family), ...usable.filter((f) => f.key !== rec.key && f.family !== family)]
-    .sort((a, b) => FAMILIES_ORDER.indexOf(a.family) - FAMILIES_ORDER.indexOf(b.family))
+  const preferred = FAMILY_FOR_TYPE[s.org.orgType] ?? 'INGO and humanitarian';
+  const sameFamily = usable.find((f) => f.family !== 'Your organisation' && f.key !== rec.key && f.family === rec.family)?.family;
+  const family = sameFamily ?? preferred;
+  const rank = (f: Format) => (f.family === preferred ? 0 : 1 + Math.max(0, FAMILIES_ORDER.indexOf(f.family)));
+  const others = [
+    ...usable.filter((f) => f.key !== rec.key && f.family === family),
+    ...usable.filter((f) => f.key !== rec.key && f.family !== family),
+  ]
+    .sort((a, b) => rank(a) - rank(b) || FAMILIES_ORDER.indexOf(a.family) - FAMILIES_ORDER.indexOf(b.family))
     .slice(0, 3)
     .map((f) => f.key);
   return { key: rec.key, reason, others };

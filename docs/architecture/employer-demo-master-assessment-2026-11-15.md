@@ -236,8 +236,8 @@ Full **icon inventory table** (Eye, History, progress, tabs, X, Approve, pencil,
 
 | ID | Finding | Round 2 sources |
 | --- | --- | --- |
-| R2-P0-1 | ~~**Free publish with empty / placeholder sections**~~ **Fixed 21 Nov 2026** (`sectionPublishBlock` in `publishBlock` / Publish UI; awaiting preview) | [Novice NGO R2](8442906c-3d03-4b4a-8a45-575f31966a17) #6 |
-| R2-P0-2 | **Sample org (Riverstone) on local NGO path** — template chips, apply URL, commitments, AI responsibilities, Google title | Novice #1,5,7,14 |
+| R2-P0-1 | ~~**Free publish with empty / placeholder sections**~~ **Fixed 21 Nov 2026** (user confirmed on preview) | [Novice NGO R2](8442906c-3d03-4b4a-8a45-575f31966a17) #6 |
+| R2-P0-2 | ~~**Sample org (Riverstone) on local NGO path**~~ **Fixed 21 Nov 2026** (Tumaini preset + recommendation ranking; confirm on preview) | Novice #1,5,7,14 |
 | R2-P0-3 | **About/Project: form hides saved text; yes/ok wipes paste; dual buffers; Accept auto-approves** | Design, Chat, Chrome, Novice, Sam |
 | R2-P0-4 | **Project Save renames heading; grip has no Project when `background` exists** | U-4, all persona chrome |
 | R2-P0-5 | **Approve ignores pencil / PageField; section Approve vanishes with no mark** | Chrome, Design, Sam, Novice |
@@ -311,7 +311,8 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 20 Nov 2026 | R1-06 (item 5 Step A) | `eccb4a7` | Approve hidden while pencil open; Save that changes text clears that section’s approval. User confirmed on preview. |
 | 20 Nov 2026 | R1-11 (item 5 Step B) | `732a06f`…`9e4ae13` | Add panel: Enter commits; Escape/blur cancel; Add your own under every group; Enter-add keeps JD scroll (`9e4ae13`). User confirmed on preview. |
 | 20–21 Nov 2026 | R1-28 | `97e7fde` | Pencil Save on How to apply no longer opens the fields card at the top of the JD. User confirmed on preview, 21 Nov 2026. |
-| 21 Nov 2026 | R2-P0-1 | `9fb0b76` | Empty / unfinished outline sections block every publish route (`sectionPublishBlock`); Publish CTA shows the reason. Confirm on preview. |
+| 21 Nov 2026 | R2-P0-1 | `9fb0b76` | Empty / unfinished outline sections block every publish route (`sectionPublishBlock`); Publish CTA shows the reason. User confirmed on preview (empty + `[Duty station]` + clear after fill). |
+| 21 Nov 2026 | R2-P0-2 | (this commit) | Tumaini Community Trust sample preset (local NGO); demo chrome switch; template `others` prefer org-type family; apply email / Tumaini commitments / AI `orgType: ngo` / Google title. Confirm on preview. |
 
 ---
 
