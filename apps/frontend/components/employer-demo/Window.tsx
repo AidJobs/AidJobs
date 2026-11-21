@@ -740,7 +740,6 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus, open,
                     key={q}
                     type="button"
                     className="aj-pill ej-answer"
-                    style={{ height: 30 }}
                     aria-pressed={(shown[i + 1]?.from === 'user' ? shown[i + 1].text : tapped?.id === m.id ? tapped.q : null) === q}
                     disabled={i < lastUser || reviewing || busy || tapped?.id === m.id}
                     onClick={() => {
@@ -1470,14 +1469,14 @@ function JobWindow({ id }: { id: string }) {
     <span className="flex shrink-0 items-center gap-1">
       {!preview && job.sections.length > 0 && (
         <Tip label="Preview: the job page, in Google, and when shared" side="bottom">
-          <button type="button" className="aj-icon-btn" style={{ width: 30, height: 30 }} onClick={openPreview} aria-label="Preview">
+          <button type="button" className="aj-icon-btn" onClick={openPreview} aria-label="Preview">
             <Eye size={14} strokeWidth={1.8} />
           </button>
         </Tip>
       )}
       {job.versions.length > 0 && (
         <Tip label="Earlier versions" side="bottom">
-          <button type="button" className="aj-icon-btn" style={{ width: 30, height: 30 }} onClick={() => setVersionsOpen(true)} aria-label="Earlier versions">
+          <button type="button" className="aj-icon-btn" onClick={() => setVersionsOpen(true)} aria-label="Earlier versions">
             <History size={14} strokeWidth={1.8} />
           </button>
         </Tip>
@@ -1574,14 +1573,14 @@ function JobWindow({ id }: { id: string }) {
         ) : (
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex shrink-0 items-center gap-1.5 border-b px-3 py-1.5 aj-hair">
-              <button type="button" className="ej-parts-btn" aria-haspopup="dialog" onClick={() => setPartsOpen(true)}>
+              <button type="button" className="ej-parts-btn" aria-haspopup="dialog" aria-label={`${currentLabel}. ${parts.filter((p) => p.done).length} of ${parts.length} done`} onClick={() => setPartsOpen(true)}>
                 <span className="ej-line-label">{currentLabel}</span>
                 <span className="ej-jump-count">
                   · {parts.filter((p) => p.done).length} of {parts.length} done
                 </span>
                 <ChevronDown size={13} strokeWidth={2} aria-hidden />
               </button>
-              <span className="ml-auto">{tools}</span>
+              <span className="ml-auto flex shrink-0 items-center gap-1">{tools}</span>
             </div>
             {tabs.length > 1 && (
               <div className="shrink-0 border-b aj-hair">

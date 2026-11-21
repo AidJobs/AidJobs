@@ -1612,6 +1612,30 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     expect(network).toEqual([]);
   });
 
+  // R2-P1-10: phone writing chrome — sticky Save, parts row leaves Eye free, touch classes present.
+  it('on phones the parts row keeps Preview free and section Save sits in a sticky action bar', () => {
+    fresh();
+    let id = '';
+    act(() => {
+      id = startJob('Hiring a Shelter Officer in Goma, closing 30 December 2026, fixed-term');
+    });
+    phone = true;
+    render();
+    route(`#job/${id}`);
+    click(/^Job/);
+    expect(byLabel('Preview')).not.toBeNull();
+    expect(container.querySelector('.ej-parts-btn')).not.toBeNull();
+    expect(container.querySelector('.ej-switch-btn')).not.toBeNull();
+    const title = job(id).sections[0]!.title;
+    act(() => byLabel(`Edit ${title}`).click());
+    expect(container.querySelector('.ej-edit-actions')).not.toBeNull();
+    expect(container.querySelector('.ej-edit-actions .aj-ink-btn')?.textContent).toBe('Save');
+    click('Chat');
+    expect(container.querySelector('.ej-send')).not.toBeNull();
+    phone = false;
+    expect(network).toEqual([]);
+  });
+
   it('steps 8 and 9 in the window: the tabs open when needed, only the latest card is live, and only its button publishes', () => {
     fresh();
     let id = '';

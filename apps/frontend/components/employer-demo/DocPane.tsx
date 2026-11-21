@@ -352,7 +352,7 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
         )}
         {!draft && sec.edited && <span className="aj-chip">Your text</span>}
         {job.walk && !job.setup && !reviewing && !editing && sec.lines.length > 0 && !job.walk.approved.includes(sec.key) && (
-          <button type="button" className="aj-pill" style={{ height: 28 }} onClick={() => approveSection(job.id, sec.key)} aria-label={`Approve ${sec.title}`}>
+          <button type="button" className="aj-pill" onClick={() => approveSection(job.id, sec.key)} aria-label={`Approve ${sec.title}`}>
             <Check size={12} strokeWidth={2} aria-hidden /> Approve
           </button>
         )}
@@ -386,7 +386,6 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
               <button
                 type="button"
                 className="aj-text-btn"
-                style={{ height: 28 }}
                 onClick={() => (job.lastChange ? undoLastChange(job.id) : undoStep(job.id))}
                 aria-disabled={job.undoStep?.writing || undefined}
               >
@@ -394,7 +393,7 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
               </button>
             </Tip>
             {onSeeChat && (
-              <button type="button" className="aj-text-btn" style={{ height: 28 }} onClick={onSeeChat}>
+              <button type="button" className="aj-text-btn" onClick={onSeeChat}>
                 See in chat
               </button>
             )}
@@ -402,14 +401,14 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
         )}
         {!draft && !reviewing && sec.key === 'about' && s.me.role === 'owner' && sec.lines.length > 0 && sec.lines.join('\n').trim() !== s.org.about.trim() && (
           <Tip label="Each new job's About us starts from it; jobs already written keep theirs">
-            <button type="button" className="aj-text-btn" style={{ height: 28 }} onClick={() => saveAboutForOrg(job.id)}>
+            <button type="button" className="aj-text-btn" onClick={() => saveAboutForOrg(job.id)}>
               Save as our About us
             </button>
           </Tip>
         )}
         {!draft && !reviewing && sec.key === 'apply' && (
           <Tip label="Set up how to apply">
-            <button type="button" className="aj-icon-btn" style={{ width: 28, height: 28 }} onClick={() => setApplyOpen(true)} aria-label="Set up how to apply">
+            <button type="button" className="aj-icon-btn" onClick={() => setApplyOpen(true)} aria-label="Set up how to apply">
               <Settings2 size={13} strokeWidth={1.8} />
             </button>
           </Tip>
@@ -417,7 +416,7 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
         {!reviewing && !editing && (
           <span className={icons ? 'ej-sec-tools' : 'contents'}>
             <Tip label={icons ? editTip : `Edit ${sec.title}`}>
-              <button type="button" className={icons ? 'ej-sec-icon' : 'aj-icon-btn'} style={icons ? undefined : { width: 28, height: 28 }} onClick={startEdit} aria-label={`Edit ${sec.title}`}>
+              <button type="button" className={icons ? 'ej-sec-icon' : 'aj-icon-btn'} onClick={startEdit} aria-label={`Edit ${sec.title}`}>
                 <Pencil size={13} strokeWidth={1.8} />
               </button>
             </Tip>
@@ -437,10 +436,10 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
         )}
         {reviewing && (
           <>
-            <button type="button" className="aj-pill" style={{ height: 28 }} onClick={() => setRemark('comment')}>
+            <button type="button" className="aj-pill" onClick={() => setRemark('comment')}>
               <MessageSquare size={12} strokeWidth={1.8} /> Comment
             </button>
-            <button type="button" className="aj-pill" style={{ height: 28 }} onClick={() => setRemark('suggestion')}>
+            <button type="button" className="aj-pill" onClick={() => setRemark('suggestion')}>
               <Pencil size={12} strokeWidth={1.8} /> Suggest
             </button>
           </>
@@ -504,7 +503,8 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
               <Plus size={12} strokeWidth={2} aria-hidden /> Add a heading inside this section
             </button>
           )}
-          <div className="flex gap-1.5">
+          {/* R2-P1-10: sticky on phone so Save/Cancel stay above the keyboard while editing. */}
+          <div className="ej-edit-actions flex gap-1.5">
             <button
               type="button"
               className="aj-ink-btn"
@@ -1246,7 +1246,7 @@ export function ChatPanel({ job, s, autoFocus }: { job: DemoJob; s: State; autoF
             {m.from === 'ai' && i > lastUser && m.quick && m.quick.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {m.quick.map((q) => (
-                  <button key={q} type="button" className="aj-pill" style={{ height: 30 }} onClick={() => sendChat(job.id, q)}>
+                  <button key={q} type="button" className="aj-pill ej-answer" onClick={() => sendChat(job.id, q)}>
                     {q}
                   </button>
                 ))}

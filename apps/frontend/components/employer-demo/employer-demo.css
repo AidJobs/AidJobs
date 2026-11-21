@@ -2809,6 +2809,96 @@ button.ej-step:hover {
   }
 }
 
+/* R2-P1-10: phone/tablet writing chrome — 44px targets, full-opacity tools, parts row does not cover Eye. */
+@media (max-width: 1023px) {
+  .aj-root:has(.ej-app) {
+    --ej-touch: 44px;
+  }
+
+  .aj-root:has(.ej-app) .ej-sec-icon,
+  .aj-root:has(.ej-app) .ej-grip.ej-sec-icon,
+  .aj-root:has(.ej-app) .ej-addend-btn {
+    width: var(--ej-touch);
+    height: var(--ej-touch);
+  }
+
+  .aj-root:has(.ej-app) .ej-switch-btn {
+    min-height: var(--ej-touch);
+    height: var(--ej-touch);
+    padding: 0 14px;
+  }
+
+  .aj-root:has(.ej-app) .ej-send {
+    width: var(--ej-touch);
+    height: var(--ej-touch);
+  }
+
+  .aj-root:has(.ej-app) .ej-ring {
+    width: 52px;
+    height: 52px;
+  }
+
+  .aj-root:has(.ej-app) .ej-ring svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .aj-root:has(.ej-app) .ej-parts-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 100%;
+    height: var(--ej-touch);
+  }
+
+  .aj-root:has(.ej-app) .ej-parts-btn .ej-line-label,
+  .aj-root:has(.ej-app) .ej-parts-btn .ej-jump-count {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .aj-root:has(.ej-app) .ej-sec-head {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  /* Beat leftover inline 28/30 heights so phone targets stay ≥44px. */
+  .aj-root:has(.ej-app) button.aj-pill,
+  .aj-root:has(.ej-app) button.aj-text-btn,
+  .aj-root:has(.ej-app) button.ej-answer {
+    min-height: var(--ej-touch) !important;
+    height: auto !important;
+  }
+
+  .aj-root:has(.ej-app) button.aj-ink-btn {
+    min-height: var(--ej-touch) !important;
+  }
+
+  .aj-root:has(.ej-app) button.aj-icon-btn {
+    width: var(--ej-touch) !important;
+    height: var(--ej-touch) !important;
+  }
+
+  .aj-root:has(.ej-app) .ej-box-grip {
+    min-height: var(--ej-touch);
+    height: var(--ej-touch);
+  }
+
+  .aj-root:has(.ej-app) .ej-edit-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    margin-inline: -4px;
+    padding: 8px 4px calc(8px + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(to top, var(--surface) 72%, color-mix(in srgb, var(--surface) 40%, transparent));
+  }
+}
+
+@media (max-width: 1023px) and (hover: none) {
+  .aj-root:has(.ej-app) .ej-sec-tools {
+    opacity: 1;
+  }
+}
+
 /* The fixed texts on the draft (section 19, phase 6, D): one block after the sections, a small shield on each text. */
 .ej-fixed-row {
   display: flex;

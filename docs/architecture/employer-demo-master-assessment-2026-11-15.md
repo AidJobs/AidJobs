@@ -20,7 +20,7 @@
 
 5. ~~Approve vs unsaved buffers; Add-panel blur/Escape~~ — **Fixed 20 Nov 2026** (Step A R1-06; Step B R1-11; user confirmed on preview)
 
-**Next (21 Nov 2026, after R2-P1-9):** **R2-P1-10** (mobile 44px+ targets), or the user’s new priority. Phase 7 held.
+**Next (21 Nov 2026, after R2-P1-10):** user’s priority for remaining English chrome (R1-12 full header clip, R1-20 setup Cancel, R1-09 / R1-15 / R1-18, …). Phase 7 held.
 
 ---
 
@@ -60,7 +60,7 @@
 | R1-09 | OPEN (partial) | **U-1 placement Fixed 20 Nov 2026.** Still open: Publish early while Languages/Review in +N; icons hidden until writing; phone parts over icons. |
 | R1-10 | **Fixed** (21 Nov 2026; click/drag U-4 B; fake Moved `7475fda`; group drops + rehome; agent confirmed on preview) | Grip threshold 12px; fake “Moved” at ends closed; outline group drag shows `data-group-drop` insertion bar; `removeGroup` rehomes sections (catalog → own group; custom → previous/next/`job`); Undo restores; AI path same. Draft has no group grips (by design). |
 | R1-11 | **Fixed** (20 Nov 2026; Step B `732a06f`…`9e4ae13`) | Enter commits; blur/Escape cancel. Add your own under every group. After Enter-add, JD scroll preserved (no jump to top). | User confirmed on preview, 20 Nov 2026 |
-| R1-12 | OPEN | Section header row: Approve/Undo/Also-in clip; pencil/grip hard on narrow/touch (opacity 0.45). |
+| R1-12 | OPEN (partial) | Section header clip / Also-in still open. **Touch:** pencil/grip/Approve ≥44px and tools opacity 1 on phone (R2-P1-10). |
 | R1-13 | **Fixed** (R2-P1-9, 21 Nov 2026) | Leaving Preview (progress part, Job description tab, walk, open/close tab) clears `preview` so Eye returns; Preview tab no longer lingers. | Agent confirmed on preview |
 | R1-14 | **Fixed** (R2-P1-8, 21 Nov 2026) | Walk Check card uses `checkPoints` (same as progress); outline gaps block Check; google stays facts-only. |
 | R1-15 | OPEN | Hide card + later ask leaves part highlighted with card shut. |
@@ -68,7 +68,7 @@
 | R1-17 | **Fixed** (U-3 Step B, 20 Nov 2026) | Bullets/short paste fixed in Step A. Sub-insert stays by design. Accept no longer auto-approves; Undo restores pack, body, and draft card. |
 | R1-18 | OPEN | Free plan hides Languages; Amplify/market/Reach sit in front of a small NGO post. |
 | R1-19 | **Fixed** (R2-P0-5, 21 Nov 2026) | After Approve, section header shows an **Approved** chip while `walk` is active; Edit+Save that changes text clears approval (R1-06) and Approve returns. |
-| R1-20 | OPEN | Phone: template picker has no Cancel during first template choice; parts button label paints over Eye/History. |
+| R1-20 | OPEN (partial) | **Parts label vs Eye:** truncated + flex so Eye/History stay free (R2-P1-10). Still open: template picker Cancel on first setup choice. |
 | R1-28 | **Fixed** (20–21 Nov 2026; `97e7fde`) | Pencil Save on How to apply no longer opens the How to apply fields card (`editSection` leaves `part` alone when that part has fields). Other sections still pin the progress line when the chat notices the edit. | User confirmed on preview, 21 Nov 2026 |
 
 #### P2 — Languages / Amplify / UN policy (after English)
@@ -259,7 +259,7 @@ Full **icon inventory table** (Eye, History, progress, tabs, X, Approve, pencil,
 | R2-P1-7 | **Fixed** (21 Nov 2026) | House vs org type + UN chips — ngo/charity type wins over house; chips National then INGO, UN only in See all |
 | R2-P1-8 | **Fixed** (21 Nov 2026) | Check done vs empty Qualifications — outline gaps in `checkPoints`; card matches progress; gaps not skippable — Novice #11, R1-14 |
 | R2-P1-9 | **Fixed** (21 Nov 2026) | Preview tab leaves Eye hidden — leave Preview clears flag; Eye returns — R1-13 |
-| R2-P1-10 | NEW | **Mobile not viable for polish** — [Phone R2](033c02d6-9e1f-40bd-a8a5-4e71b6565a6a) — 44px+ targets |
+| R2-P1-10 | **Fixed** (21 Nov 2026) | Mobile writing chrome ≥44px — touch token, full-opacity tools, sticky Save, parts row vs Eye — [Phone R2](033c02d6-9e1f-40bd-a8a5-4e71b6565a6a) |
 
 **P2 — after English (langs, UN content, Amplify, mobile polish detail)**
 
@@ -325,6 +325,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 21 Nov 2026 | R2-P1-7 | `c90cf88`…`d698879` | `recommendation` / `familiesForOrg`: ngo/charity chips National then INGO, UN excluded from quick chips; See all + phone strip org-aware. `defaultFormatKey`: ngo/charity use `FORMAT_FOR_TYPE`, not house. Tests `employerDemoR2P17.test.ts`. **Agent confirmed on preview** (Tumaini: chips Local NGO concise → Domestic charity → About you narrative; phone strip National/INGO/donors then UN last). |
 | 21 Nov 2026 | R2-P1-8, R1-14 | `e7c5c4b`…`58deeba` | `checkPoints` includes outline gaps from `sectionOutlineGaps`; leave cannot skip them; walk Check card lists `checkPoints` (not `openPoints`). Tests `employerDemoR2P18.test.ts`. **Agent confirmed on preview** (pencil-clear Qualifications → Save → Check to do; card: “Qualifications and experience: still empty or unfinished”; earlier: inclusive point matched progress, no Google). |
 | 21 Nov 2026 | R2-P1-9, R1-13 | `4a6e4f1`…`1300b7a` | `Window.tsx`: `pickPanelTab` + `setPreview(false)` on progress part, Job description / other panel tabs, walk focus, open/close tab, toJob, version tab. Test in `employer-demo-no-fetch.test.tsx` (leave Preview → Eye back). **Agent confirmed on preview** (Communications Intern: Eye → Preview tab; About us part restores Eye, Preview tab gone; Eye → Job description tab restores Eye). |
+| 21 Nov 2026 | R2-P1-10, R1-12/20 partial | *(this commit)* | `--ej-touch: 44px` @ ≤1023; section icons / Chat·Job / Send / parts / pills / icons; touch tools opacity 1; sticky `.ej-edit-actions`; parts row flex+truncate; strip winning Eye/History/Approve inlines. Tests `employerDemoR2P110.test.ts` + phone no-fetch. Confirm on preview ~390px. |
 
 ---
 
@@ -332,7 +333,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 
 1. Read this file and `employer-side-plan.md` Phase 6 / polish status.  
 2. Confirm `demo/employer` tip and that English-first still holds.  
-3. **Default next:** **R2-P1-10** (mobile 44px+), after R2-P1-9 preview confirm. Or the user’s new priority.  
+3. **Default next:** remaining English chrome the user prioritises (R1-20 setup Cancel, R1-12 clip, R1-09 / R1-15 / R1-18, …). Or the user’s new priority.  
 4. Mark IDs Fixed in the tables and add a Fix log row in the same commit as the code.  
 5. Do not close Phase 7 until the user says English chrome is good enough.  
 6. Never stage leftover `apps/frontend/lib/__tests__/employerDemoPhase6Review.test.ts` or `apps/frontend/AGENTS.md` unless the user asks.
