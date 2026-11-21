@@ -110,6 +110,11 @@ export function PageField({ job, s, kind, open }: { job: DemoJob; s: State; kind
   const what = kind === 'about' ? 'About us' : 'About the project';
   const text = job.pageIntake?.[kind] ?? '';
   const setText = (v: string) => setPageIntake(job.id, kind, v.slice(0, MAX_TEXT));
+  // R2-P0-3: after Accept/clear, intake is empty — show what is already kept so the card does not look blank.
+  const kept =
+    kind === 'about'
+      ? (job.pack?.about?.text || s.org.about || '').trim()
+      : (job.pack?.project?.text || '').trim();
   const makeDraft = async (t: string, source: 'your website' | 'the project page' | 'you told us', social: string[] = []) => {
     setBusy(true);
     setNote('');
@@ -159,6 +164,11 @@ export function PageField({ job, s, kind, open }: { job: DemoJob; s: State; kind
         aria-label={`Text for ${what}`}
         disabled={ro}
       />
+      {!text.trim() && kept ? (
+        <p className="aj-faint m-0" style={{ fontSize: 12 }}>
+          Already kept: {kept.length > 160 ? `${kept.slice(0, 160)}…` : kept}
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-center gap-1.5">
         <button type="button" className="aj-pill" style={{ height: 30 }} disabled={busy || ro || !text.trim()} onClick={() => makeDraft(text, 'you told us')}>
           Draft from this text

@@ -48,6 +48,15 @@ import { profileFor, profileName, profileOf } from './profiles';
 import { aiWrites, ASKS, asksOf, checkPoints, contentPrint, essentials, ESSENTIAL_WORDS, FIXED_SECTIONS, isSettled, isWritten, nextStep, parkedIn, parkKey, sectionPublishBlock, stepKey, type Step } from './flow';
 import { AGAIN_DATE, AGAIN_PLACE, AGAIN_POSITIONS, INVITE, KEEP_ALL, KEEP_AS_IS, MARK_REVIEWED, NO_MORE_LANGS, NO_REVIEW, NOT_NOW, NOTHING_ELSE, REMIND, SEND_REVIEW, SHOW_FLYER, stateMessage, THIS_JOB } from './walkChat';
 import { ALL_GOOD, ABOUT_QUICK, APPROVE_FIXED, ASK_TEXT as WALK_ASK, CHANGE_NO, DISMISS_MARK, CHANGE_YES, CHOOSE_SDGS, fixedNamed, NO_SDGS, orgGoalsAnswer, GENUINE, GOOD, KEEP_FIXED, LEAVE_IT, NO_THANKS, NONE_OF_THESE, OTHER_WORDING, overview, paceIn, PACE_QUICK, PROJECT_QUICK, promptFor, readAnswer, readDetails, STYLE_QUICK, styleQuestion } from './walkChat';
+
+/** Lazy: `context` imports this file; a top-level import of `keepProfileAbout` is undefined under Jest's cycle. */
+function keepOrgAbout(id: string, said?: string) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  (require('./context') as typeof import('./context')).keepProfileAbout(id, said);
+}
+
+/** Same string as `KEEP_PROFILE_ABOUT` in context.ts (kept here to avoid the cycle above). */
+const KEEP_PROFILE_ABOUT = "Keep our profile's About us";
 import {
   addToGroup,
   applyOp,
@@ -1289,12 +1298,27 @@ function setupTurn(s: State, j: DemoJob, text: string): boolean {
   const say = (reply: string, quick?: string[]) => updateJob(j.id, (x) => ({ ...x, chat: [...x.chat, userMsg, msg('ai', reply, quick)] }));
   if (j.setup === 'about') {
     const t = text.trim();
-    if (t === ABOUT_QUICK[0] || /\b(keep|use).*(about|profile)|as it is\b/i.test(t) || YES.test(t)) {
+    const intake = j.pageIntake?.about?.trim();
+    if (t === ABOUT_QUICK[1] || t === 'Skip for now' || SKIP.test(t) || /\bskip\b|\blater\b|\bnot now\b/i.test(t)) {
       advanceFromAbout(j.id, text);
       return true;
     }
-    if (t === ABOUT_QUICK[1] || t === 'Skip for now' || SKIP.test(t) || /\bskip\b|\blater\b|\bnot now\b/i.test(t)) {
-      advanceFromAbout(j.id, text);
+    // Use / keep as it is: materialise org About into pack (and the About section when the template has one). R2-P0-3 / R1-03.
+    if (t === ABOUT_QUICK[0] || t === KEEP_PROFILE_ABOUT || /\b(keep|use).*(about|profile)|as it is\b/i.test(t)) {
+      keepOrgAbout(j.id, text);
+      return true;
+    }
+    // Bare yes/ok with a paste in the card must not advance or clear it (mirror project / R2-P0-3).
+    if (YES.test(t) && intake) {
+      say('Your paste is still in the card. Draft from it, clear it, or choose one of the answers.', s.org.about.trim() ? ABOUT_QUICK : ['Skip for now']);
+      return true;
+    }
+    if (YES.test(t)) {
+      if (s.org.about.trim()) {
+        keepOrgAbout(j.id, text);
+        return true;
+      }
+      say('Paste a page address in the card below, or choose one of the answers.', ['Skip for now']);
       return true;
     }
     // A URL or long paste is handled by the page field / card; otherwise nudge.

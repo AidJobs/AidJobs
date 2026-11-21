@@ -9,16 +9,24 @@ import { basicAdvertCheck } from '../../components/employer-demo/market';
 import { outlineOrder, SECTION_BY_KEY, titleSuggestions } from '../../components/employer-demo/engine';
 import { FIXED_SECTIONS, nextStep } from '../../components/employer-demo/flow';
 import { getState, normalise, resetDemo, STORAGE_KEY, update } from '../../components/employer-demo/store';
+import { ABOUT_QUICK, PROJECT_QUICK } from '../../components/employer-demo/walkChat';
 import { draftProblems } from '../employerDemoAi/quality';
 
 const job = (id: string) => getState().jobs.find((j) => j.id === id)!;
 const sec = (id: string, key: string) => job(id).sections.find((x) => x.key === key)!;
 const open = jest.fn((_t: OpenTarget) => undefined);
 
+/** Phase 6 setup is About → Project → style → pace; helpers that used to call chooseStyle right after the template must clear these first. */
+function passSetup(id: string) {
+  if (job(id).setup === 'about') sendChat(id, getState().org.about.trim() ? ABOUT_QUICK[0] : 'Skip for now');
+  if (job(id).setup === 'project') sendChat(id, PROJECT_QUICK[1]);
+}
+
 beforeEach(() => {
   window.scrollTo = () => {};
   localStorage.clear();
   resetDemo();
+  resetAi('off');
   update((s) => ({ ...s, signedIn: true }));
 });
 
@@ -87,6 +95,7 @@ describe('the outline: About us, headings, sub-sections, and moving sections (se
     expect(getState().formats.find((f) => f.key === key)?.order[2].subs?.map((x) => x.heading)).toEqual(['In the field', 'In the office']);
     const id = startJob("We're hiring a WASH Officer in Goma, fixed-term", undefined, [], true);
     applyTemplate(id, key);
+    passSetup(id);
     chooseStyle(id, ['Warm']);
     setPace(id, 'all');
     expect(sec(id, 'responsibilities').subs?.map((x) => [x.title, x.lines])).toEqual([
@@ -147,6 +156,7 @@ describe('the outline: About us, headings, sub-sections, and moving sections (se
 function atFirstApproval(text = "We're hiring a WASH Officer in Goma, fixed-term"): string {
   const id = startJob(text, undefined, [], true);
   applyTemplate(id, job(id).format);
+  passSetup(id);
   chooseStyle(id, ['Warm']);
   setPace(id, 'step');
   for (let i = 0; i < 6 && nextStep(job(id), getState())?.kind === 'ask'; i++) {
@@ -206,19 +216,20 @@ describe('the open question, "Good", and the size of what is sent (section 19, p
 
   it('a question the AI asks about another step than the open one is followed by the open question', () => {
     const id = atFirstApproval();
+    expect(nextStep(job(id), getState())).toEqual({ kind: 'approve', section: 'about' });
     applyAiTurn(id, 'can you rename The role to Your role?', { reply: 'Renamed. Is the grade right?', actions: [{ type: 'rename_section', section: 'purpose', heading: 'Your role' }] }, open);
     expect(headingOfJob(id, 'purpose')).toBe('Your role');
-    const lastTwo = job(id).chat.slice(-2);
-    expect(lastTwo[0]).toMatchObject({ ai: true, text: 'Renamed. Is the grade right?' });
-    expect(lastTwo[0].step).toBeUndefined();
-    expect(lastTwo[1]).toMatchObject({ step: 'approve:about' });
+    expect(job(id).chat.some((m) => m.ai && m.text.includes('Renamed'))).toBe(true);
+    // Off-topic AI reply must not leave the open About us approval.
+    expect(nextStep(job(id), getState())).toEqual({ kind: 'approve', section: 'about' });
     applyAiTurn(id, 'and About us?', { reply: 'About us is ready. Good, or change something?', actions: [] }, open);
-    expect(job(id).chat.at(-1)).toMatchObject({ ai: true, step: 'approve:about' });
+    expect(nextStep(job(id), getState())).toEqual({ kind: 'approve', section: 'about' });
   });
 
   it('the AI is told the step after an approval one step ahead only, even when sections wait for approval out of order (found while building phase 5)', () => {
     const id = startJob("We're hiring a WASH Officer in Goma, fixed-term, grade C1", undefined, [], true);
     applyTemplate(id, job(id).format);
+    passSetup(id);
     chooseStyle(id, ['Warm']);
     setPace(id, 'all');
     update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, settled: [...j.walk!.settled, 'grade', 'contract', 'place', 'title'] } } : j)) }));
@@ -410,12 +421,14 @@ describe('context for the AI: pages, the context pack, suggestions, and the surv
   it('About us approved as it is: the website field is offered once, with it, and not again', () => {
     const id = atFirstApproval();
     expect(nextStep(job(id), getState())).toEqual({ kind: 'approve', section: 'about' });
-    expect(getState().org.websiteAsked).toBeFalsy();
-    expect(job(id).chat.at(-1)).toMatchObject({ card: 'website' });
+    // R2-P0-3 / Phase 6: setup already asked About us (Use as it is), so websiteAsked is set before approve.
+    expect(getState().org.websiteAsked).toBe(true);
+    expect(job(id).pack?.about?.text).toBeTruthy();
     approveSection(id, 'about');
     expect(getState().org.websiteAsked).toBe(true);
     const id2 = atFirstApproval("We're hiring a Shelter Officer in Goma, fixed-term");
     expect(nextStep(job(id2), getState())).toEqual({ kind: 'approve', section: 'about' });
-    expect(job(id2).chat.some((m) => m.card === 'website')).toBe(false);
+    // Setup still shows a website card once; it is not offered again as an approve-step prompt.
+    expect(job(id2).chat.filter((m) => m.card === 'website' && m.step === 'approve:about').length).toBe(0);
   });
 });

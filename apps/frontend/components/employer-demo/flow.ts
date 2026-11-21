@@ -359,7 +359,11 @@ export function nextStep(job: DemoJob, s: State): Step | null {
   if (!isSettled('title', job)) return { kind: 'ask', fact: 'title' };
   const unwritten = job.tags.filter((k) => !isWritten(job, k));
   const all = w.pace === 'all';
-  if (all && unwritten.length && !job.tags.some((k) => !FIXED_SECTIONS.includes(k) && isWritten(job, k))) return { kind: 'write', sections: unwritten };
+  // R2-P0-3: About us kept from the organisation during setup (`pack.about`) may already fill that section; that must not block writing the rest in one go.
+  const alreadyWriting = job.tags.some(
+    (k) => !FIXED_SECTIONS.includes(k) && isWritten(job, k) && !(k === 'about' && Boolean(job.pack?.about?.text)),
+  );
+  if (all && unwritten.length && !alreadyWriting) return { kind: 'write', sections: unwritten };
   // The reading order, group by group; the facts asked before a section follow the section's own kind, wherever it is shown.
   for (const k of job.tags) {
     if (w.approved.includes(k) && isWritten(job, k)) continue;

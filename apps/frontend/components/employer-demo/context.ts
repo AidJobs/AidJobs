@@ -212,12 +212,44 @@ export function rejectPageDraft(id: string) {
   else goOn(id);
 }
 
-/** "Keep our profile's About us": the website is not asked again; the job keeps the organisation's About us. */
+/**
+ * "Use our About us as it is" / keep profile About (R2-P0-3 / R1-03): put org About into `pack.about`.
+ * When the template has an About us section, write it there; Local NGO concise and other formats without `about`
+ * keep pack-only context and say so plainly. Does not invent an About heading against the outline.
+ */
 export function keepProfileAbout(id: string, said?: string) {
+  const s0 = getState();
+  const about = s0.org.about.trim();
+  const user = (said?: string): ChatMsg[] => (said ? [{ id: `m${Math.random().toString(36).slice(2, 9)}`, from: 'user' as const, text: said }] : []);
+  if (!about) {
+    updateJob(id, (j) => ({
+      ...j,
+      chat: [...j.chat, ...user(said), say('You have no organisation About us yet. Paste a page or text in the card, or skip for now.')],
+    }));
+    return;
+  }
   update((s) => ({
     ...s,
     org: { ...s.org, websiteAsked: true },
-    jobs: s.jobs.map((j) => (j.id === id && said ? { ...j, chat: [...j.chat, { id: `m${Math.random().toString(36).slice(2, 9)}`, from: 'user', text: said }, say("Fine: About us stays as your profile has it. Your website can be read later from the About us section or Organisation settings.")] } : j)),
+    jobs: s.jobs.map((j) => {
+      if (j.id !== id) return j;
+      const hasAboutTag = j.tags.includes('about');
+      const lines = pageLinesOf(about);
+      const pack: ContextPack = { ...j.pack, about: { text: about, source: 'your website' } };
+      let tags = j.tags;
+      let sections = j.sections;
+      if (hasAboutTag && lines.length) {
+        const title = headingOf(s, j, 'about');
+        const existing = j.sections.find((x) => x.key === 'about');
+        const sec: Section = existing ? { ...existing, lines, ai: true, edited: undefined } : { key: 'about', title, lines, ai: true };
+        tags = placeIn(j.tags, 'about');
+        sections = existing ? j.sections.map((x) => (x.key === 'about' ? sec : x)) : inOutlineOrder([...j.sections, sec], tags);
+      }
+      const reply = hasAboutTag
+        ? "Fine: About us stays as your profile has it. Your website can be read later from the About us section or Organisation settings."
+        : "Fine: your organisation's About us is kept for writing this job. This format starts later in the outline, so it is not a separate section on the advert.";
+      return { ...j, tags, sections, pack, chat: [...j.chat, ...user(said), say(reply)] };
+    }),
   }));
   const after = getState().jobs.find((x) => x.id === id);
   if (after?.setup === 'about') advanceFromAbout(id);

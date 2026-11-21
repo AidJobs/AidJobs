@@ -21,7 +21,7 @@ import type { ChatMsg } from './types';
 import { aiOn, askAi, carryMessage, GO_ON, probeAi, useAi, whenAnswered, writeVersion } from './ai';
 import { amplifying, FIXED_SECTIONS, flyerStale, nextStep, outlineEditOpen, partOfStep, reachOpen, stepKey, walkAutoOpen } from './flow';
 import { readJobFile } from './readFile';
-import { CHOOSE_SDGS, INVITE, OTHER_WORDING, SHOW_FLYER, SKIP_APPROVAL, stateOffer } from './walkChat';
+import { ABOUT_QUICK, CHOOSE_SDGS, INVITE, OTHER_WORDING, PROJECT_QUICK, SHOW_FLYER, SKIP_APPROVAL, stateOffer } from './walkChat';
 import { STATE_DIALOGS, type OpenTarget } from './aiActions';
 import { changesSince, changeSummary } from './changes';
 import { openPoints } from './Checks';
@@ -753,7 +753,20 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus, open,
               </div>
             )}
             {m.from === 'ai' && m === last && m.ask && !reviewing && !busy && <AskAnswer job={job} s={s} kind={m.ask} onAnswered={() => setTimeout(() => input.current?.focus(), 0)} />}
-            {m.from === 'ai' && m.card && i === lastCard && i > lastUser && !reviewing && (m.card !== 'state' || !m.state || m.state === job.status) && <ChatCardView kind={m.card} job={job} s={s} open={open} act={act} />}
+            {m.from === 'ai' &&
+              m.card &&
+              !reviewing &&
+              (m.card !== 'state' || !m.state || m.state === job.status) &&
+              (() => {
+                // R2-P0-3: while setup is still about/project, keep the matching card live even after an intervening AI bubble hid lastCard.
+                const setupLive =
+                  (m.card === 'website' && job.setup === 'about') || (m.card === 'project' && job.setup === 'project');
+                if (setupLive) {
+                  const lastMatch = shown.reduce((acc, x, idx) => (x.card === m.card ? idx : acc), -1);
+                  return i === lastMatch;
+                }
+                return i === lastCard && i > lastUser;
+              })() && <ChatCardView kind={m.card} job={job} s={s} open={open} act={act} />}
           </div>
         ))}
         {reading && (
@@ -1301,7 +1314,16 @@ function JobWindow({ id }: { id: string }) {
     }
     if (text === CHOOSE_SDGS) setFact('sdgs');
     if (parkingReply(job, s, text)) return byRules(text);
-    const rulesAnswer = last?.from === 'ai' && !last.ai && Boolean(last.quick?.includes(text)) && text !== OTHER_WORDING;
+    // R2-P0-3: About/Project setup chips must hit setupTurn even when the last bubble is OpenRouter-tagged (stops About↔project loop).
+    const setupStageQuick =
+      (job.setup === 'about' || job.setup === 'project') &&
+      (text === ABOUT_QUICK[0] ||
+        text === ABOUT_QUICK[1] ||
+        text === PROJECT_QUICK[0] ||
+        text === PROJECT_QUICK[1] ||
+        text === 'Skip for now');
+    const rulesAnswer =
+      (last?.from === 'ai' && !last.ai && Boolean(last.quick?.includes(text)) && text !== OTHER_WORDING) || setupStageQuick;
     if (aiOn() && !rulesAnswer) {
       void askAi(job.id, text, { focus: focus ?? undefined, version: inVersion, open: (x) => openRef.current(x) }).then((done) => {
         if (!done) byRules(text);

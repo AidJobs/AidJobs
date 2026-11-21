@@ -44,7 +44,7 @@
 | --- | --- | --- | --- |
 | R1-01 | **Fixed** (U-3, 20 Nov 2026; open→write confirmed) | About/Background reading view shows parent lines + subs. JD helpers (URL/Read/Draft/Upload) live inside the open pencil editor, not a second always-on pad. | NGO, chrome |
 | R1-02 | **Fixed** (U-3, 20 Nov 2026; open→write confirmed) | Project yes/ok/sure no longer skips; bullet / short paste drafts via `you told us`. JD About/Project: open→write→Save/Cancel like other sections; chat setup card still draft-until-Accept. | NGO, INGO |
-| R1-03 | OPEN | “Use our About us as it is” on Local NGO concise adds no About us section (template starts at Project brief); chat says kept. | NGO |
+| R1-03 | **Fixed** (R2-P0-3, 21 Nov 2026) | “Use our About us as it is” sets `pack.about`; Local NGO concise stays pack-only with honest chat (no orphan About); templates with `about` write the section. | NGO |
 | R1-04 | **Fixed** (with U-2, 20 Nov 2026) | Undo / remove / walk: focus steal to Market; remove can mount Market without scroll; lingering `lastChange`/`undoStep` permanently skips later Market open; chat Undo may not pin part. | Chrome, INGO, U-2 |
 | R1-05 | **Fixed** (U-2 + note-hide follow-up, 20 Nov 2026) | Removed note auto-dismiss (~2s) called `dismissChange` and deleted Undo. Now the note hides in the UI only; `undoStep` stays for chat Undo until the next change. | Chrome |
 | R1-06 | **Fixed** (20 Nov 2026; Step A `eccb4a7`) | Approve hidden while pencil open; Save that changes text clears `walk.approved` for that section (`editSection` / project Save). | User confirmed on preview, 20 Nov 2026 |
@@ -238,7 +238,7 @@ Full **icon inventory table** (Eye, History, progress, tabs, X, Approve, pencil,
 | --- | --- | --- |
 | R2-P0-1 | ~~**Free publish with empty / placeholder sections**~~ **Fixed 21 Nov 2026** (user confirmed on preview) | [Novice NGO R2](8442906c-3d03-4b4a-8a45-575f31966a17) #6 |
 | R2-P0-2 | ~~**Sample org (Riverstone) on local NGO path**~~ **Fixed 21 Nov 2026** (Tumaini preset + recommendation ranking; user confirmed on preview, including live Key responsibilities local-scale) | Novice #1,5,7,14 |
-| R2-P0-3 | **About/Project setup leftovers** (after U-3): chat card hides org/pack text; About-stage yes/ok still advances and clears paste; “Use our About us as it is” does not set `pack.about` / R1-03; setup card vanishes + setup quick picks go to AI when `last.ai` (About↔project loop). ~~Absorbed by U-3:~~ project yes/ok paste wipe; Accept auto-approve + Undo; JD parent+sub / open→write | Design, Chat, Chrome, Novice, Sam; R1-03 |
+| R2-P0-3 | ~~**About/Project setup leftovers**~~ **Fixed 21 Nov 2026** (`keepProfileAbout` → pack; About yes+paste guard; setup chips always rules; sticky about/project card; “Already kept” on empty intake). Confirm on preview. ~~Absorbed earlier by U-3:~~ project yes/ok paste wipe; Accept auto-approve + Undo; JD parent+sub / open→write | Design, Chat, Chrome, Novice, Sam; R1-03 |
 | R2-P0-4 | **Project Save renames heading; grip has no Project when `background` exists** | U-4, all persona chrome |
 | R2-P0-5 | **Approve ignores pencil / PageField; section Approve vanishes with no mark** | Chrome, Design, Sam, Novice |
 | R2-P0-6 | ~~**Remove Undo deleted at 2s** (`dismissChange`)~~ **Fixed with U-2 (20 Nov 2026)** | Chrome, Chat, Design, UN, Novice |
@@ -313,7 +313,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 20–21 Nov 2026 | R1-28 | `97e7fde` | Pencil Save on How to apply no longer opens the fields card at the top of the JD. User confirmed on preview, 21 Nov 2026. |
 | 21 Nov 2026 | R2-P0-1 | `9fb0b76` | Empty / unfinished outline sections block every publish route (`sectionPublishBlock`); Publish CTA shows the reason. User confirmed on preview (empty + `[Duty station]` + clear after fill). |
 | 21 Nov 2026 | R2-P0-2 | `b7a1787` | Tumaini Community Trust sample preset (local NGO); demo chrome switch; template `others` prefer org-type family; apply email / Tumaini commitments / AI `orgType: ngo` / Google title. User confirmed on preview the same day (preset switch, Local NGO concise path, live Key responsibilities without cluster/Sphere/donor/MEAL). |
-| 21 Nov 2026 | R2-P0-3 (scope) | — | Investigation only: U-3 already closed project yes/ok wipe, Accept auto-approve, JD dual-body. Remaining = setup card loop, About yes+paste, Use-as-is → pack (R1-03), chat field empty after Accept. Plan next. |
+| 21 Nov 2026 | R2-P0-3, R1-03 | (this push) | `keepProfileAbout` sets `pack.about` (+ About section when tagged); About yes with paste does not advance; setup About/Project chips always rules even if `last.ai`; sticky website/project card while setup open; PageField “Already kept” when intake empty; write-all not blocked by setup-kept About. Confirm on preview. |
 
 ---
 

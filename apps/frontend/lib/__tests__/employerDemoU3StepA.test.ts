@@ -57,6 +57,7 @@ describe('U-3 Step A: About us / Project Save and paste', () => {
     expect(job(id).setup).toBe('about');
     sendChat(id, 'yes');
     expect(job(id).setup).toBe('project');
+    expect(job(id).pack?.about?.text).toMatch(/Riverstone Aid/);
     setPageIntake(id, 'project', 'Paste that must stay while yes is ignored');
     sendChat(id, 'yes');
     expect(job(id).setup).toBe('project');
