@@ -237,8 +237,8 @@ Full **icon inventory table** (Eye, History, progress, tabs, X, Approve, pencil,
 | ID | Finding | Round 2 sources |
 | --- | --- | --- |
 | R2-P0-1 | ~~**Free publish with empty / placeholder sections**~~ **Fixed 21 Nov 2026** (user confirmed on preview) | [Novice NGO R2](8442906c-3d03-4b4a-8a45-575f31966a17) #6 |
-| R2-P0-2 | ~~**Sample org (Riverstone) on local NGO path**~~ **Fixed 21 Nov 2026** (Tumaini preset + recommendation ranking; confirm on preview) | Novice #1,5,7,14 |
-| R2-P0-3 | **About/Project: form hides saved text; yes/ok wipes paste; dual buffers; Accept auto-approves** | Design, Chat, Chrome, Novice, Sam |
+| R2-P0-2 | ~~**Sample org (Riverstone) on local NGO path**~~ **Fixed 21 Nov 2026** (Tumaini preset + recommendation ranking; user confirmed on preview, including live Key responsibilities local-scale) | Novice #1,5,7,14 |
+| R2-P0-3 | **About/Project setup leftovers** (after U-3): chat card hides org/pack text; About-stage yes/ok still advances and clears paste; “Use our About us as it is” does not set `pack.about` / R1-03; setup card vanishes + setup quick picks go to AI when `last.ai` (About↔project loop). ~~Absorbed by U-3:~~ project yes/ok paste wipe; Accept auto-approve + Undo; JD parent+sub / open→write | Design, Chat, Chrome, Novice, Sam; R1-03 |
 | R2-P0-4 | **Project Save renames heading; grip has no Project when `background` exists** | U-4, all persona chrome |
 | R2-P0-5 | **Approve ignores pencil / PageField; section Approve vanishes with no mark** | Chrome, Design, Sam, Novice |
 | R2-P0-6 | ~~**Remove Undo deleted at 2s** (`dismissChange`)~~ **Fixed with U-2 (20 Nov 2026)** | Chrome, Chat, Design, UN, Novice |
@@ -312,7 +312,8 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 20 Nov 2026 | R1-11 (item 5 Step B) | `732a06f`…`9e4ae13` | Add panel: Enter commits; Escape/blur cancel; Add your own under every group; Enter-add keeps JD scroll (`9e4ae13`). User confirmed on preview. |
 | 20–21 Nov 2026 | R1-28 | `97e7fde` | Pencil Save on How to apply no longer opens the fields card at the top of the JD. User confirmed on preview, 21 Nov 2026. |
 | 21 Nov 2026 | R2-P0-1 | `9fb0b76` | Empty / unfinished outline sections block every publish route (`sectionPublishBlock`); Publish CTA shows the reason. User confirmed on preview (empty + `[Duty station]` + clear after fill). |
-| 21 Nov 2026 | R2-P0-2 | `b7a1787` | Tumaini Community Trust sample preset (local NGO); demo chrome switch; template `others` prefer org-type family; apply email / Tumaini commitments / AI `orgType: ngo` / Google title. Confirm on preview. |
+| 21 Nov 2026 | R2-P0-2 | `b7a1787` | Tumaini Community Trust sample preset (local NGO); demo chrome switch; template `others` prefer org-type family; apply email / Tumaini commitments / AI `orgType: ngo` / Google title. User confirmed on preview the same day (preset switch, Local NGO concise path, live Key responsibilities without cluster/Sphere/donor/MEAL). |
+| 21 Nov 2026 | R2-P0-3 (scope) | — | Investigation only: U-3 already closed project yes/ok wipe, Accept auto-approve, JD dual-body. Remaining = setup card loop, About yes+paste, Use-as-is → pack (R1-03), chat field empty after Accept. Plan next. |
 
 ---
 
