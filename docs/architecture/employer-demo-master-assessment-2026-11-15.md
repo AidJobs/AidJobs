@@ -20,7 +20,7 @@
 
 5. ~~Approve vs unsaved buffers; Add-panel blur/Escape~~ — **Fixed 20 Nov 2026** (Step A R1-06; Step B R1-11; user confirmed on preview)
 
-**Next (21 Nov 2026, after R1-10 / R2-P1-4 group drops + remove-group rehome built):** **R2-P1-6** (opening brief pay/date on AI path). Phase 7 held. Confirm group-drop bar + remove-group rehome on preview first.
+**Next (21 Nov 2026, after R1-10 / R2-P1-4 confirmed on preview):** **R2-P1-6** (opening brief pay/date on AI path). Phase 7 held.
 
 ---
 
@@ -58,7 +58,7 @@
 | ID | Status | Fault |
 | --- | --- | --- |
 | R1-09 | OPEN (partial) | **U-1 placement Fixed 20 Nov 2026.** Still open: Publish early while Languages/Review in +N; icons hidden until writing; phone parts over icons. |
-| R1-10 | **Fixed** (21 Nov 2026; click/drag U-4 B; fake Moved `7475fda`; group drops + rehome) | Grip threshold 12px; fake “Moved” at ends closed; outline group drag shows `data-group-drop` insertion bar; `removeGroup` rehomes sections (catalog → own group; custom → previous/next/`job`); Undo restores; AI path same. Draft has no group grips (by design). Confirm on preview. |
+| R1-10 | **Fixed** (21 Nov 2026; click/drag U-4 B; fake Moved `7475fda`; group drops + rehome; agent confirmed on preview) | Grip threshold 12px; fake “Moved” at ends closed; outline group drag shows `data-group-drop` insertion bar; `removeGroup` rehomes sections (catalog → own group; custom → previous/next/`job`); Undo restores; AI path same. Draft has no group grips (by design). |
 | R1-11 | **Fixed** (20 Nov 2026; Step B `732a06f`…`9e4ae13`) | Enter commits; blur/Escape cancel. Add your own under every group. After Enter-add, JD scroll preserved (no jump to top). | User confirmed on preview, 20 Nov 2026 |
 | R1-12 | OPEN | Section header row: Approve/Undo/Also-in clip; pencil/grip hard on narrow/touch (opacity 0.45). |
 | R1-13 | OPEN | Preview Eye vanishes while Preview tab stays after picking a progress part. |
@@ -253,7 +253,7 @@ Full **icon inventory table** (Eye, History, progress, tabs, X, Approve, pencil,
 | R2-P1-1 | **(1) U-1** | **Placement Fixed 20 Nov 2026** (user confirmed). Still open: +N ordering (Publish early), phone sheet, Eye hidden until sections |
 | R2-P1-2 | **(2) Fixed with U-2** | Chat `undo` vs `undoStep`; remove dismiss |
 | R2-P1-3 | **(3)** | Save/Cancel semantics; setup card no Save; 40-char draft rule |
-| R2-P1-4 | **(4)/(5) Fixed** (21 Nov 2026) | Grip click Fixed (U-4 B); Add blur/Escape Fixed (R1-11); fake “Moved” at ends Fixed; group drop insertion bar + remove-group rehome Fixed (confirm on preview) |
+| R2-P1-4 | **(4)/(5) Fixed** (21 Nov 2026) | Grip click Fixed (U-4 B); Add blur/Escape Fixed (R1-11); fake “Moved” at ends Fixed; group drop insertion bar + remove-group rehome Fixed (agent confirmed on preview) |
 | R2-P1-5 | **(5) partial Fixed** | Approve vs buffer Fixed (R1-06); Approved mark Fixed (R1-19 / R2-P0-5). Still open: Approve triple meaning across chat / fixed texts |
 | R2-P1-6 | NEW | **Opening brief facts wrong** (pay/date on AI path) — Sam, verify with tests |
 | R2-P1-7 | NEW | **House format + UN chips before NGO template** — Sam, Novice |
@@ -319,7 +319,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 21 Nov 2026 | R2-P0-4 | `b4a4185` | Project pencil Save no longer renames the Background/Project brief heading (body via `savePageFieldText` / `intoSection` only; Heading hidden in project editor). Grip offers **Add About the project** when `background` exists without that sub. Confirm on preview. |
 | 21 Nov 2026 | R2-P0-5, R1-19 | `2f17568` | Section header shows **Approved** chip after Approve while walk is active; R1-06 already hid Approve during pencil and cleared approval on Save. Confirm on preview. |
 | 21 Nov 2026 | R1-10 / R2-P1-4 (fake Moved) | `7475fda` | Move up on first / Move down on last: no “Moved” announce, menu items disabled (`off`), `outlineOp`/`versionOp` leave tags and undoStep unchanged. Confirmed on preview (first Move up disabled + empty status; last Move down disabled). |
-| 21 Nov 2026 | R1-10 / R2-P1-4 (group drop + remove-group) | `d77138e`…`3f53f82` | Outline: string `data-group-drop` + sage insertion bar while dragging a group; keyboard `groupBy` unchanged. `removeCustomGroup` / `rehomeTarget`: remove empty custom group only, rehome sections (catalog → own; custom → prev/next/`job`); `outlineOp` / `versionOp` / `applyToEntries` / AI `remove_group`. Undo restores. Confirm on preview. |
+| 21 Nov 2026 | R1-10 / R2-P1-4 (group drop + remove-group) | `d77138e`…`3f53f82` | Outline: string `data-group-drop` + sage insertion bar while dragging a group; keyboard `groupBy` unchanged. `removeCustomGroup` / `rehomeTarget`: remove empty custom group only, rehome sections (catalog → own; custom → prev/next/`job`); `outlineOp` / `versionOp` / `applyToEntries` / AI `remove_group`. Undo restores. Agent confirmed on preview (drop bar + status while dragging; Annex + Kit list → remove → Kit under Applying; keyboard move group). |
 
 ---
 
@@ -327,7 +327,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 
 1. Read this file and `employer-side-plan.md` Phase 6 / polish status.  
 2. Confirm `demo/employer` tip and that English-first still holds.  
-3. **Default next:** confirm R1-10 / R2-P1-4 group-drop + remove-group on preview if not yet; then **R2-P1-6** (opening brief pay/date). Or the user’s new priority.  
+3. **Default next:** **R2-P1-6** (opening brief pay/date). Or the user’s new priority.  
 4. Mark IDs Fixed in the tables and add a Fix log row in the same commit as the code.  
 5. Do not close Phase 7 until the user says English chrome is good enough.  
 6. Never stage leftover `apps/frontend/lib/__tests__/employerDemoPhase6Review.test.ts` or `apps/frontend/AGENTS.md` unless the user asks.
