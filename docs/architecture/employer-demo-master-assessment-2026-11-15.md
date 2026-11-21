@@ -240,7 +240,7 @@ Full **icon inventory table** (Eye, History, progress, tabs, X, Approve, pencil,
 | R2-P0-2 | ~~**Sample org (Riverstone) on local NGO path**~~ **Fixed 21 Nov 2026** (Tumaini preset + recommendation ranking; user confirmed on preview, including live Key responsibilities local-scale) | Novice #1,5,7,14 |
 | R2-P0-3 | ~~**About/Project setup leftovers**~~ **Fixed 21 Nov 2026** (user confirmed on preview, including Urmul **Read this page** → Accept → `pack.about`) | Design, Chat, Chrome, Novice, Sam; R1-03 |
 | R2-P0-4 | ~~**Project Save renames heading; grip has no Project when `background` exists**~~ **Fixed 21 Nov 2026** (project Save body-only / no Heading rename; grip **Add About the project** when background exists without that sub; confirmed on preview) | U-4, all persona chrome |
-| R2-P0-5 | ~~**Approve ignores pencil / PageField; section Approve vanishes with no mark**~~ **Fixed 21 Nov 2026** (R1-06 already covered pencil/buffer; R1-19 **Approved** chip on section header). Confirm on preview. | Chrome, Design, Sam, Novice |
+| R2-P0-5 | ~~**Approve ignores pencil / PageField; section Approve vanishes with no mark**~~ **Fixed 21 Nov 2026** (R1-06 already covered pencil/buffer; R1-19 **Approved** chip on section header; confirmed on preview) | Chrome, Design, Sam, Novice |
 | R2-P0-6 | ~~**Remove Undo deleted at 2s** (`dismissChange`)~~ **Fixed with U-2 (20 Nov 2026)** | Chrome, Chat, Design, UN, Novice |
 | R2-P0-7 | ~~**Undo / chat undo / `lastChange` → Market or stuck progress line**~~ **Fixed with U-2 (20 Nov 2026)** | U-2, Chat #7, Sam #9 |
 
