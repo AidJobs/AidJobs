@@ -393,6 +393,16 @@ export function versionOp(id: string, lang: JobLang, op: OutlineOp) {
       if (op.op === 'remove' && (KEPT.includes(op.key) || !v.keys.includes(op.key) || v.keys.length < 2)) return j;
       if (op.op === 'add' && (v.keys.includes(op.key) || !SECTION_BY_KEY[op.key])) return j;
       const placed = applyOp(v.keys, { ...v.grouping, customGroups: t.customGroups }, op);
+      // Same honesty as outlineOp: Move up/down at the ends must not create a fake “Moved” undo (R1-10 leftover).
+      if (
+        op.op !== 'add' &&
+        op.op !== 'remove' &&
+        placed.keys.join() === v.keys.join() &&
+        JSON.stringify({ groupOrder: placed.grouping.groupOrder, groupOf: placed.grouping.groupOf }) ===
+          JSON.stringify({ groupOrder: v.grouping.groupOrder, groupOf: v.grouping.groupOf })
+      ) {
+        return j;
+      }
       const sections = op.op === 'add' ? [...v.sections, draftIn(s, j, op.key, lang)] : v.sections.filter((x) => placed.keys.includes(x.key));
       const next = withView({ ...touched(j), ...liveEdit(j) }, lang, { ...v, keys: placed.keys, grouping: placed.grouping, sections });
       if (next === j) return j;

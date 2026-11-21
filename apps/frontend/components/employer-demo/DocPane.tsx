@@ -12,7 +12,7 @@ import { PageFillTools } from './ContextCards';
 import { viewOf } from './langs';
 import { jobLang, langOf } from './translate';
 import { placeFor } from './MenuButton';
-import { groupLabelOf, groupOfKey, groupOrderOf, KEPT, placeSaid } from './outline';
+import { groupLabelOf, groupOfKey, groupOrderOf, grouped, KEPT, placeSaid } from './outline';
 import { contractPicks, deadlinePicks, eligibilityPicks, gradePicks, languagePicks, methodPicks, placePatch, placePicks, salaryPicks, safeguardingPicks, type Pick } from './answers';
 import { DOCUMENTS } from './apply';
 import { PROJECT_SECTION, saveAboutForOrg, savePageFieldText } from './context';
@@ -948,52 +948,66 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inW
   const g = groupingOf(job);
   const keys = job.walk ? job.tags : inOutlineOrder(job.sections, job.tags).map((x) => x.key);
   const [said, setSaid] = useState('');
+  const reading = grouped(job.tags, g);
   // Each move is announced with the section's new place (section 19, phase 6, C), and the grip keeps the focus.
+  // R1-10 leftover: do not announce “Moved” when Move up/down is a no-op at the ends.
   const focusGrip = (key: string) => {
     const now = getState().jobs.find((x) => x.id === job.id);
     if (now) setSaid(`Moved. ${placeSaid(now.tags, groupingOf(now), key, now.sections.find((x) => x.key === key)?.title ?? key)}, ${now.tags.indexOf(key) + 1} of ${now.tags.length} in the job description`);
     requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-grip-key="${key}"]`)?.focus({ preventScroll: true }));
   };
+  const moveByReading = (key: string, by: -1 | 1) => {
+    const before = getState().jobs.find((x) => x.id === job.id);
+    if (!before) return;
+    const tagsBefore = before.tags.join();
+    const groupBefore = JSON.stringify(groupingOf(before));
+    outlineOp(job.id, { op: 'by', key, by, reading: true });
+    const after = getState().jobs.find((x) => x.id === job.id);
+    if (!after || (after.tags.join() === tagsBefore && JSON.stringify(groupingOf(after)) === groupBefore)) return;
+    focusGrip(key);
+  };
   const openAdd = (after: string | null, anchor: HTMLElement | null, end: boolean) => anchor && setAdding({ after, anchor, end });
   const tools: DraftTools | undefined = icons
     ? {
-        grip: (sec) => [
-          { label: 'Move up', run: () => (outlineOp(job.id, { op: 'by', key: sec.key, by: -1, reading: true }), focusGrip(sec.key)) },
-          { label: 'Move down', run: () => (outlineOp(job.id, { op: 'by', key: sec.key, by: 1, reading: true }), focusGrip(sec.key)) },
-          { label: 'Move to group…', items: groupOrderOf(g).filter((x) => x !== groupOfKey(g, sec.key)).map((x) => ({ label: groupLabelOf(x, job.customGroups), run: () => (outlineOp(job.id, { op: 'toGroup', key: sec.key, group: x }), focusGrip(sec.key)) })) },
-          { label: 'Add a section below', run: () => openAdd(sec.key, document.querySelector<HTMLElement>(`[data-grip-key="${sec.key}"]`), false) },
-          // U-4 / R2-P0-4: missing background → Add format heading; background without "About the project" sub → add that sub only.
-          ...(!keys.includes(PROJECT_SECTION)
-            ? [
-                {
-                  label: `Add ${headingFor(PROJECT_SECTION, formatOf(s, job.format))}`,
-                  run: () => {
-                    outlineOp(job.id, { op: 'add', key: PROJECT_SECTION, after: sec.key });
-                    focusGrip(PROJECT_SECTION);
-                  },
-                },
-              ]
-            : (() => {
-                const bg = job.sections.find((x) => x.key === PROJECT_SECTION);
-                if (!bg || bg.subs?.some((sb) => sb.title === PROJECT_SUB)) return [];
-                return [
+        grip: (sec) => {
+          const at = reading.indexOf(sec.key);
+          const first = at <= 0;
+          const last = at < 0 || at >= reading.length - 1;
+          return [
+            { label: 'Move up', off: first ? 'It is first in the job description' : undefined, run: () => moveByReading(sec.key, -1) },
+            { label: 'Move down', off: last ? 'It is last in the job description' : undefined, run: () => moveByReading(sec.key, 1) },
+            { label: 'Move to group…', items: groupOrderOf(g).filter((x) => x !== groupOfKey(g, sec.key)).map((x) => ({ label: groupLabelOf(x, job.customGroups), run: () => (outlineOp(job.id, { op: 'toGroup', key: sec.key, group: x }), focusGrip(sec.key)) })) },
+            { label: 'Add a section below', run: () => openAdd(sec.key, document.querySelector<HTMLElement>(`[data-grip-key="${sec.key}"]`), false) },
+            // U-4 / R2-P0-4: missing background → Add format heading; background without "About the project" sub → add that sub only.
+            ...(!keys.includes(PROJECT_SECTION)
+              ? [
                   {
-                    label: `Add ${PROJECT_SUB}`,
+                    label: `Add ${headingFor(PROJECT_SECTION, formatOf(s, job.format))}`,
                     run: () => {
-                      changeSub(job.id, PROJECT_SECTION, { add: PROJECT_SUB });
-                      document.getElementById(`ej-sec-${PROJECT_SECTION}`)?.scrollIntoView({ block: 'nearest' });
+                      outlineOp(job.id, { op: 'add', key: PROJECT_SECTION, after: sec.key });
                       focusGrip(PROJECT_SECTION);
                     },
                   },
-                ];
-              })()),
-          ...(KEPT.includes(sec.key) ? [] : [{ label: 'Remove', danger: true, run: () => outlineOp(job.id, { op: 'remove', key: sec.key }) }]),
-          ...(sec.key === 'about' && s.me.role === 'owner' && sec.lines.length > 0 && sec.lines.join('\n').trim() !== s.org.about.trim() ? [{ label: 'Save as our About us', run: () => saveAboutForOrg(job.id) }] : []),
-        ],
-        onKey: (key, by) => {
-          outlineOp(job.id, { op: 'by', key, by, reading: true });
-          focusGrip(key);
+                ]
+              : (() => {
+                  const bg = job.sections.find((x) => x.key === PROJECT_SECTION);
+                  if (!bg || bg.subs?.some((sb) => sb.title === PROJECT_SUB)) return [];
+                  return [
+                    {
+                      label: `Add ${PROJECT_SUB}`,
+                      run: () => {
+                        changeSub(job.id, PROJECT_SECTION, { add: PROJECT_SUB });
+                        document.getElementById(`ej-sec-${PROJECT_SECTION}`)?.scrollIntoView({ block: 'nearest' });
+                        focusGrip(PROJECT_SECTION);
+                      },
+                    },
+                  ];
+                })()),
+            ...(KEPT.includes(sec.key) ? [] : [{ label: 'Remove', danger: true, run: () => outlineOp(job.id, { op: 'remove', key: sec.key }) }]),
+            ...(sec.key === 'about' && s.me.role === 'owner' && sec.lines.length > 0 && sec.lines.join('\n').trim() !== s.org.about.trim() ? [{ label: 'Save as our About us', run: () => saveAboutForOrg(job.id) }] : []),
+          ];
         },
+        onKey: (key, by) => moveByReading(key, by),
         onDrag: (key, y, finished) => {
           if (y === null) return setDropAfter(undefined);
           const at = dropAt(root.current, y, key);

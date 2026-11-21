@@ -7,7 +7,8 @@ import { dismissToUpdate, editVersionSection, keepTranslation, refreshTranslatio
 import { AddPanel, StepNote, useRemovedNoteHidden } from './DocPane';
 import FixedBlock from './FixedBlock';
 import Grip, { dropAt, type GripAction } from './Grip';
-import { groupLabelOf, groupOfKey, groupOrderOf, KEPT } from './outline';
+import { groupLabelOf, groupOfKey, groupOrderOf, grouped, KEPT } from './outline';
+import { getState } from './store';
 import { jobLang, langOf, stale, stillOwn, totalLines, untranslated, versionsOf } from './translate';
 import type { DemoJob, GroupKey, JobLang, Section, State } from './types';
 import { inputStyle, radioKeys } from './ui';
@@ -233,22 +234,36 @@ export function LangDoc({ job, s, lang, readOnly = false }: { job: DemoJob; s: S
   const isStale = stale(job, t);
   const keys = t.sections.map((x) => x.key);
   const g = { groupOrder: t.groupOrder, groupOf: t.groupOf, customGroups: t.customGroups };
+  const reading = grouped(keys, g);
   const focusGrip = (key: string) => requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-grip-key="ver:${key}"]`)?.focus({ preventScroll: true }));
+  // R1-10 leftover: skip refocus announce path when Move up/down is a no-op at the ends.
+  const moveByReading = (key: string, by: -1 | 1) => {
+    const before = getState().jobs.find((x) => x.id === job.id)?.translations?.[lang];
+    if (!before) return;
+    const keysBefore = before.sections.map((x) => x.key).join();
+    const groupBefore = JSON.stringify({ groupOrder: before.groupOrder, groupOf: before.groupOf });
+    versionOp(job.id, lang, { op: 'by', key, by, reading: true });
+    const after = getState().jobs.find((x) => x.id === job.id)?.translations?.[lang];
+    if (!after || (after.sections.map((x) => x.key).join() === keysBefore && JSON.stringify({ groupOrder: after.groupOrder, groupOf: after.groupOf }) === groupBefore)) return;
+    focusGrip(key);
+  };
   const openAdd = (after: string | null, anchor: HTMLElement | null, end: boolean) => anchor && setAdding({ after, anchor, end });
   const tools: Tools | undefined = readOnly
     ? undefined
     : {
-        grip: (sec) => [
-          { label: 'Move up', run: () => (versionOp(job.id, lang, { op: 'by', key: sec.key, by: -1, reading: true }), focusGrip(sec.key)) },
-          { label: 'Move down', run: () => (versionOp(job.id, lang, { op: 'by', key: sec.key, by: 1, reading: true }), focusGrip(sec.key)) },
-          { label: 'Move to group…', items: groupOrderOf(g).filter((x) => x !== groupOfKey(g, sec.key)).map((x) => ({ label: groupLabelOf(x, t.customGroups), run: () => (versionOp(job.id, lang, { op: 'toGroup', key: sec.key, group: x }), focusGrip(sec.key)) })) },
-          { label: 'Add a section below', run: () => openAdd(sec.key, document.querySelector<HTMLElement>(`[data-grip-key="ver:${sec.key}"]`), false) },
-          ...(KEPT.includes(sec.key) ? [] : [{ label: 'Remove', danger: true, run: () => versionOp(job.id, lang, { op: 'remove', key: sec.key }) }]),
-        ],
-        onKey: (key, by) => {
-          versionOp(job.id, lang, { op: 'by', key, by, reading: true });
-          focusGrip(key);
+        grip: (sec) => {
+          const at = reading.indexOf(sec.key);
+          const first = at <= 0;
+          const last = at < 0 || at >= reading.length - 1;
+          return [
+            { label: 'Move up', off: first ? 'It is first in the job description' : undefined, run: () => moveByReading(sec.key, -1) },
+            { label: 'Move down', off: last ? 'It is last in the job description' : undefined, run: () => moveByReading(sec.key, 1) },
+            { label: 'Move to group…', items: groupOrderOf(g).filter((x) => x !== groupOfKey(g, sec.key)).map((x) => ({ label: groupLabelOf(x, t.customGroups), run: () => (versionOp(job.id, lang, { op: 'toGroup', key: sec.key, group: x }), focusGrip(sec.key)) })) },
+            { label: 'Add a section below', run: () => openAdd(sec.key, document.querySelector<HTMLElement>(`[data-grip-key="ver:${sec.key}"]`), false) },
+            ...(KEPT.includes(sec.key) ? [] : [{ label: 'Remove', danger: true, run: () => versionOp(job.id, lang, { op: 'remove', key: sec.key }) }]),
+          ];
         },
+        onKey: (key, by) => moveByReading(key, by),
         onDrag: (key, y, finished) => {
           if (y === null) return setDropAfter(undefined);
           const at = dropAt(root.current, y, key);

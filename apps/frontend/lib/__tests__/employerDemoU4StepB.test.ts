@@ -1,6 +1,6 @@
 /**
  * U-4 Step B (20 November 2026): grip click vs drag — a small wobble must not start a drag (menu still opens on click).
- * Naming / Add was Step A. Rest of R1-10 (fake Moved, group drops) stays open.
+ * Naming / Add was Step A. Fake “Moved” at ends closed in R1-10 leftover (`employerDemoR1_10Ends.test.ts`); group drops stay open.
  */
 import { describe, expect, it } from '@jest/globals';
 import { GRIP_DRAG_PX, gripMovedEnough } from '../../components/employer-demo/Grip';

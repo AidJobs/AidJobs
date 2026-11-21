@@ -34,7 +34,7 @@
 | U-1 | **Fixed** (20 Nov 2026) | Progress line on the **job panel** (phase 3), flush under the window header; measure-row bug removed; header and progress hairlines removed; chat in `aj-card` aligned with the progress line; `+N` clear of the connector; side menu resizable (drag open/close) with open/closed remembered. | User confirmed on preview, 20 Nov 2026 |
 | U-2 | **Fixed** (20 Nov 2026) | Undo / remove / walk no longer open Market over the JD; chat undo and `lastChange` pin like icon Undo. Removed note hides after ~2s **without** clearing `undoStep` (polish `3f0f4c4` + R1-05; U-2 had wrongly left the note forever). | User confirmed on preview, 20 Nov 2026 (Market steal + Removed note hide) |
 | U-3 | **Fixed** (20 Nov 2026; Step A/B; JD open→write→Save/Cancel `6670de3`) | Step A/B as before. Follow-up: About us / Project match other sections — pencil opens one box with Save/Cancel; link/Read/Draft/Upload fill that same box (no always-on second pad). Project Save still uses `intoSection` (no heading rename / parent wipe). Chat window PageField still uses draft card Accept. | User confirmed on preview, 20 Nov 2026 |
-| U-4 | **Fixed** (20 Nov 2026; Step A `314a4b0`, Step B `b7fbbf4`) | Step A: one `background` slot; Add uses format heading; no force-rename; no duplicate Project chip. Step B: grip drag threshold 3→12px so a normal press opens the menu (R1-10 click part). Rest of R1-10 (fake Moved, group drops) stays open. | User confirmed Step A and Step B on preview, 20 Nov 2026 |
+| U-4 | **Fixed** (20 Nov 2026; Step A `314a4b0`, Step B `b7fbbf4`) | Step A: one `background` slot; Add uses format heading; no force-rename; no duplicate Project chip. Step B: grip drag threshold 3→12px so a normal press opens the menu (R1-10 click part). Fake Moved at ends closed 21 Nov 2026 (R1-10 leftover); group drops still open. | User confirmed Step A and Step B on preview, 20 Nov 2026 |
 
 ### B. Combined open findings (Round 1)
 
@@ -56,7 +56,7 @@
 | ID | Status | Fault |
 | --- | --- | --- |
 | R1-09 | OPEN (partial) | **U-1 placement Fixed 20 Nov 2026.** Still open: Publish early while Languages/Review in +N; icons hidden until writing; phone parts over icons. |
-| R1-10 | OPEN (partial: click/drag Fixed in U-4 Step B) | Grip drag threshold raised 3→12px (menu click). Still open: Move up/down says “Moved” at ends; no group drop targets; remove group deletes its sections. |
+| R1-10 | OPEN (partial: click/drag Fixed in U-4 Step B; fake Moved Fixed 21 Nov 2026) | Grip drag threshold raised 3→12px (menu click). Fake “Moved” at ends closed (announce + disabled menu + no undoStep). Still open: no group drop targets; remove group deletes its sections. |
 | R1-11 | **Fixed** (20 Nov 2026; Step B `732a06f`…`9e4ae13`) | Enter commits; blur/Escape cancel. Add your own under every group. After Enter-add, JD scroll preserved (no jump to top). | User confirmed on preview, 20 Nov 2026 |
 | R1-12 | OPEN | Section header row: Approve/Undo/Also-in clip; pencil/grip hard on narrow/touch (opacity 0.45). |
 | R1-13 | OPEN | Preview Eye vanishes while Preview tab stays after picking a progress part. |
@@ -251,7 +251,7 @@ Full **icon inventory table** (Eye, History, progress, tabs, X, Approve, pencil,
 | R2-P1-1 | **(1) U-1** | **Placement Fixed 20 Nov 2026** (user confirmed). Still open: +N ordering (Publish early), phone sheet, Eye hidden until sections |
 | R2-P1-2 | **(2) Fixed with U-2** | Chat `undo` vs `undoStep`; remove dismiss |
 | R2-P1-3 | **(3)** | Save/Cancel semantics; setup card no Save; 40-char draft rule |
-| R2-P1-4 | **(4)/(5) partial Fixed** | Grip click Fixed (U-4 B); Add blur/Escape Fixed (R1-11). Still open: Move at end lies |
+| R2-P1-4 | **(4)/(5) partial Fixed** | Grip click Fixed (U-4 B); Add blur/Escape Fixed (R1-11); fake “Moved” at ends Fixed (R1-10 leftover, 21 Nov 2026). Still open: group drop targets / remove-group deletes sections |
 | R2-P1-5 | **(5) partial Fixed** | Approve vs buffer Fixed (R1-06); Approved mark Fixed (R1-19 / R2-P0-5). Still open: Approve triple meaning across chat / fixed texts |
 | R2-P1-6 | NEW | **Opening brief facts wrong** (pay/date on AI path) — Sam, verify with tests |
 | R2-P1-7 | NEW | **House format + UN chips before NGO template** — Sam, Novice |
@@ -316,6 +316,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 21 Nov 2026 | R2-P0-3, R1-03 | `cb78694` (+ `aa3a008` Use-as-it-is) | `keepProfileAbout` sets `pack.about`; setup About/Project chips/sticky card; user confirmed on preview (incl. Urmul Read this page → Accept). |
 | 21 Nov 2026 | R2-P0-4 | `b4a4185` | Project pencil Save no longer renames the Background/Project brief heading (body via `savePageFieldText` / `intoSection` only; Heading hidden in project editor). Grip offers **Add About the project** when `background` exists without that sub. Confirm on preview. |
 | 21 Nov 2026 | R2-P0-5, R1-19 | `2f17568` | Section header shows **Approved** chip after Approve while walk is active; R1-06 already hid Approve during pencil and cleared approval on Save. Confirm on preview. |
+| 21 Nov 2026 | R1-10 / R2-P1-4 (fake Moved) | _(this commit)_ | Move up on first / Move down on last: no “Moved” announce, menu items disabled (`off`), `outlineOp`/`versionOp` leave tags and undoStep unchanged. Group drops / remove-group still open. Confirm on preview. |
 
 ---
 
