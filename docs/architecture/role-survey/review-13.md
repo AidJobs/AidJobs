@@ -55,3 +55,11 @@ None.
 3. **A few named rows are noise, and one signature row is not a band keep.** Three programme-management groups at `advert_count` 5 are named as noise and labeled `Fact`: `pm-cps-requirements`, `pm-cps-financial-aspects`, `pm-sanaa-place-noise`. `communications_advocacy` / `ca-languages` is `top_count` 0, `bottom_count` 0, no normative source; the row itself says it is not a sealed specificity delta (88 adverts, languages often missing). The family still has four other questions, so the flag would stay true without it. Neither flips a flag falsely. When phrasing starts, do not treat those three groups as duties to phrase, and do not let a 0/0 row with an empty note count toward the minimum of three.
 
 `deep_reconciled_path` and `deep_scores_sealed_in_archive` are unused. `duty_bank.phrasing` is rejected only when it is truthy (`[]` would pass that branch), and a non-null `phrasing` on an unnamed group is checked only when naming is ready. Rebuild equality still catches both on `check`. Fold a `phrasing is None` check for every group into the validator while fixing item 2.
+
+## Re-review
+
+**Approve.** Commit `2cc8857`. `python -m pytest tools/survey/test_library.py` — 13 passed. `python tools/survey/library.py check` — 0 problems.
+
+1. Taken. Family and index are closed shapes; group `phrasing` is `type: null`; `check` walks that subset, and the walker test rejects a non-null `phrasing` and an extra field. `default_source_ids` stays an open string array; `un-values-behaviours` is refused in `validate_normative_citations` (tested). The walker has no `enum` or `not`, so that ban cannot live in the schema subset.
+2. Taken. CRLF bytes match the raw `.sha256` and the prefix constant, the LF hash does not, and one flipped byte fails `deep_scores_ok_for_ready`. Refusal tests assert `un-values-behaviours`, `phrasing`, and `seal`.
+3. Taken. Build raises unless the CSV count equals `n_groups_reported` and `named` is exactly `advert_count >= 5`. `duty_grouping` has counts only, no group ids. A bad live seal raises before any write, and `check` reports that sentence; with no archive the prefix constant is still trusted.
