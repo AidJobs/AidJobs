@@ -52,7 +52,8 @@ from contracts.outbound import (
     fetch_message,
     fetch_url,
 )
-from contracts.persist import created_ids, observable_jobs, observe_known, persist_candidate
+from contracts.persist import persist_candidate
+from contracts.persist import created_ids, observable_jobs, observe_known
 from contracts.reader import Response
 from contracts.refusal import refusal
 from contracts.run_ownership import OwnershipLost, confirm_running, save_failure_outcome
