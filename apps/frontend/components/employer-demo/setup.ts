@@ -126,21 +126,36 @@ const FAMILY_FOR_TYPE: Record<State['org']['orgType'], Format['family']> = {
   contractor: 'Donors, foundations and contractors',
 };
 
+/**
+ * Browse order for template lists (See all, Start from, phone strip): Your organisation, then this org type's
+ * family, then the rest. For national NGOs and charities, UN is last so INGO chips come before UN (R2-P1-7).
+ */
+export function familiesForOrg(orgType: State['org']['orgType']): Array<Format['family']> {
+  const preferred = FAMILY_FOR_TYPE[orgType] ?? 'INGO and humanitarian';
+  const rest = FAMILIES_ORDER.filter((f) => f !== 'Your organisation' && f !== preferred);
+  const ordered =
+    orgType === 'ngo' || orgType === 'charity'
+      ? [...rest.filter((f) => f !== 'UN and multilateral'), ...rest.filter((f) => f === 'UN and multilateral')]
+      : rest;
+  return ['Your organisation', preferred, ...ordered];
+}
+
 /** The template the chat recommends, with its reason, and the close matches it offers next. */
 export function recommendation(s: State, defaultKey: string): { key: string; reason: string; others: string[] } {
   const usable = s.formats.filter((f) => !f.key.startsWith('pasted-'));
   const rec = usable.find((f) => f.key === defaultKey) ?? usable[0];
   const usual = usualTemplate(s);
   const reason = usual?.key === rec.key ? `your usual template, used for ${usual.count} of your jobs` : rec.family === 'Your organisation' ? 'your own format' : `the format most organisations like yours use`;
-  const preferred = FAMILY_FOR_TYPE[s.org.orgType] ?? 'INGO and humanitarian';
-  const sameFamily = usable.find((f) => f.family !== 'Your organisation' && f.key !== rec.key && f.family === rec.family)?.family;
-  const family = sameFamily ?? preferred;
-  const rank = (f: Format) => (f.family === preferred ? 0 : 1 + Math.max(0, FAMILIES_ORDER.indexOf(f.family)));
-  const others = [
-    ...usable.filter((f) => f.key !== rec.key && f.family === family),
-    ...usable.filter((f) => f.key !== rec.key && f.family !== family),
-  ]
-    .sort((a, b) => rank(a) - rank(b) || FAMILIES_ORDER.indexOf(a.family) - FAMILIES_ORDER.indexOf(b.family))
+  const familyRank = familiesForOrg(s.org.orgType);
+  const rank = (f: Format) => {
+    const i = familyRank.indexOf(f.family);
+    return i < 0 ? 99 : i;
+  };
+  // National NGOs / charities: keep UN out of the three quick chips (still in See all).
+  const national = s.org.orgType === 'ngo' || s.org.orgType === 'charity';
+  const others = usable
+    .filter((f) => f.key !== rec.key && !(national && f.family === 'UN and multilateral'))
+    .sort((a, b) => rank(a) - rank(b) || a.label.localeCompare(b.label))
     .slice(0, 3)
     .map((f) => f.key);
   return { key: rec.key, reason, others };

@@ -54,15 +54,15 @@ describe('R2-P0-2: Tumaini local NGO preset', () => {
     expect(lines.join(' ')).not.toMatch(/riverstone/i);
   });
 
-  it('recommendation others for ngo prefer National NGOs before UN', () => {
+  it('recommendation others for ngo prefer National NGOs then INGO, not UN chips', () => {
     resetDemo('tumaini');
     update((s) => ({ ...s, signedIn: true }));
     const rec = recommendation(getState(), 'local-concise');
     expect(rec.key).toBe('local-concise');
     const labels = rec.others.map((k) => getState().formats.find((f) => f.key === k)?.family);
     expect(labels[0]).toBe('National NGOs and charities');
-    expect(labels.includes('UN and multilateral')).toBe(true);
-    expect(labels.indexOf('National NGOs and charities')).toBeLessThan(labels.indexOf('UN and multilateral'));
+    expect(labels[1]).toBe('INGO and humanitarian');
+    expect(labels.includes('UN and multilateral')).toBe(false);
   });
 
   it('AI context for Tumaini exposes orgType ngo and Tumaini name', () => {

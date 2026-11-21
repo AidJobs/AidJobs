@@ -6,11 +6,11 @@ import Tip from '@/components/site/Tip';
 import { createFormat, formatOf, groupingOf, headingOf, outlineOp, setFacts as changeFacts, versionOp } from './actions';
 import { differences } from './langs';
 import { jobLang, langOf, versionsOf } from './translate';
-import { CONTRACTS, ENGAGEMENTS, FAMILIES_ORDER, GROUPS, headingFor, orderSections, recommendSections, SECTION_BY_KEY } from './engine';
+import { CONTRACTS, ENGAGEMENTS, GROUPS, headingFor, orderSections, recommendSections, SECTION_BY_KEY } from './engine';
 import { addToGroup, applyToEntries, formatGrouping, groupedEntries, groupOfKey, groupOrderOf } from './outline';
 import OutlineEditor from './OutlineEditor';
 import MenuButton from './MenuButton';
-import { recommendation, TYPE_REASONS, wordsFor } from './setup';
+import { familiesForOrg, recommendation, TYPE_REASONS, wordsFor } from './setup';
 import { getState } from './store';
 import type { DemoJob, Format, JobLang, Recruitment, State } from './types';
 import { inputStyle } from './ui';
@@ -188,7 +188,7 @@ function StartFrom({ s, job, value, onPick }: { s: State; job: DemoJob; value: s
       <span className="ej-panel-label">Start from</span>
       <select className="ej-select" value={value} onChange={(e) => onPick(e.target.value)} aria-label="Start from">
         <option value="">Blank</option>
-        {FAMILIES_ORDER.map((fam) => {
+        {familiesForOrg(s.org.orgType).map((fam) => {
           const list = usable.filter((f) => f.family === fam);
           return list.length ? (
             <optgroup key={fam} label={fam}>
@@ -240,7 +240,7 @@ function TemplateFields({ s, job, pick, setPick }: { s: State; job: DemoJob; pic
       <label className="flex flex-col gap-1">
         <span className="ej-panel-label">Template</span>
         <select className="ej-select" value={pick.key} onChange={(e) => setPick({ ...pick, ...pickOf(s, job, e.target.value) })} aria-label="Template">
-          {FAMILIES_ORDER.map((fam) => {
+          {familiesForOrg(s.org.orgType).map((fam) => {
             const list = usable.filter((x) => x.family === fam).sort((a, b) => Number(b.key === rec) - Number(a.key === rec));
             return list.length ? (
               <optgroup key={fam} label={fam}>
@@ -534,9 +534,16 @@ function SaveAsOurs({ s, pick }: { s: State; pick: Pick }) {
 export function PhoneTemplate({ job, s, pick, setPick, onApply, onChat, onCancel, question }: { job: DemoJob; s: State; pick: Pick; setPick: (p: Pick) => void; onApply: () => void; onChat: () => void; onCancel?: () => void; question: ReactNode }) {
   const strip = useRef<HTMLDivElement>(null);
   const frame = useRef(0);
-  const rec = recommendation(s, job.format).key;
+  const rec = recommendation(s, job.format);
   const usable = s.formats.filter((f) => !f.key.startsWith('pasted-'));
-  const cards = [...usable.filter((f) => f.key === rec), ...usable.filter((f) => f.key !== rec)];
+  const familyRank = familiesForOrg(s.org.orgType);
+  const prefer = [rec.key, ...rec.others];
+  const cards = [
+    ...prefer.map((k) => usable.find((f) => f.key === k)).filter((f): f is Format => Boolean(f)),
+    ...usable
+      .filter((f) => !prefer.includes(f.key))
+      .sort((a, b) => familyRank.indexOf(a.family) - familyRank.indexOf(b.family) || a.label.localeCompare(b.label)),
+  ];
   const choose = (key: string | 'own') => (key === 'own' ? setPick({ ...pick, tab: 'own' }) : setPick({ ...pick, tab: 'templates', ...pickOf(s, job, key) }));
   const nearest = () => {
     cancelAnimationFrame(frame.current);
@@ -595,7 +602,7 @@ export function PhoneTemplate({ job, s, pick, setPick, onApply, onChat, onCancel
               {f.label}
             </span>
             <span className="aj-faint truncate" style={{ fontSize: 11 }}>
-              {f.key === rec ? 'Recommended · ' : ''}
+              {f.key === rec.key ? 'Recommended · ' : ''}
               {orderFor(s, job, f.key).length} sections
             </span>
           </button>

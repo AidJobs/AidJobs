@@ -456,7 +456,10 @@ export function formatOf(s: State, key: string): Format {
 }
 
 export function defaultFormatKey(s: State): string {
-  return s.formats.some((f) => f.key === 'house') ? 'house' : FORMAT_FOR_TYPE[s.org.orgType];
+  const typed = FORMAT_FOR_TYPE[s.org.orgType];
+  // R2-P1-7: national NGO / charity Settings type wins over a leftover house format.
+  if (s.org.orgType === 'ngo' || s.org.orgType === 'charity') return typed;
+  return s.formats.some((f) => f.key === 'house') ? 'house' : typed;
 }
 
 export function ctxFor(s: State, j: DemoJob): BuildContext {

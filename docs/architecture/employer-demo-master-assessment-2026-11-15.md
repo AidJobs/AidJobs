@@ -20,7 +20,7 @@
 
 5. ~~Approve vs unsaved buffers; Add-panel blur/Escape~~ — **Fixed 20 Nov 2026** (Step A R1-06; Step B R1-11; user confirmed on preview)
 
-**Next (21 Nov 2026, after Background/Project heading polish confirmed on preview):** **R2-P1-7** (house format + UN chips before NGO template), or the user’s new priority. Phase 7 held.
+**Next (21 Nov 2026, after R2-P1-7):** **R2-P1-8** (Check “done” vs empty Qualifications), or the user’s new priority. Phase 7 held.
 
 ---
 
@@ -256,7 +256,7 @@ Full **icon inventory table** (Eye, History, progress, tabs, X, Approve, pencil,
 | R2-P1-4 | **(4)/(5) Fixed** (21 Nov 2026) | Grip click Fixed (U-4 B); Add blur/Escape Fixed (R1-11); fake “Moved” at ends Fixed; group drop insertion bar + remove-group rehome Fixed (agent confirmed on preview) |
 | R2-P1-5 | **(5) partial Fixed** | Approve vs buffer Fixed (R1-06); Approved mark Fixed (R1-19 / R2-P0-5). Still open: Approve triple meaning across chat / fixed texts |
 | R2-P1-6 | **Fixed** (21 Nov 2026) | Opening brief pay/date on AI path — `groundPayDeadline` refuses invented pay; user’s `extractFacts` deadline wins |
-| R2-P1-7 | NEW | **House format + UN chips before NGO template** — Sam, Novice |
+| R2-P1-7 | **Fixed** (21 Nov 2026) | House vs org type + UN chips — ngo/charity type wins over house; chips National then INGO, UN only in See all |
 | R2-P1-8 | NEW | **Check “done” vs empty Qualifications** — progress vs `walk.approved` — Novice #11, R1-14 |
 | R2-P1-9 | NEW | **Preview tab leaves Eye hidden** — R1-13 — Chrome, Novice |
 | R2-P1-10 | NEW | **Mobile not viable for polish** — [Phone R2](033c02d6-9e1f-40bd-a8a5-4e71b6565a6a) — 44px+ targets |
@@ -271,7 +271,7 @@ UN clearance blockers (R1-08, R2-UN), INGO LANG-ONLY pack, Reach/flyer/version p
 
 **Workflow: 4/10.** One window works; template/facts opening loses trust; Save/Cancel/Approve/Undo rules diverge after draft exists.
 
-**22 findings** — CONFIRMS most English chrome (U-1–U-4, R1-01–06, 09–13, 20). **NEW (opening brief pay/date Fixed R2-P1-6):** was 180k→120k / wrong date on AI path. Still open from this pass: UN templates in chips before Local NGO; org type does not override house format; org settings no Save; approval rule “senior P4/D” on national NGO; composer readiness ring swallows first Send.
+**22 findings** — CONFIRMS most English chrome (U-1–U-4, R1-01–06, 09–13, 20). **NEW (opening brief pay/date Fixed R2-P1-6):** was 180k→120k / wrong date on AI path. **Fixed R2-P1-7:** UN chips before Local NGO; org type vs house. Still open from this pass: org settings no Save; approval rule “senior P4/D” on national NGO; composer readiness ring swallows first Send.
 
 **Repetitions:** Setup stack (About, project, style, pace) before write; “yes” means three different things; long walk after brief already typed.
 
@@ -322,6 +322,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 21 Nov 2026 | R1-10 / R2-P1-4 (group drop + remove-group) | `d77138e`…`3f53f82` | Outline: string `data-group-drop` + sage insertion bar while dragging a group; keyboard `groupBy` unchanged. `removeCustomGroup` / `rehomeTarget`: remove empty custom group only, rehome sections (catalog → own; custom → prev/next/`job`); `outlineOp` / `versionOp` / `applyToEntries` / AI `remove_group`. Undo restores. Agent confirmed on preview (drop bar + status while dragging; Annex + Kit list → remove → Kit under Applying; keyboard move group). |
 | 21 Nov 2026 | R2-P1-6 | `917804d` | AI `set_facts`: `groundPayDeadline` — salary digits must appear in the user’s words / brief; closing date from `extractFacts` on that corpus wins over the AI’s ISO; invented pay/date refused. Tests in `employerDemoAiChat.test.ts`. **Agent confirmed on preview** (WASH Coordinator brief: KES 180,000 + in 3 weeks → stayed `180000` / `2026-12-12` after template and AI re-apply). |
 | 21 Nov 2026 | Background / Project heading polish (user) | `d16b5b1`…`9301374` | Restore Heading + other-title chips on project pencil (Save body still no force-rename). Formats without a `background` slot add **Project brief**. Grip: `Add Project brief` / `Add “About the project” under …`. Add panel: fixed `GROUPS` order even if the job regrouped. **Agent confirmed on preview** (Add Project brief; pencil Heading + Background / About the programme chips; Add panel About the employer → The job → …). |
+| 21 Nov 2026 | R2-P1-7 | *(this commit)* | `recommendation` / `familiesForOrg`: ngo/charity chips National then INGO, UN excluded from quick chips; See all + phone strip org-aware. `defaultFormatKey`: ngo/charity use `FORMAT_FOR_TYPE`, not house. Tests `employerDemoR2P17.test.ts`. Confirm on preview. |
 
 ---
 
@@ -329,7 +330,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 
 1. Read this file and `employer-side-plan.md` Phase 6 / polish status.  
 2. Confirm `demo/employer` tip and that English-first still holds.  
-3. **Default next:** **R2-P1-7** (house format + UN chips), after Background/Project heading preview confirm. Or the user’s new priority.  
+3. **Default next:** **R2-P1-8** (Check “done” vs empty Qualifications), after R2-P1-7 preview confirm. Or the user’s new priority.  
 4. Mark IDs Fixed in the tables and add a Fix log row in the same commit as the code.  
 5. Do not close Phase 7 until the user says English chrome is good enough.  
 6. Never stage leftover `apps/frontend/lib/__tests__/employerDemoPhase6Review.test.ts` or `apps/frontend/AGENTS.md` unless the user asks.
