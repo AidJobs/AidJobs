@@ -1,0 +1,92 @@
+{
+  "$id": "https://aidjobs.app/role-survey/library/schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "description": "Schema for docs/architecture/role-survey/library/{family}.json and index.json. schema_version 0.2.0.",
+  "properties": {
+    "built_at": {
+      "type": "string"
+    },
+    "built_from": {
+      "type": "object"
+    },
+    "deep_fields_ready": {
+      "additionalProperties": false,
+      "properties": {
+        "duty_bank_naming": {
+          "type": "boolean"
+        },
+        "duty_bank_phrasing": {
+          "type": "boolean"
+        },
+        "reference_jds": {
+          "type": "boolean"
+        },
+        "signature_fact_questions": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "duty_bank_naming",
+        "duty_bank_phrasing",
+        "signature_fact_questions",
+        "reference_jds"
+      ],
+      "type": "object"
+    },
+    "deep_option_a_scores": {
+      "type": "object"
+    },
+    "duty_bank": {
+      "type": "object"
+    },
+    "families": {
+      "type": "array"
+    },
+    "family_id": {
+      "type": "string"
+    },
+    "inputs": {
+      "type": "object"
+    },
+    "measured_broad": {
+      "type": "object"
+    },
+    "name_en": {
+      "type": "string"
+    },
+    "normative_sources": {
+      "type": "object"
+    },
+    "recognition": {
+      "type": "object"
+    },
+    "reference_jds": {
+      "type": "array"
+    },
+    "requirements_by_level": {
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "0.2.0",
+      "type": "string"
+    },
+    "signature_fact_questions": {
+      "type": "array"
+    },
+    "standards_application": {
+      "type": "object"
+    },
+    "wave": {
+      "const": "1a",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "wave"
+  ],
+  "schema_version": "0.2.0",
+  "title": "AidJobs role library (wave 1a)",
+  "type": "object"
+}

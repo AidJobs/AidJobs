@@ -1,0 +1,214 @@
+family_id,group_id,heuristic_name,stable_id,name_en,name_fr,named,line_count,advert_count,organisation_count,label
+programme_management,27,project-implementation,pm-project-implementation,Project implementation,Mise en œuvre de projet,true,78,30,18,Fact
+programme_management,15,partners-government,pm-partner-government-relations,Partner and government relations,Relations avec les partenaires et les gouvernements,true,35,26,16,Fact
+programme_management,4,team-teams,pm-team-leadership,Team leadership,Encadrement d’équipe,true,24,14,10,Fact
+programme_management,16,documents-projets,pm-internal-project-documents,Internal project documents,Documents internes de projet,true,24,17,10,Fact
+programme_management,28,data-monitoring,pm-programme-data-monitoring,Programme data and monitoring,Données et suivi de programme,true,21,16,12,Fact
+programme_management,2,funding-development,pm-funding-proposals,Funding and proposal development,Élaboration des propositions de financement,true,17,10,8,Fact
+programme_management,17,cps-exigences,pm-cps-requirements,CPS requirements (employer noise),Exigences CPS (bruit employeur),true,17,5,3,Fact
+programme_management,50,budgets-budget,pm-project-budgets,Project budget preparation,Préparation des budgets de projet,true,14,11,10,Fact
+programme_management,9,progress-tracking,pm-progress-tracking,Implementation progress tracking,Suivi de l’avancement,true,14,10,7,Fact
+programme_management,83,donor-reporting,pm-donor-reporting,Donor reporting,Rapports aux bailleurs,true,13,9,7,Fact
+programme_management,35,principales-responsabilités,pm-main-responsibilities,Main responsibilities heading (catch-all),Responsabilités principales (fourre-tout),true,13,9,5,Fact
+programme_management,39,finance-project,pm-project-finance-operations,Project finance and operations,Finances et opérations de projet,true,13,9,7,Fact
+programme_management,103,development-investments,pm-development-investments,Development investment projects,Projets d’investissement pour le développement,true,13,7,2,Fact
+programme_management,76,outputs-expected,,,,false,13,4,3,Fact
+programme_management,117,management-field,pm-field-programme-coordination,Field programme coordination,Coordination des programmes de terrain,true,11,8,5,Fact
+programme_management,72,meetings-attend,pm-meetings-follow-up,Meeting attendance and follow-up,Participation aux réunions et suivi,true,11,10,8,Fact
+programme_management,42,reports-reporting,pm-progress-reporting,Progress reporting,Rapports d’avancement,true,11,8,7,Fact
+programme_management,25,negotiations-sponsors,pm-sponsor-lender-negotiations,Sponsor and lender negotiations,Négociations avec les sponsors et les prêteurs,true,10,9,2,Fact
+programme_management,8,programme-performance,pm-programme-performance,Programme performance review,Revue de la performance des programmes,true,10,7,5,Fact
+programme_management,29,risk-country,pm-country-risk-management,Country-level risk management,Gestion des risques au niveau pays,true,9,5,4,Fact
+programme_management,91,local-community,pm-local-community-liaison,Local community liaison,Liaison avec les communautés locales,true,9,5,4,Fact
+programme_management,3,research-programme,,,,false,9,3,2,Fact
+programme_management,7,portfolio-contribute,pm-portfolio-supervision,Portfolio company supervision,Supervision des sociétés en portefeuille,true,9,5,2,Fact
+programme_management,10,sana’a-requirements,pm-sanaa-place-noise,Sana'a programme requirements (place noise),Exigences du programme Sanaa (bruit géographique),true,9,5,3,Fact
+programme_management,37,program-processes,pm-programme-processes,Programme process execution,Exécution des processus de programme,true,9,7,6,Fact
+programme_management,41,project-excellence,pm-project-excellence,Project management excellence (broad),Excellence de la gestion de projet (générique),true,8,6,4,Fact
+programme_management,119,action-minutes,pm-meeting-minutes,Meeting minutes and actions,Comptes rendus et suivi des actions,true,8,6,5,Fact
+programme_management,23,country-regional,,,,false,7,3,3,Fact
+programme_management,184,gaps-identify,,,,false,7,4,4,Fact
+programme_management,64,information-files,,,,false,6,4,4,Fact
+programme_management,46,humanitarian-needs,,,,false,6,3,2,Fact
+programme_management,77,written-english,pm-language-requirements,Language requirements in duties (weak),Exigences linguistiques dans les tâches (faible),true,6,5,3,Fact
+programme_management,14,farmers-farmer,,,,false,6,3,2,Fact
+programme_management,44,team-coordination,pm-team-coordination,Project team coordination,Coordination de l’équipe projet,true,6,5,4,Fact
+programme_management,49,cps-aspects,pm-cps-financial-aspects,CPS financial aspects (employer noise),Aspects financiers CPS (bruit employeur),true,6,5,3,Fact
+programme_management,71,documents-services,,,,false,5,3,2,Fact
+programme_management,56,inputs-iom,,,,false,5,3,3,Fact
+programme_management,80,project-coordination,pm-project-events,Project events and coordination,Événements et coordination de projet,true,5,5,5,Fact
+programme_management,90,materials-staff,pm-staff-technical-materials,Technical materials for staff,Supports techniques pour le personnel,true,5,5,5,Fact
+programme_management,96,lessons-programme,,,,false,5,4,3,Fact
+programme_management,118,sessions-programs,,,,false,5,4,3,Fact
+programme_management,94,calls-grant,,,,false,5,4,2,Fact
+programme_management,33,proactively-identify,pm-operational-improvement,Operational improvement (weak),Amélioration opérationnelle (faible),true,5,5,4,Fact
+programme_management,104,notes-materials,,,,false,4,3,2,Fact
+programme_management,172,project-assurance,,,,false,4,3,3,Fact
+programme_management,92,development-concept,,,,false,4,3,2,Fact
+programme_management,6,environmental-sustainable,,,,false,4,3,3,Fact
+programme_management,59,risks-project,,,,false,4,4,3,Fact
+programme_management,26,milestones-project,,,,false,4,4,4,Fact
+programme_management,11,landscape,,,,false,4,4,4,Fact
+programme_management,65,accountability,,,,false,4,3,3,Fact
+programme_management,73,issues-actions,,,,false,4,3,2,Fact
+programme_management,79,knowledge,,,,false,3,3,3,Fact
+programme_management,58,communication-storytelling,,,,false,3,3,2,Fact
+programme_management,36,difficult-pressure,,,,false,3,3,2,Fact
+programme_management,128,inclusive-youth,,,,false,3,3,2,Fact
+programme_management,78,team-issues,,,,false,3,3,3,Fact
+programme_management,95,logistics-administrative,,,,false,3,3,3,Fact
+programme_management,5,mentor-modelling,,,,false,3,3,2,Fact
+programme_management,210,management,,,,false,3,3,3,Fact
+programme_management,0,étroitement-financements,,,,false,3,3,3,Fact
+programme_management,18,partenaires,,,,false,3,3,2,Fact
+programme_management,13,safeguarding-protection,,,,false,3,3,2,Fact
+programme_management,114,claire-fournisseurs,,,,false,3,3,2,Fact
+programme_management,74,program-evaluation,,,,false,3,3,2,Fact
+programme_management,158,mel-indicators,,,,false,3,3,2,Fact
+meal,1,data-quality,meal-data-quality-collection,Data quality and collection,Qualité et collecte des données,true,64,18,13,Fact
+meal,9,project-monitoring,meal-project-monitoring,Project monitoring,Suivi de projet,true,33,16,8,Fact
+meal,23,meal-data,meal-data-tools,MEAL data tools,Outils de données MEAL,true,22,5,5,Fact
+meal,7,evaluation-mid,,,,false,20,4,3,Fact
+meal,5,mel-project,,,,false,14,4,4,Fact
+meal,26,research-data,meal-research-data,Research data team leadership,Pilotage des équipes de données de recherche,true,13,11,7,Fact
+meal,20,stakeholders-parties,meal-stakeholder-engagement,Stakeholder engagement,Relations avec les parties prenantes,true,13,11,7,Fact
+meal,41,learning-collaborative,meal-collaborative-learning,Collaborative learning,Apprentissage collaboratif,true,12,5,5,Fact
+meal,14,impact-data,meal-impact-indicators,Impact data and indicators,Données et indicateurs d’impact,true,9,6,6,Fact
+meal,17,principales-responsabilités,meal-main-responsibilities,Main responsibilities heading (catch-all),Responsabilités principales (fourre-tout),true,9,7,4,Fact
+meal,66,reporting-reports,meal-stakeholder-reporting,Stakeholder reporting,Rapports aux parties prenantes,true,8,6,6,Fact
+meal,15,mel-programme,,,,false,8,4,4,Fact
+meal,51,base-données,,,,false,8,3,2,Fact
+meal,46,data-sector-specific,,,,false,8,3,3,Fact
+meal,56,réunions-documents,meal-working-group-representation,Working-group representation,Représentation en groupes de travail,true,8,5,2,Fact
+meal,130,data-reporting,meal-data-definitions,Data definitions and reporting,Définitions des données et du reporting,true,7,6,5,Fact
+meal,2,data-confidentiality,meal-data-confidentiality,Data confidentiality,Confidentialité des données,true,6,5,3,Fact
+meal,29,acted-coordination,,,,false,6,3,2,Fact
+meal,24,data-information,,,,false,5,4,3,Fact
+meal,61,partenaires-partners,,,,false,5,3,2,Fact
+meal,13,data-products,,,,false,5,4,4,Fact
+meal,6,data-collected,,,,false,4,3,2,Fact
+meal,4,gaps-identify,,,,false,4,4,3,Fact
+meal,94,dissemination-produits,,,,false,4,4,2,Fact
+meal,37,implementation-lessons,,,,false,4,4,4,Fact
+meal,65,terrain-équipes,,,,false,4,4,3,Fact
+meal,64,signature,,,,false,3,3,3,Fact
+meal,3,data-interviews,,,,false,3,3,3,Fact
+meal,36,performance-improvement,,,,false,3,3,3,Fact
+meal,44,génération-spécifiques,,,,false,3,3,2,Fact
+meal,47,evaluation-initiatives,,,,false,3,3,3,Fact
+meal,32,learning,,,,false,3,3,3,Fact
+communications_advocacy,44,team-teams,ca-internal-team-management,Internal team management,Encadrement de l’équipe interne,true,33,21,11,Fact
+communications_advocacy,6,communication-communications,ca-strategic-communications,Strategic communications,Communication stratégique,true,33,17,12,Fact
+communications_advocacy,0,media-relationships,ca-media-relations,Media and journalist relations,Relations presse,true,26,12,10,Fact
+communications_advocacy,3,science-communication,ca-science-communication,Science communication,Communication scientifique,true,20,5,2,Fact
+communications_advocacy,2,event-events,ca-event-management,Event management,Organisation d’événements,true,19,7,5,Fact
+communications_advocacy,22,donors-partners,ca-donor-partner-communications,Donor and partner communications,Communication bailleurs et partenaires,true,18,10,6,Fact
+communications_advocacy,28,duties-principales,ca-assigned-duties,Assigned duties (catch-all),Tâches assignées (fourre-tout),true,17,13,7,Fact
+communications_advocacy,9,relationships-partners,ca-advocacy-partner-relations,Advocacy partner relations,Partenariats de plaidoyer,true,17,10,8,Fact
+communications_advocacy,7,reports-media,ca-media-reports,Media and communication reports,Rapports médias et communication,true,15,10,7,Fact
+communications_advocacy,46,social-teams,ca-social-campaigns,Social media campaigns,Campagnes sur les réseaux sociaux,true,15,12,7,Fact
+communications_advocacy,63,audiences-communications,ca-audience-communications,Audience communications,Communication auprès des publics,true,15,10,6,Fact
+communications_advocacy,26,projects-project,ca-project-communications,Project communications support,Appui à la communication de projet,true,13,11,8,Fact
+communications_advocacy,10,brand-messaging,ca-brand-messaging,Brand voice and messaging,Identité de marque et messages,true,11,10,7,Fact
+communications_advocacy,40,advocacy-initiative,ca-advocacy-strategy,Advocacy strategy,Stratégie de plaidoyer,true,10,7,5,Fact
+communications_advocacy,23,media-coverage,ca-media-monitoring,Media coverage monitoring,Veille médiatique,true,10,7,6,Fact
+communications_advocacy,37,newsletters-content,ca-newsletters,Newsletters and media content,Newsletters et contenus médias,true,9,7,7,Fact
+communications_advocacy,18,communication-responsable,,,,false,8,3,2,Fact
+communications_advocacy,95,rédiger-contenus,,,,false,7,4,3,Fact
+communications_advocacy,24,creative-production,,,,false,7,4,2,Fact
+communications_advocacy,94,communication-actions,,,,false,7,4,3,Fact
+communications_advocacy,74,events-director,ca-events-director-tasks,Events and director tasks (weak),Tâches événements et direction (faible),true,6,5,2,Fact
+communications_advocacy,25,content-social,ca-social-content-monitoring,Social media content monitoring,Suivi des contenus sur les réseaux sociaux,true,6,5,4,Fact
+communications_advocacy,85,content-creation,ca-content-creation,Video and content creation,Création de contenus et de vidéos,true,6,5,3,Fact
+communications_advocacy,39,communication-committee,ca-communications-committee,Communications committee leadership,Animation du comité de communication,true,6,5,4,Fact
+communications_advocacy,14,social-media,ca-social-media-strategy,Social media strategy,Stratégie de réseaux sociaux,true,6,5,4,Fact
+communications_advocacy,8,expense-meeting,ca-meeting-expenses,Meeting and expense administration (weak),Administration des réunions et des frais (faible),true,5,5,4,Fact
+communications_advocacy,12,metrics-performance,ca-communications-metrics,Communications performance metrics,Indicateurs de performance de la communication,true,5,5,4,Fact
+communications_advocacy,114,policy-potential,,,,false,5,4,3,Fact
+communications_advocacy,107,narratives-storytelling,,,,false,5,4,3,Fact
+communications_advocacy,171,senior-executives,ca-executive-advice,Communications advice to executives,Conseil en communication à la direction,true,5,5,3,Fact
+communications_advocacy,47,draft-materials,ca-press-materials,Press materials and releases,Communiqués et supports presse,true,5,5,5,Fact
+communications_advocacy,5,team-keep,,,,false,5,4,4,Fact
+communications_advocacy,156,crisis-crise,,,,false,4,4,3,Fact
+communications_advocacy,86,reputational-potential,,,,false,4,4,3,Fact
+communications_advocacy,120,described-following,,,,false,4,4,2,Fact
+communications_advocacy,88,clear-direction,,,,false,4,4,2,Fact
+communications_advocacy,20,communications-one,,,,false,4,4,2,Fact
+communications_advocacy,59,vendor-needed,,,,false,4,4,4,Fact
+communications_advocacy,19,résultats-optimisations,,,,false,4,4,3,Fact
+communications_advocacy,4,stories-impact,,,,false,4,4,4,Fact
+communications_advocacy,105,travel-logistics,,,,false,3,3,2,Fact
+communications_advocacy,162,engagement-digital,,,,false,3,3,3,Fact
+communications_advocacy,106,programmatic-case,,,,false,3,3,2,Fact
+communications_advocacy,68,technical-scientific,,,,false,3,3,2,Fact
+communications_advocacy,100,timelines-partners,,,,false,3,3,2,Fact
+communications_advocacy,102,contacts-regularly,,,,false,3,3,2,Fact
+communications_advocacy,75,training-followed,,,,false,3,3,2,Fact
+communications_advocacy,87,resourcespace-sauvegarde,,,,false,3,3,2,Fact
+communications_advocacy,21,plateforme-envoyer,,,,false,3,3,2,Fact
+communications_advocacy,128,chaîne-graphique,,,,false,3,3,2,Fact
+communications_advocacy,35,stratégie-définition,,,,false,3,3,2,Fact
+communications_advocacy,34,tâches-réalisation,,,,false,3,3,2,Fact
+communications_advocacy,54,team-priorities,,,,false,3,3,3,Fact
+communications_advocacy,111,communications,,,,false,3,3,3,Fact
+communications_advocacy,83,travel-event,,,,false,3,3,3,Fact
+finance,4,financial-management,fn-financial-management,Financial management,Gestion financière,true,45,20,15,Fact
+finance,136,financial-planning,fn-financial-planning,Financial planning and analysis,Planification et analyse financières,true,43,20,14,Fact
+finance,3,audit-audits,fn-internal-audit,Internal audit preparation,Préparation de l’audit interne,true,41,21,16,Fact
+finance,18,finance-financial,fn-finance-leadership,Finance leadership,Direction financière,true,27,15,11,Fact
+finance,79,risks-financial,fn-financial-risk,Financial risk monitoring,Suivi des risques financiers,true,18,14,10,Fact
+finance,96,cash-flow,fn-cash-flow,Cash-flow management,Gestion de la trésorerie,true,17,9,8,Fact
+finance,20,accounting-accounts,fn-accounting,Accounting and accounts,Comptabilité et tenue des comptes,true,16,12,9,Fact
+finance,40,équipes-teams,fn-team-verification,Team verification and support,Vérification et appui aux équipes,true,14,7,6,Fact
+finance,11,financial-records,fn-financial-records,Financial records and transactions,Pièces et transactions financières,true,14,10,8,Fact
+finance,51,monthly-quarterly,fn-periodic-cycles,"Monthly, quarterly and annual cycles","Cycles mensuels, trimestriels et annuels",true,14,13,11,Fact
+finance,90,accounting-integrity,fn-general-ledger,General ledger oversight,Supervision de la comptabilité générale,true,13,9,8,Fact
+finance,99,donor-financial,fn-donor-financial-reporting,Donor financial reporting,Rapports financiers aux bailleurs,true,12,8,7,Fact
+finance,82,perform-assigned,fn-assigned-duties,Assigned duties (catch-all),Tâches assignées (fourre-tout),true,10,9,9,Fact
+finance,15,tax-statutory,fn-tax-statutory,Tax and statutory compliance,Obligations fiscales et réglementaires,true,9,7,5,Fact
+finance,6,bank-reconciliation,fn-bank-reconciliation,Bank and cash reconciliation,Rapprochements bancaires et de trésorerie,true,8,7,6,Fact
+finance,0,closing-monthly,fn-monthly-close,Monthly closing and reconciliations,Clôture mensuelle et rapprochements,true,8,7,6,Fact
+finance,31,requests-request,fn-payment-requests,Payment request review,Contrôle des demandes de paiement,true,8,6,6,Fact
+finance,9,cas-prendre,fn-incident-handling,Incident and exception handling,Gestion des incidents et des écarts,true,7,6,4,Fact
+finance,94,process,fn-finance-processes,Finance processes (broad),Processus financiers (générique),true,7,6,4,Fact
+finance,33,service-formations,fn-finance-training,Training and case files,Formations et dossiers,true,7,5,2,Fact
+finance,142,systems-financial,fn-financial-systems,Financial systems,Systèmes financiers,true,7,5,4,Fact
+finance,150,workflows-automation,fn-workflow-automation,Finance workflow automation,Automatisation des processus financiers,true,7,5,2,Fact
+finance,49,finance-improvement,fn-continuous-improvement,Continuous finance improvement,Amélioration continue de la finance,true,7,6,4,Fact
+finance,72,reporting-timely,fn-timely-reporting,Timely management reporting,Reporting de gestion dans les délais,true,7,5,4,Fact
+finance,55,fraud-prevention,,,,false,7,4,3,Fact
+finance,48,finance-financial,fn-country-finance,Country finance support,Appui à la finance pays,true,7,5,4,Fact
+finance,5,auditors-external,fn-external-audit,External audit and tax,Audit externe et fiscalité,true,7,7,5,Fact
+finance,17,accounting-budgétaires,,,,false,6,4,4,Fact
+finance,54,coordination-effective,fn-effective-coordination,Effective coordination (weak),Coordination efficace (faible),true,6,6,6,Fact
+finance,14,accounting-financial,,,,false,6,4,4,Fact
+finance,25,project-accuracy,,,,false,6,3,3,Fact
+finance,44,project-management,,,,false,5,4,4,Fact
+finance,36,forecasting-financial,fn-financial-forecasting,Financial forecasting,Prévisions financières,true,5,5,5,Fact
+finance,16,documentation-process,fn-process-controls,Process documentation and controls,Documentation des processus et des contrôles,true,5,5,4,Fact
+finance,67,reconciliations-investigated,,,,false,5,4,4,Fact
+finance,19,requirements-implementation,fn-requirements-implementation,Requirements implementation (broad),Mise en œuvre des exigences (générique),true,5,5,3,Fact
+finance,76,investment-performance,,,,false,4,3,3,Fact
+finance,98,board-reports,,,,false,4,3,3,Fact
+finance,190,global-annual,,,,false,4,4,4,Fact
+finance,7,requirements-business,,,,false,4,3,3,Fact
+finance,87,quotidiennes-relations,,,,false,4,4,4,Fact
+finance,34,financial-procedures,,,,false,4,4,4,Fact
+finance,30,archiving-quality,,,,false,4,3,3,Fact
+finance,65,accounting-delegation,,,,false,4,3,3,Fact
+finance,8,financial-reporting,,,,false,4,4,4,Fact
+finance,83,team-management,,,,false,4,4,3,Fact
+finance,2,english-communication,,,,false,4,3,2,Fact
+finance,62,siège-technique,,,,false,3,3,2,Fact
+finance,194,financial-sustainability,,,,false,3,3,3,Fact
+finance,85,manager-office,,,,false,3,3,3,Fact
+finance,66,budget,,,,false,3,3,3,Fact
+finance,13,donor-agreement,,,,false,3,3,3,Fact
+finance,35,voucher,,,,false,3,3,3,Fact
+finance,45,training-consultants,,,,false,3,3,3,Fact
+finance,50,opportunities-efficiency,,,,false,3,3,3,Fact
+finance,52,budget,,,,false,3,3,3,Fact
+finance,106,leadership,,,,false,3,3,3,Fact
+finance,198,analysis-variance,,,,false,3,3,3,Fact
+finance,47,excel-advanced,,,,false,3,3,2,Fact
+finance,92,procurement-policy,,,,false,3,3,3,Fact
