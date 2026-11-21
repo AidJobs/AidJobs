@@ -2534,7 +2534,7 @@ export function outlineOp(id: string, op: OutlineOp) {
         const removed = removeCustomGroup(j.tags, groupingOf(j), op.group);
         if (!removed) return j;
         const base = { ...touched(j), ...liveEdit(j), customGroups: removed.customGroups };
-        const next = regrouped(base, { ...removed.grouping, customGroups: removed.customGroups }, removed.keys);
+        const next = regrouped(base, removed.grouping, removed.keys);
         const out = stepped(j, { ...next, sections: inOutlineOrder(j.sections, next.tags) }, opNote(next, s, op, j), 'doc');
         const part = keepJdPart(out.tags, j.part);
         return part ? { ...out, part } : out;
