@@ -1214,6 +1214,6 @@ Sealed sets are never edited. Packets, answers, disagreements and seals stay in 
 
 **Library tooling.** Schema `0.3.0` (minor, additive `phrasing_lines` and richer `reference_jds` entries). Deterministic rebuild; LF-normalised hashes for committed inputs; raw-byte seals for archive. Self-review + CI for schema/tooling; independent blind scorers for references (`review-14` / blind notes).
 
-**Out of scope (deferred):** Phase 5 / vault key / OpenRouter US$5; Option B; more families; Ashby; production crawls; generator wiring into the employer demo; A2 / W-39 / W-40 / UX public site.
+**Out of scope (deferred):** Phase 5 / vault key / OpenRouter US$5; Option B; more families; Ashby; production crawls; generator wiring into the employer demo; W-39 / W-40 / UX public site (A2 already done as PR #186).
 
-**Next:** Phase 5 US$5 stop when phrasing and kept references are on `main`; or crawl A2 if the user wants the mainline crawler step next.
+**Next:** Phase 5 US$5 stop (vault key) — phrasing and kept references are on `main` as of PR #184 (`9d83e5e`); or W-39 on the crawler stream.
