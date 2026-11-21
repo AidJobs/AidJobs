@@ -2893,7 +2893,8 @@ button.ej-step:hover {
   }
 }
 
-@media (max-width: 1023px) and (hover: none) {
+/* Full opacity on narrow screens (phones and narrow tablets); desktop hover fade stays ≥1024. */
+@media (max-width: 1023px) {
   .aj-root:has(.ej-app) .ej-sec-tools {
     opacity: 1;
   }

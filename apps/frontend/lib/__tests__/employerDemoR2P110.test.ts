@@ -20,8 +20,8 @@ describe('R2-P1-10: mobile 44px writing chrome', () => {
     expect(css).toMatch(/\.ej-parts-btn[\s\S]*flex:\s*1 1 0/);
   });
 
-  it('makes section tools fully opaque on touch and sticks the edit actions bar', () => {
-    expect(css).toMatch(/@media \(max-width: 1023px\) and \(hover: none\)[\s\S]*\.ej-sec-tools\s*\{\s*opacity:\s*1/);
+  it('makes section tools fully opaque under 1023px and sticks the edit actions bar', () => {
+    expect(css).toMatch(/@media \(max-width: 1023px\)[\s\S]*\.ej-sec-tools\s*\{\s*opacity:\s*1/);
     expect(css).toMatch(/\.ej-edit-actions[\s\S]*position:\s*sticky/);
   });
 });
