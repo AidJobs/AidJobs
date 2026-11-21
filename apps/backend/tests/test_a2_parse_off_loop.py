@@ -7,7 +7,8 @@ import time
 import pytest
 
 from contracts.reader import Response
-from crawler_v2.readers import LISTING_STRATEGY, GeneralReader
+from crawler_v2 import readers as readers_mod
+from crawler_v2.readers import LISTING_STRATEGY, GeneralReader, RssFeedReader
 from crawler_v2.simple_crawler import SimpleCrawler
 
 
@@ -56,6 +57,35 @@ def test_listing_extract_keeps_event_loop_responsive(crawler, monkeypatch):
 
     (_, _), worst = asyncio.run(_with_heartbeat(run()))
     assert calls, "extract should have run in a worker thread"
+    assert worst < 0.5, f"event loop stalled {worst:.2f}s"
+
+
+def test_rss_feed_parse_keeps_event_loop_responsive(monkeypatch):
+    real = readers_mod._rss_feed_jobs
+    calls = []
+
+    def slow(body, careers_url):
+        time.sleep(1.1)
+        calls.append(1)
+        return real(body, careers_url)
+
+    monkeypatch.setattr(readers_mod, "_rss_feed_jobs", slow)
+    body = (
+        '<?xml version="1.0"?><rss version="2.0"><channel>'
+        "<item><title>Officer</title>"
+        "<link>https://example.org/job/1</link>"
+        "<description>Nairobi</description></item>"
+        "</channel></rss>"
+    )
+
+    async def run():
+        return await RssFeedReader().read(
+            Response(200, body), {"careers_url": "https://example.org/feed"}
+        )
+
+    result, worst = asyncio.run(_with_heartbeat(run()))
+    assert calls, "RSS parse should have run in a worker thread"
+    assert result.jobs
     assert worst < 0.5, f"event loop stalled {worst:.2f}s"
 
 

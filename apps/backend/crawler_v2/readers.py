@@ -110,6 +110,9 @@ def _greenhouse_merge_detail(job: Dict, body: str) -> None:
 
 
 def _teamtailor_feed_jobs(body: str) -> List[Dict]:
+    # looks_like parses XML; keep it in the worker with jobs_from_* (A2 review).
+    if not looks_like_teamtailor(body):
+        return []
     return jobs_from_teamtailor(body)
 
 
@@ -123,6 +126,8 @@ def _lever_feed_jobs(body: str) -> List[Dict]:
 
 
 def _personio_feed_jobs(body: str, account: str, tld: str) -> List[Dict]:
+    if not looks_like_personio(body):
+        return []
     return jobs_from_personio(body, account, tld)
 
 
@@ -445,8 +450,6 @@ class TeamtailorFeedReader(Reader):
             return None
         if first.stop or first.status != 200 or not (first.body or "").strip():
             return ListingResult(self.name)
-        if not looks_like_teamtailor(first.body):
-            return ListingResult(self.name)
         jobs = await asyncio.to_thread(_teamtailor_feed_jobs, first.body)
         logger.info("Teamtailor feed reader found %s jobs", len(jobs))
         return ListingResult(self.name, jobs)
@@ -521,8 +524,6 @@ class PersonioFeedReader(Reader):
         if not recognised:
             return None
         if first.stop or first.status != 200 or not (first.body or "").strip():
-            return ListingResult(self.name)
-        if not looks_like_personio(first.body):
             return ListingResult(self.name)
         parsed = personio_account(source.get("careers_url") or "")
         if not parsed:

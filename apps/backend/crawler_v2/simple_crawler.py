@@ -2524,7 +2524,8 @@ class SimpleCrawler:
                     logger.warning(f"Error checking rollout config: {e}, using default extraction")
                 
                 if use_new_extractor:
-                    # Use new pipeline extractor
+                    # Dormant rollout path (W-23). A2 does not offload its BeautifulSoup/
+                    # classifier work; when this path is live again, wrap it like _listing_jobs.
                     try:
                         from pipeline.integration import PipelineAdapter
                         pipeline_adapter = PipelineAdapter(
