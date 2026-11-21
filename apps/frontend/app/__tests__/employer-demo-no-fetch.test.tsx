@@ -1591,7 +1591,9 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
       setPace(id, 'all');
       // The organisation's free Amplify is already used, so this walk goes through the paid checkout.
       update((st) => ({ ...st, free: { amplify: 'job-earlier' }, org: { ...st.org, keepOffered: ['fixed', 'apply'] }, jobs: st.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, approved: [...j.tags], settled: [...ASKS, ...LEFT] } } : j)) }));
-      const points = checkPoints(job(id), getState()).map((p) => p.key);
+      const points = checkPoints(job(id), getState())
+        .map((p) => p.key)
+        .filter((k) => !k.startsWith('outline-gap-'));
       update((st) => ({ ...st, jobs: st.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, skipped: points } } : j)) }));
       goOn(id);
     });
@@ -1653,7 +1655,9 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
       chooseStyle(id, ['Warm']);
       setPace(id, 'all');
       update((st) => ({ ...st, org: { ...st.org, keepOffered: ['fixed', 'apply'] }, jobs: st.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, approved: [...j.tags], settled: [...ASKS, ...LEFT] } } : j)) }));
-      const points = checkPoints(job(id), getState()).map((p) => p.key);
+      const points = checkPoints(job(id), getState())
+        .map((p) => p.key)
+        .filter((k) => !k.startsWith('outline-gap-'));
       update((st) => ({ ...st, jobs: st.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, skipped: points } } : j)) }));
       goOn(id);
     });

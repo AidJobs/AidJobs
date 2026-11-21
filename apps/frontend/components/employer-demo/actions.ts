@@ -45,7 +45,7 @@ import { canReopen, isPublished } from './lifecycle';
 import { advancedSource, detectLang, draftTranslation, draftVersionSection, headingIn, inLanguage, jobLang, keptTranslation, langOf, redraftTranslation, sourceOf, versionChoices, versionsOf } from './translate';
 import { contentOf, describeStyle, proposedStyle, recommendation, styleFromReply, styleWords, toneOf, TYPE_REASONS, usualTemplate, wordsFor } from './setup';
 import { profileFor, profileName, profileOf } from './profiles';
-import { aiWrites, ASKS, asksOf, checkPoints, contentPrint, essentials, ESSENTIAL_WORDS, FIXED_SECTIONS, isSettled, isWritten, nextStep, parkedIn, parkKey, sectionPublishBlock, stepKey, type Step } from './flow';
+import { aiWrites, ASKS, asksOf, checkPoints, contentPrint, essentials, ESSENTIAL_WORDS, FIXED_SECTIONS, isOutlineGapPoint, isSettled, isWritten, nextStep, parkedIn, parkKey, sectionPublishBlock, stepKey, type Step } from './flow';
 import { AGAIN_DATE, AGAIN_PLACE, AGAIN_POSITIONS, INVITE, KEEP_ALL, KEEP_AS_IS, MARK_REVIEWED, NO_MORE_LANGS, NO_REVIEW, NOT_NOW, NOTHING_ELSE, REMIND, SEND_REVIEW, SHOW_FLYER, stateMessage, THIS_JOB } from './walkChat';
 import { ALL_GOOD, ABOUT_QUICK, APPROVE_FIXED, ASK_TEXT as WALK_ASK, CHANGE_NO, DISMISS_MARK, CHANGE_YES, CHOOSE_SDGS, fixedNamed, NO_SDGS, orgGoalsAnswer, GENUINE, GOOD, KEEP_FIXED, LEAVE_IT, NO_THANKS, NONE_OF_THESE, OTHER_WORDING, overview, paceIn, PACE_QUICK, PROJECT_QUICK, promptFor, readAnswer, readDetails, STYLE_QUICK, styleQuestion } from './walkChat';
 
@@ -1660,16 +1660,29 @@ export function approveRest(id: string, said?: string) {
   ensureAsk(id);
 }
 
-/** A check point left as it is: nothing changes, and the check moves on. */
+/** A check point left as it is: nothing changes, and the check moves on. Outline gaps cannot be left (R2-P1-8). */
 export function leavePoint(id: string, key: string, said?: string) {
   if (!ownerOnly()) return;
+  if (isOutlineGapPoint(key)) {
+    updateJob(id, (j) =>
+      j.walk && said
+        ? { ...j, walk: { ...j.walk, awaiting: undefined }, chat: [...j.chat, msg('user', said), msg('ai', 'That section still needs wording before Check is done; write it or remove it from the outline.')] }
+        : j,
+    );
+    ensureAsk(id);
+    return;
+  }
   updateJob(id, (j) => (j.walk ? { ...j, walk: { ...j.walk, skipped: Array.from(new Set([...(j.walk.skipped ?? []), key])), awaiting: undefined }, chat: said ? [...j.chat, msg('user', said), msg('ai', 'Left as it is.')] : j.chat } : j));
   ensureAsk(id);
 }
 
-/** Highlighted wording kept as a genuine requirement, with its one-line reason. */
+/** Highlighted wording kept as a genuine requirement, with its one-line reason. Outline gaps cannot be left (R2-P1-8). */
 export function acceptPoint(id: string, key: string, hit: string, reason: string, said?: string) {
   if (!ownerOnly()) return;
+  if (isOutlineGapPoint(key)) {
+    leavePoint(id, key, said);
+    return;
+  }
   markGenuine(id, hit, reason);
   updateJob(id, (j) => (j.walk ? { ...j, walk: { ...j.walk, skipped: Array.from(new Set([...(j.walk.skipped ?? []), key])), awaiting: undefined }, chat: said ? [...j.chat, msg('user', said), msg('ai', 'Kept, with your reason in the job’s history.')] : j.chat } : j));
   ensureAsk(id);

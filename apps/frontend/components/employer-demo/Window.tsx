@@ -19,7 +19,7 @@ import { planCount } from './invites';
 import { ReviewForm, ReviewPanel } from './Review';
 import type { ChatMsg } from './types';
 import { aiOn, askAi, carryMessage, GO_ON, probeAi, useAi, whenAnswered, writeVersion } from './ai';
-import { amplifying, FIXED_SECTIONS, flyerStale, nextStep, outlineEditOpen, partOfStep, reachOpen, stepKey, walkAutoOpen } from './flow';
+import { amplifying, checkPoints, FIXED_SECTIONS, flyerStale, nextStep, outlineEditOpen, partOfStep, reachOpen, stepKey, walkAutoOpen } from './flow';
 import { readJobFile } from './readFile';
 import { ABOUT_QUICK, CHOOSE_SDGS, INVITE, OTHER_WORDING, PROJECT_QUICK, SHOW_FLYER, SKIP_APPROVAL, stateOffer } from './walkChat';
 import { STATE_DIALOGS, type OpenTarget } from './aiActions';
@@ -422,11 +422,12 @@ function SdgDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
 
 /** A part's own fields, in the panel above the job description, so it can be set without the chat. */
 function PartFields({ part, job, s, onClose, onFact, open, act }: { part: string; job: DemoJob; s: State; onClose: () => void; onFact: (k: RowKey) => void; open: Opener; act: (a: StateAction) => void }) {
-  const points = job.sections.length ? openPoints(job, s, false) : [];
+  // Walk jobs: same list as the progress Check dot (R2-P1-8). Non-walk: Publish-style openPoints.
+  const points = job.walk ? checkPoints(job, s).map((p) => p.title) : job.sections.length ? openPoints(job, s, false) : [];
   const head: Record<string, [string, string]> = {
     details: ['Details', 'The facts the job description and Google use'],
     fixed: ['Fixed text', "Your organisation's commitments, word for word"],
-    check: ['Check', 'Clarity, inclusive language, placeholders, and dates'],
+    check: ['Check', 'Clarity, inclusive language, placeholders, dates, and unfinished sections'],
     plan: ['Free or Amplify', 'How it goes out; the free terms and the packages'],
     market: ['Market check', 'How your job compares with similar open jobs'],
     full: ['Full check', 'Requirements and pay, compared with similar jobs'],

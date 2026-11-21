@@ -279,21 +279,35 @@ function unfinishedWording(text: string): boolean {
 }
 
 /**
- * Outline sections that must not go live empty or unfinished (R2-P0-1): each tag needs real lines, with no leftover placeholders.
- * Returns section titles for the publish block message. Inclusive-language / thin-duties stay Check-only.
+ * Outline sections that must not go live empty or unfinished (R2-P0-1 / R2-P1-8): each tag needs real lines, with no leftover
+ * placeholders. Inclusive-language / thin-duties stay Check-only (not outline gaps).
  */
-export function sectionPublishGaps(job: DemoJob): string[] {
-  const gaps: string[] = [];
+export function sectionOutlineGaps(job: DemoJob): Array<{ key: string; title: string }> {
+  const gaps: Array<{ key: string; title: string }> = [];
   for (const key of job.tags) {
     const sec = job.sections.find((x) => x.key === key);
     const title = sec?.title ?? job.renamed?.[key] ?? SECTION_BY_KEY[key]?.label ?? key;
     if (!sec || sec.lines.length === 0) {
-      gaps.push(title);
+      gaps.push({ key, title });
       continue;
     }
-    if (unfinishedWording(allLines(sec).join('\n'))) gaps.push(title);
+    if (unfinishedWording(allLines(sec).join('\n'))) gaps.push({ key, title });
   }
   return gaps;
+}
+
+/** Section titles for the publish block message (R2-P0-1). */
+export function sectionPublishGaps(job: DemoJob): string[] {
+  return sectionOutlineGaps(job).map((g) => g.title);
+}
+
+/** Check / leavePoint keys for empty or unfinished outline sections; never skippable (R2-P1-8). */
+export function outlineGapPointKey(sectionKey: string): string {
+  return `outline-gap-${sectionKey}`;
+}
+
+export function isOutlineGapPoint(key: string): boolean {
+  return key.startsWith('outline-gap-');
 }
 
 const GAP_LIST = 4;
@@ -310,17 +324,25 @@ export function sectionPublishBlock(job: DemoJob): string | null {
 /**
  * The basic check's open points, without those the user chose to leave; Google's needs are asked for as facts. In the job's own
  * language, fixed texts machine-translated and not approved yet are a point too (section 19, phase 6, E), as are sections a linked
- * change marked "to update".
+ * change marked "to update". Outline gaps (R2-P1-8) use the same rules as the publish gate and cannot be skipped.
  */
 export function checkPoints(job: DemoJob, s: State): Point[] {
   const machine = fixedMarked(job, s).machine;
+  const outline: Point[] = sectionOutlineGaps(job).map((g) => ({
+    key: outlineGapPointKey(g.key),
+    ok: false,
+    section: g.key,
+    title: `${g.title}: still empty or unfinished`,
+  }));
   const extra: Point[] = [
     ...(machine.length ? [{ key: 'fixed-machine', ok: false, title: `Fixed text machine-translated: please check and approve ${machine.map(fixedLabel).join(', ')}` }] : []),
     ...Object.entries(job.toUpdate ?? {})
       .filter(([k]) => job.tags.includes(k))
       .map(([k, from]) => ({ key: `to-update-${k}`, ok: false, section: k, title: `${job.sections.find((x) => x.key === k)?.title ?? k}: to update, after a change in ${langOf(from).label}` })),
   ];
-  return [...basicAdvertCheck(job, s), ...extra].filter((p) => !p.ok && p.key !== 'google' && !job.walk?.skipped?.includes(p.key));
+  return [...basicAdvertCheck(job, s), ...extra, ...outline].filter(
+    (p) => !p.ok && p.key !== 'google' && (isOutlineGapPoint(p.key) || !job.walk?.skipped?.includes(p.key)),
+  );
 }
 
 /** Up to three sections that would make this job description stronger, not in it yet. */
@@ -496,7 +518,10 @@ export function broughtForward(job: DemoJob, s: State): DemoJob {
   const walk: Walk = { pace: 'all', approved: job.tags.filter((k) => isWritten(job, k)), settled: [...DECLINABLE, ...LEFT] };
   const base: DemoJob = { ...job, walk };
   if (job.status === 'draft') return base;
-  const skipped = checkPoints(base, s).map((p) => p.key);
+  // Outline gaps stay open on Check (R2-P1-8); only soft check points are pre-left for reviewed jobs.
+  const skipped = checkPoints(base, s)
+    .map((p) => p.key)
+    .filter((k) => !isOutlineGapPoint(k));
   return skipped.length ? { ...base, walk: { ...walk, skipped } } : base;
 }
 

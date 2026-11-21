@@ -49,7 +49,11 @@ function advance(id: string, until: (st: Step) => boolean): Step | null {
     else if (st.kind === 'write') goOn(id);
     else if (['details', 'sdgs', 'fixed', 'suggest'].includes(st.kind)) settleQuestion(id, st.kind);
     else if (st.kind === 'keep') keepForAll(id, st.what, false);
-    else if (st.kind === 'check') leavePoint(id, st.point.key);
+    else if (st.kind === 'check') {
+      // Outline gaps cannot be left (R2-P1-8); stop so the test surfaces unfinished sections.
+      if (st.point.key.startsWith('outline-gap-')) return st;
+      leavePoint(id, st.point.key);
+    }
     else return st;
     goOn(id);
   }

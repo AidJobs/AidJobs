@@ -36,7 +36,10 @@ function toPlan(text = "We're hiring a Logistics Officer in Goma, fixed-term, cl
   chooseStyle(id, ['Warm']);
   setPace(id, 'all');
   update((s) => ({ ...s, org: { ...s.org, keepOffered: ['fixed', 'apply'] }, jobs: s.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, approved: [...j.tags], settled: [...ASKS, ...LEFT] } } : j)) }));
-  const points = checkPoints(job(id), getState()).map((p) => p.key);
+  // Soft check points only — outline gaps cannot be skipped (R2-P1-8).
+  const points = checkPoints(job(id), getState())
+    .map((p) => p.key)
+    .filter((k) => !k.startsWith('outline-gap-'));
   update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, skipped: points } } : j)) }));
   goOn(id);
   return id;

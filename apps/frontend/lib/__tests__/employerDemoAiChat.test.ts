@@ -366,7 +366,9 @@ describe('the AI chat, steps 8 to 10 (section 19): checked actions, and nothing 
   it('a language version is never the job’s Languages section; with a version’s tab open, section actions are carried out on the version', () => {
     turn('job-comms', 'amplify, and French', [{ type: 'choose_plan', plan: 'amplify' }, { type: 'add_language', language: 'fr' }]);
     update((s) => ({ ...s, org: { ...s.org, keepOffered: ['fixed', 'apply'] }, jobs: s.jobs.map((j) => (j.id === 'job-comms' ? { ...j, walk: { pace: 'step', approved: [...j.tags], settled: ['title', 'place', 'contract', 'grade', 'eligibility', 'languages', 'safeguarding', 'salary', 'deadline', 'method', 'details', 'sdgs', 'fixed', 'suggest', 'plan', 'market', 'full'], skipped: [] } } : j)) }));
-    const skipped = checkPoints(job('job-comms'), getState()).map((p) => p.key);
+    const skipped = checkPoints(job('job-comms'), getState())
+      .map((p) => p.key)
+      .filter((k) => !k.startsWith('outline-gap-'));
     update((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === 'job-comms' ? { ...j, walk: { ...j.walk!, skipped } } : j)) }));
     expect(nextStep(job('job-comms'), getState())?.kind).toBe('langs');
     const tags = [...job('job-comms').tags];
