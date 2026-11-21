@@ -49,14 +49,6 @@ import { aiWrites, ASKS, asksOf, checkPoints, contentPrint, essentials, ESSENTIA
 import { AGAIN_DATE, AGAIN_PLACE, AGAIN_POSITIONS, INVITE, KEEP_ALL, KEEP_AS_IS, MARK_REVIEWED, NO_MORE_LANGS, NO_REVIEW, NOT_NOW, NOTHING_ELSE, REMIND, SEND_REVIEW, SHOW_FLYER, stateMessage, THIS_JOB } from './walkChat';
 import { ALL_GOOD, ABOUT_QUICK, APPROVE_FIXED, ASK_TEXT as WALK_ASK, CHANGE_NO, DISMISS_MARK, CHANGE_YES, CHOOSE_SDGS, fixedNamed, NO_SDGS, orgGoalsAnswer, GENUINE, GOOD, KEEP_FIXED, LEAVE_IT, NO_THANKS, NONE_OF_THESE, OTHER_WORDING, overview, paceIn, PACE_QUICK, PROJECT_QUICK, promptFor, readAnswer, readDetails, STYLE_QUICK, styleQuestion } from './walkChat';
 
-/** Lazy: `context` imports this file; a top-level import of `keepProfileAbout` is undefined under Jest's cycle. */
-function keepOrgAbout(id: string, said?: string) {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  (require('./context') as typeof import('./context')).keepProfileAbout(id, said);
-}
-
-/** Same string as `KEEP_PROFILE_ABOUT` in context.ts (kept here to avoid the cycle above). */
-const KEEP_PROFILE_ABOUT = "Keep our profile's About us";
 import {
   addToGroup,
   applyOp,
@@ -79,7 +71,56 @@ import {
 import { canWord, fixedLabel, fixedList, fixedMarked, fixedShown, fixedStore, fixedWordingNow, isLocked, offeredFixed, ORG_LANG, orgWording } from './fixed';
 import { diffViews, isEmpty, langsOf, linkedTo, mirror, viewOf, withView, type Diff, type LangView } from './langs';
 import { hasFields, keepJdPart, sectionPart } from './parts';
-import type { ApplySettings, AskKind, ChatMsg, Content, CustomGroup, DeletedJob, Delivery, DemoJob, Facts, FixedOwn, Format, Grouping, JobLang, Pace, PayRequest, Person, Plan, ReachPlan, Recipient, Review, Section, State, Tone, Translation, UndoStep } from './types';
+import type { ApplySettings, AskKind, ChatMsg, Content, ContextPack, CustomGroup, DeletedJob, Delivery, DemoJob, Facts, FixedOwn, Format, Grouping, JobLang, Pace, PayRequest, Person, Plan, ReachPlan, Recipient, Review, Section, State, Tone, Translation, UndoStep } from './types';
+
+export const KEEP_PROFILE_ABOUT = "Keep our profile's About us";
+
+/**
+ * "Use our About us as it is" / keep profile About (R2-P0-3 / R1-03): put org About into `pack.about`.
+ * Lives in actions (not context) so setupTurn can call it without a webpack/Jest cycle on `require('./context')`.
+ */
+export function keepProfileAbout(id: string, said?: string) {
+  if (!ownerOnly()) return;
+  const s0 = getState();
+  const about = s0.org.about.trim();
+  const user = said ? [msg('user', said)] : [];
+  if (!about) {
+    updateJob(id, (j) => ({
+      ...j,
+      chat: [...j.chat, ...user, msg('ai', 'You have no organisation About us yet. Paste a page or text in the card, or skip for now.')],
+    }));
+    return;
+  }
+  update((s) => ({
+    ...s,
+    org: { ...s.org, websiteAsked: true },
+    jobs: s.jobs.map((j) => {
+      if (j.id !== id) return j;
+      const hasAboutTag = j.tags.includes('about');
+      const lines = about
+        .split('\n')
+        .map((l) => l.replace(/^[•*]\s*/, '- '))
+        .filter((l) => l.trim());
+      const pack: ContextPack = { ...j.pack, about: { text: about, source: 'your website' } };
+      let tags = j.tags;
+      let sections = j.sections;
+      if (hasAboutTag && lines.length) {
+        const title = headingOf(s, j, 'about');
+        const existing = j.sections.find((x) => x.key === 'about');
+        const sec: Section = existing ? { ...existing, lines, ai: true, edited: undefined } : { key: 'about', title, lines, ai: true };
+        tags = placeIn(j.tags, 'about');
+        sections = existing ? j.sections.map((x) => (x.key === 'about' ? sec : x)) : inOutlineOrder([...j.sections, sec], tags);
+      }
+      const reply = hasAboutTag
+        ? "Fine: About us stays as your profile has it. Your website can be read later from the About us section or Organisation settings."
+        : "Fine: your organisation's About us is kept for writing this job. This format starts later in the outline, so it is not a separate section on the advert.";
+      return { ...j, tags, sections, pack, chat: [...j.chat, ...user, msg('ai', reply)] };
+    }),
+  }));
+  const after = getState().jobs.find((x) => x.id === id);
+  if (after?.setup === 'about') advanceFromAbout(id);
+  else goOn(id);
+}
 
 /** A job's or a version's grouping (section 19, phase 6, B), with any added groups. */
 export function groupingOf(x: Grouping & { customGroups?: CustomGroup[] }): GroupingFull {
@@ -1305,7 +1346,7 @@ function setupTurn(s: State, j: DemoJob, text: string): boolean {
     }
     // Use / keep as it is: materialise org About into pack (and the About section when the template has one). R2-P0-3 / R1-03.
     if (t === ABOUT_QUICK[0] || t === KEEP_PROFILE_ABOUT || /\b(keep|use).*(about|profile)|as it is\b/i.test(t)) {
-      keepOrgAbout(j.id, text);
+      keepProfileAbout(j.id, text);
       return true;
     }
     // Bare yes/ok with a paste in the card must not advance or clear it (mirror project / R2-P0-3).
@@ -1315,7 +1356,7 @@ function setupTurn(s: State, j: DemoJob, text: string): boolean {
     }
     if (YES.test(t)) {
       if (s.org.about.trim()) {
-        keepOrgAbout(j.id, text);
+        keepProfileAbout(j.id, text);
         return true;
       }
       say('Paste a page address in the card below, or choose one of the answers.', ['Skip for now']);
