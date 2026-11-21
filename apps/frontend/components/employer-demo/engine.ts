@@ -852,13 +852,22 @@ export function allLines(sec: Section): string[] {
 }
 
 /**
+ * When a format has no heading for a catalog key, prefer these over the catalog label so Riverstone / INGO
+ * (no `background` slot) add **Project brief**, not the catalog word Background.
+ */
+const HEADING_WHEN_ABSENT: Partial<Record<string, string>> = {
+  background: 'Project brief',
+};
+
+/**
  * Two or three other titles for a section (section 19, phase 5, B): the headings other templates give it, and its plain name; never the
  * one in use. A suggestion applies only when chosen.
  */
 export function titleSuggestions(formats: Format[], key: string, current: string): string[] {
   const seen = new Set([current.trim().toLowerCase()]);
   const out: string[] = [];
-  for (const h of [...formats.flatMap((f) => f.order.filter((o) => o.key === key).map((o) => o.heading)), SECTION_BY_KEY[key]?.label ?? '']) {
+  const absent = HEADING_WHEN_ABSENT[key] ?? '';
+  for (const h of [...formats.flatMap((f) => f.order.filter((o) => o.key === key).map((o) => o.heading)), SECTION_BY_KEY[key]?.label ?? '', absent]) {
     const t = h.trim();
     if (t && !seen.has(t.toLowerCase())) {
       seen.add(t.toLowerCase());
@@ -874,7 +883,7 @@ export function orderSections(keys: string[], format: Format): string[] {
 }
 
 export function headingFor(key: string, format: Format): string {
-  return format.order.find((o) => o.key === key)?.heading ?? SECTION_BY_KEY[key]?.label ?? key;
+  return format.order.find((o) => o.key === key)?.heading ?? HEADING_WHEN_ABSENT[key] ?? SECTION_BY_KEY[key]?.label ?? key;
 }
 
 const NEXT_HINTS: Array<{ need: (f: Facts, hasRole: boolean) => boolean; text: (today: number) => string }> = [

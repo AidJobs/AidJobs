@@ -64,9 +64,10 @@ describe('U-4 Step A: background naming and Add', () => {
     expect(sec('job-comms', PROJECT_SECTION)?.title).toBe('Project brief');
   });
 
-  it('ingo Background: grip-style add without rename keeps Background', () => {
+  it('INGO / Riverstone (no background slot): Add uses Project brief, not catalog Background', () => {
     applyFormat('job-comms', 'ingo-role-profile');
-    expect(headingFor(PROJECT_SECTION, formatOf(getState(), 'ingo-role-profile'))).toBe('Background');
+    expect(headingFor(PROJECT_SECTION, formatOf(getState(), 'ingo-role-profile'))).toBe('Project brief');
+    expect(headingFor(PROJECT_SECTION, formatOf(getState(), 'house'))).toBe('Project brief');
     if (job('job-comms').tags.includes(PROJECT_SECTION) && sec('job-comms', PROJECT_SECTION)) {
       expect(job('job-comms').tags.length).toBeGreaterThan(1);
       outlineOp('job-comms', { op: 'remove', key: PROJECT_SECTION });
@@ -78,7 +79,7 @@ describe('U-4 Step A: background naming and Add', () => {
       }));
     }
     outlineOp('job-comms', { op: 'add', key: PROJECT_SECTION, after: job('job-comms').tags[0] });
-    expect(sec('job-comms', PROJECT_SECTION)?.title).toBe('Background');
+    expect(sec('job-comms', PROJECT_SECTION)?.title).toBe('Project brief');
   });
 
   it('Accept of a new project draft uses the format heading, not About the project as the section title', () => {

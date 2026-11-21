@@ -3,9 +3,10 @@
  * "About the project" when background already exists without that sub.
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import { applyFormat, changeSub, editSection, formatOf, outlineOp } from '../../components/employer-demo/actions';
+import { applyFormat, changeSub, editSection, formatOf, groupingOf, outlineOp, renameSection } from '../../components/employer-demo/actions';
 import { PROJECT_SECTION, savePageFieldText } from '../../components/employer-demo/context';
-import { headingFor } from '../../components/employer-demo/engine';
+import { headingFor, titleSuggestions } from '../../components/employer-demo/engine';
+import { groupOfKey, groupOrderOf } from '../../components/employer-demo/outline';
 import { getState, resetDemo, update } from '../../components/employer-demo/store';
 
 const PROJECT_SUB = 'About the project';
@@ -63,7 +64,7 @@ describe('R2-P0-4: Project Save heading and grip About the project sub', () => {
     expect(Boolean(sec('job-comms', PROJECT_SECTION)?.subs?.some((sb) => sb.title === PROJECT_SUB))).toBe(true);
   });
 
-  it('INGO Background: Save project text keeps Background as the section title', () => {
+  it('INGO (no background slot): Save project text keeps Project brief and never force-renames to About the project', () => {
     applyFormat('job-comms', 'ingo-role-profile');
     if (job('job-comms').tags.includes(PROJECT_SECTION) && sec('job-comms', PROJECT_SECTION)) {
       outlineOp('job-comms', { op: 'remove', key: PROJECT_SECTION });
@@ -76,14 +77,39 @@ describe('R2-P0-4: Project Save heading and grip About the project sub', () => {
     }
     outlineOp('job-comms', { op: 'add', key: PROJECT_SECTION });
     editSection('job-comms', PROJECT_SECTION, 'Programme background for the country office.');
-    expect(sec('job-comms', PROJECT_SECTION)?.title).toBe('Background');
+    expect(sec('job-comms', PROJECT_SECTION)?.title).toBe('Project brief');
 
     savePageFieldText('job-comms', 'project', 'This job supports the Clean Water programme.');
 
-    expect(sec('job-comms', PROJECT_SECTION)?.title).toBe('Background');
+    expect(sec('job-comms', PROJECT_SECTION)?.title).toBe('Project brief');
+    expect(sec('job-comms', PROJECT_SECTION)?.title).not.toBe(PROJECT_SUB);
     expect(sec('job-comms', PROJECT_SECTION)?.lines).toEqual(['Programme background for the country office.']);
     expect(sec('job-comms', PROJECT_SECTION)?.subs?.map((x) => [x.title, x.lines])).toEqual([
       [PROJECT_SUB, ['This job supports the Clean Water programme.']],
     ]);
+  });
+
+  it('pencil-style rename keeps body Save separate: renameSection then savePageFieldText does not overwrite the new heading', () => {
+    ensureBackground('job-comms');
+    renameSection('job-comms', PROJECT_SECTION, 'About the programme');
+    expect(sec('job-comms', PROJECT_SECTION)?.title).toBe('About the programme');
+    savePageFieldText('job-comms', 'project', 'The Clean Water project repairs 40 water points.');
+    expect(sec('job-comms', PROJECT_SECTION)?.title).toBe('About the programme');
+    expect(sec('job-comms', PROJECT_SECTION)?.subs?.some((sb) => sb.title === PROJECT_SUB)).toBe(true);
+  });
+
+  it('other-title chips include Project brief / About the programme / Background; Add panel groups stay in catalog order', () => {
+    const formats = getState().formats;
+    const chips = titleSuggestions(formats, PROJECT_SECTION, 'Something else');
+    expect(chips).toEqual(expect.arrayContaining(['Project brief', 'About the programme', 'Background']));
+    applyFormat('job-comms', 'house');
+    const g = groupingOf(job('job-comms'));
+    const order = groupOrderOf(g);
+    expect(order.slice(0, 5)).toEqual(['employer', 'job', 'person', 'offer', 'apply']);
+    const afterPurpose = job('job-comms').tags.find((k) => groupOfKey(g, k) === 'job') ?? job('job-comms').tags[0];
+    expect(groupOfKey(g, afterPurpose)).toBe('job');
+    // Place of + is job, but catalog order still starts with employer (Add panel no longer promotes “here” to the top).
+    expect(order[0]).toBe('employer');
+    expect(order.indexOf('job')).toBeGreaterThan(order.indexOf('employer'));
   });
 });

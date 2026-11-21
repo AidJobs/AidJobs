@@ -3,7 +3,7 @@
 import { AlertCircle, Check, CheckCircle2, ChevronUp, Info, Lock, MessageSquare, Pencil, Plus, Settings2, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import Tip from '@/components/site/Tip';
-import { addRemark, alsoIn, answerFact, approveSection, bringBackFixed, changeSub, changedSinceLastRound, editSection, formatOf, groupingOf, markGenuine, outlineOp, sendChat, setApply, setFacts, setMethod, settleRemark, subId, undoLastChange, undoStep, versionOp } from './actions';
+import { addRemark, alsoIn, answerFact, approveSection, bringBackFixed, changeSub, changedSinceLastRound, editSection, formatOf, groupingOf, markGenuine, outlineOp, renameSection, sendChat, setApply, setFacts, setMethod, settleRemark, subId, undoLastChange, undoStep, versionOp } from './actions';
 import type { OpenTarget } from './aiActions';
 import Grip, { dropAt, type GripAction } from './Grip';
 import FixedBlock from './FixedBlock';
@@ -459,28 +459,24 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
               <ApplyFields job={job} />
             </div>
           )}
-          {/* R2-P0-4: project editor writes the About the project body only; parent heading stays the format name (outline rename). */}
-          {pageKind !== 'project' && (
-            <>
-              <label className="flex flex-col gap-1">
-                <span className="aj-faint" style={{ fontSize: 11.5 }}>
-                  Heading
-                </span>
-                <input style={inputStyle} value={title} onChange={(e) => setTitle(e.target.value)} aria-label={`Heading of ${sec.title}`} />
-              </label>
-              {others.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Other titles">
-                  <span className="aj-faint" style={{ fontSize: 11.5 }}>
-                    Other titles:
-                  </span>
-                  {others.map((t) => (
-                    <button key={t} type="button" className="aj-pill" style={{ height: 26 }} onClick={() => setTitle(t)}>
-                      {t}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </>
+          {/* Heading + other-title chips for every section, including Project (R2-P0-4: Save body still never force-renames to About the project). */}
+          <label className="flex flex-col gap-1">
+            <span className="aj-faint" style={{ fontSize: 11.5 }}>
+              Heading
+            </span>
+            <input style={inputStyle} value={title} onChange={(e) => setTitle(e.target.value)} aria-label={`Heading of ${sec.title}`} />
+          </label>
+          {others.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Other titles">
+              <span className="aj-faint" style={{ fontSize: 11.5 }}>
+                Other titles:
+              </span>
+              {others.map((t) => (
+                <button key={t} type="button" className="aj-pill" style={{ height: 26 }} onClick={() => setTitle(t)}>
+                  {t}
+                </button>
+              ))}
+            </div>
           )}
           {pageKind && <PageFillTools kind={pageKind} website={s.org.website} text={text} onText={(t) => setText(t.slice(0, MAX_TEXT))} disabled={reviewing} />}
           <textarea style={{ ...inputStyle, minHeight: 140, lineHeight: 1.6 }} value={text} onChange={(e) => setText(e.target.value)} aria-label={`${sec.title} text`} autoFocus placeholder={pageKind ? `Write ${sec.title} here` : undefined} />
@@ -515,6 +511,8 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
               onClick={() => {
                 if (pageKind === 'project') {
                   if (text.trim()) savePageFieldText(job.id, 'project', text);
+                  const next = title.trim();
+                  if (next && next !== sec.title) renameSection(job.id, sec.key, next);
                   setEditing(false);
                   return;
                 }
@@ -727,8 +725,8 @@ function AddNameField({ label, onCommit, onCancel }: { label: string; onCommit: 
 }
 
 /**
- * The + panel (section 19, phase 6, C): catalog chips by group (place of the + first), Add your own under every group
- * (same as the outline), then fixed texts left out. Catalog chips still insert at the +, Add your own names a section in that group.
+ * The + panel (section 19, phase 6, C): catalog chips by group in catalog order (employer → job → …), with the group of
+ * the + marked “here”; Add your own under every group; then fixed texts left out. Catalog chips still insert at the +.
  */
 export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State; at: { after: string | null; anchor: HTMLElement; end: boolean }; onClose: () => void; lang?: JobLang }) {
   const box = useRef<HTMLDivElement>(null);
@@ -740,8 +738,9 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
   const view = viewOf(job, lang);
   const g = { ...(view?.grouping ?? groupingOf(job)), customGroups: view?.customGroups ?? job.customGroups };
   const keys = view?.keys ?? job.tags;
-  const here = at.after ? groupOfKey(g, at.after) : groupOrderOf(g)[0];
-  const groups = [here, ...groupOrderOf(g).filter((x) => x !== here)];
+  // Catalog group order (employer → job → …); mark the group of the + as “here” instead of promoting it to the top.
+  const groups = groupOrderOf(g);
+  const here = at.after ? groupOfKey(g, at.after) : groups[0];
   const format = formatOf(s, job.format);
   const rec = recommendSections(format, job.facts);
   const left = offeredFixed(s.org).filter((k) => !fixedList(job, lang).includes(k));
@@ -851,9 +850,13 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
       {groups.map((gk) => {
         const missing = SECTIONS.filter((d) => d.group === gk && !keys.includes(d.key));
         const label = GROUPS.find((x) => x.key === gk)?.label ?? (view?.customGroups ?? job.customGroups)?.find((x) => x.id === gk)?.label ?? gk;
+        const atHere = gk === here;
         return (
-          <div key={gk} className="flex flex-col gap-1" role="group" aria-label={label}>
-            <span className="ej-menu-label">{label}</span>
+          <div key={gk} className="flex flex-col gap-1" role="group" aria-label={atHere ? `${label}, where you opened Add` : label} data-add-here={atHere || undefined}>
+            <span className="ej-menu-label">
+              {label}
+              {atHere ? ' · here' : ''}
+            </span>
             <div className="flex flex-wrap gap-1 px-1.5">
               {missing.map((d) => (
                 <Tip key={d.key} label={`${d.hint}${rec.includes(d.key) ? ' · recommended for this job' : ''}`}>
@@ -978,7 +981,7 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inW
             { label: 'Move down', off: last ? 'It is last in the job description' : undefined, run: () => moveByReading(sec.key, 1) },
             { label: 'Move to group…', items: groupOrderOf(g).filter((x) => x !== groupOfKey(g, sec.key)).map((x) => ({ label: groupLabelOf(x, job.customGroups), run: () => (outlineOp(job.id, { op: 'toGroup', key: sec.key, group: x }), focusGrip(sec.key)) })) },
             { label: 'Add a section below', run: () => openAdd(sec.key, document.querySelector<HTMLElement>(`[data-grip-key="${sec.key}"]`), false) },
-            // U-4 / R2-P0-4: missing background → Add format heading; background without "About the project" sub → add that sub only.
+            // U-4 / R2-P0-4: one slot — missing → Add format/default heading; present without project sub → add that sub under the parent (never a second section).
             ...(!keys.includes(PROJECT_SECTION)
               ? [
                   {
@@ -992,9 +995,10 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inW
               : (() => {
                   const bg = job.sections.find((x) => x.key === PROJECT_SECTION);
                   if (!bg || bg.subs?.some((sb) => sb.title === PROJECT_SUB)) return [];
+                  const parent = bg.title || headingFor(PROJECT_SECTION, formatOf(s, job.format));
                   return [
                     {
-                      label: `Add ${PROJECT_SUB}`,
+                      label: `Add “${PROJECT_SUB}” under ${parent}`,
                       run: () => {
                         changeSub(job.id, PROJECT_SECTION, { add: PROJECT_SUB });
                         document.getElementById(`ej-sec-${PROJECT_SECTION}`)?.scrollIntoView({ block: 'nearest' });

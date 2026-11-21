@@ -20,7 +20,7 @@
 
 5. ~~Approve vs unsaved buffers; Add-panel blur/Escape~~ — **Fixed 20 Nov 2026** (Step A R1-06; Step B R1-11; user confirmed on preview)
 
-**Next (21 Nov 2026, after R2-P1-6 confirmed on preview):** **R2-P1-7** (house format + UN chips before NGO template), or the user’s new priority. Phase 7 held.
+**Next (21 Nov 2026, after Background/Project heading polish — confirm on preview):** **R2-P1-7** (house format + UN chips before NGO template), or the user’s new priority. Phase 7 held.
 
 ---
 
@@ -321,6 +321,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 21 Nov 2026 | R1-10 / R2-P1-4 (fake Moved) | `7475fda` | Move up on first / Move down on last: no “Moved” announce, menu items disabled (`off`), `outlineOp`/`versionOp` leave tags and undoStep unchanged. Confirmed on preview (first Move up disabled + empty status; last Move down disabled). |
 | 21 Nov 2026 | R1-10 / R2-P1-4 (group drop + remove-group) | `d77138e`…`3f53f82` | Outline: string `data-group-drop` + sage insertion bar while dragging a group; keyboard `groupBy` unchanged. `removeCustomGroup` / `rehomeTarget`: remove empty custom group only, rehome sections (catalog → own; custom → prev/next/`job`); `outlineOp` / `versionOp` / `applyToEntries` / AI `remove_group`. Undo restores. Agent confirmed on preview (drop bar + status while dragging; Annex + Kit list → remove → Kit under Applying; keyboard move group). |
 | 21 Nov 2026 | R2-P1-6 | `917804d` | AI `set_facts`: `groundPayDeadline` — salary digits must appear in the user’s words / brief; closing date from `extractFacts` on that corpus wins over the AI’s ISO; invented pay/date refused. Tests in `employerDemoAiChat.test.ts`. **Agent confirmed on preview** (WASH Coordinator brief: KES 180,000 + in 3 weeks → stayed `180000` / `2026-12-12` after template and AI re-apply). |
+| 21 Nov 2026 | Background / Project heading polish (user) | _(this tip)_ | Restore Heading + other-title chips on project pencil (Save body still no force-rename). Formats without a `background` slot add **Project brief** (`headingFor` fallback). Grip: `Add Project brief` / `Add “About the project” under …` (one slot). Add panel: catalog group order with **· here** on the open place. Confirm on preview. |
 
 ---
 
@@ -328,7 +329,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 
 1. Read this file and `employer-side-plan.md` Phase 6 / polish status.  
 2. Confirm `demo/employer` tip and that English-first still holds.  
-3. **Default next:** **R2-P1-7** (house format + UN chips), after R2-P1-6 preview confirm. Or the user’s new priority.  
+3. **Default next:** **R2-P1-7** (house format + UN chips), after Background/Project heading preview confirm. Or the user’s new priority.  
 4. Mark IDs Fixed in the tables and add a Fix log row in the same commit as the code.  
 5. Do not close Phase 7 until the user says English chrome is good enough.  
 6. Never stage leftover `apps/frontend/lib/__tests__/employerDemoPhase6Review.test.ts` or `apps/frontend/AGENTS.md` unless the user asks.
