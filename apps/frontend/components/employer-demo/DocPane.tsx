@@ -362,8 +362,9 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
             <Check size={11} strokeWidth={2} aria-hidden /> Approved
           </span>
         )}
+        {/* R1-12: change note on its own full-width row (like StepNote) so Also-in / Undo are not ellipsized away. */}
         {noteText && (
-          <>
+          <div className="ej-sec-change">
             <span className="ej-change-text" title={noteText}>
               {noteText}
               {job.undoStep?.also && !job.lastChange && (
@@ -382,22 +383,24 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
                 </span>
               )}
             </span>
-            <Tip label={job.undoStep?.writing ? 'Waits until the linked translation is written' : 'Put it back as it was'}>
-              <button
-                type="button"
-                className="aj-text-btn"
-                onClick={() => (job.lastChange ? undoLastChange(job.id) : undoStep(job.id))}
-                aria-disabled={job.undoStep?.writing || undefined}
-              >
-                Undo
-              </button>
-            </Tip>
-            {onSeeChat && (
-              <button type="button" className="aj-text-btn" onClick={onSeeChat}>
-                See in chat
-              </button>
-            )}
-          </>
+            <span className="ej-change-actions">
+              <Tip label={job.undoStep?.writing ? 'Waits until the linked translation is written' : 'Put it back as it was'}>
+                <button
+                  type="button"
+                  className="aj-text-btn"
+                  onClick={() => (job.lastChange ? undoLastChange(job.id) : undoStep(job.id))}
+                  aria-disabled={job.undoStep?.writing || undefined}
+                >
+                  Undo
+                </button>
+              </Tip>
+              {onSeeChat && (
+                <button type="button" className="aj-text-btn" onClick={onSeeChat}>
+                  See in chat
+                </button>
+              )}
+            </span>
+          </div>
         )}
         {!draft && !reviewing && sec.key === 'about' && s.me.role === 'owner' && sec.lines.length > 0 && sec.lines.join('\n').trim() !== s.org.about.trim() && (
           <Tip label="Each new job's About us starts from it; jobs already written keep theirs">

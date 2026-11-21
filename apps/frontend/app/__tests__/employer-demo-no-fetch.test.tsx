@@ -1515,9 +1515,10 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     expect(use().disabled).toBe(true);
 
     const tabs = () => Array.from(container.querySelectorAll('[role="tab"]')).map((t) => t.textContent);
-    expect(tabs()).toEqual(['Job description', 'Français']);
+    // With a language version, the original tab is named (English), not "Job description".
+    expect(tabs()).toEqual(['English', 'Français']);
     say('show the preview');
-    expect(tabs()).toEqual(['Job description', 'Français', 'Preview']);
+    expect(tabs()).toEqual(['English', 'Français', 'Preview']);
     expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Preview');
     shows('The preview is open in the panel');
     click('In Google');
@@ -1526,7 +1527,7 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Français');
     shows('French version');
     act(() => (container.querySelector('[role="tab"][aria-selected="true"]') as HTMLElement).dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true })));
-    expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Job description');
+    expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('English');
 
     const key = job(id).sections[1].key;
     act(() => byLabel(`Edit ${job(id).sections[1].title}`).click());
@@ -1538,6 +1539,9 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     click('Save');
     expect(job(id).part).toBe(`s:${key}`);
     shows('by hand');
+    // R1-12: section change note is a full-width row with Undo outside the ellipsis.
+    expect(container.querySelector('.ej-sec-change')).not.toBeNull();
+    expect(container.querySelector('.ej-sec-change .ej-change-actions')?.textContent).toContain('Undo');
 
     say('publish it');
     shows('nothing goes out until you press it');

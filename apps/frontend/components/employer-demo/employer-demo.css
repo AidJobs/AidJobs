@@ -2519,17 +2519,43 @@ button.ej-step:hover {
   background: var(--surface-2);
 }
 
+/* R1-12: wrap so Approve / Undo / Also-in / tools are never clipped by the JD column. */
 .ej-sec-head {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  row-gap: 4px;
   min-width: 0;
 }
 
 .ej-sec-title {
-  flex: 1 1 auto;
+  flex: 1 1 6rem;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ej-sec-head > .ej-sec-tools,
+.ej-sec-head > .aj-pill,
+.ej-sec-head > .aj-chip,
+.ej-sec-head > .ej-sec-change,
+.ej-sec-head > button.aj-text-btn,
+.ej-sec-head > button.aj-icon-btn {
+  flex-shrink: 0;
+}
+
+.ej-sec-head > .ej-sec-change {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.ej-sec-head > .ej-sec-change .ej-change-text {
+  overflow: visible;
+  text-overflow: unset;
+  white-space: normal;
 }
 
 .ej-change-note {
@@ -2854,11 +2880,6 @@ button.ej-step:hover {
   .aj-root:has(.ej-app) .ej-parts-btn .ej-jump-count {
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  .aj-root:has(.ej-app) .ej-sec-head {
-    flex-wrap: wrap;
-    row-gap: 4px;
   }
 
   /* Beat leftover inline 28/30 heights so phone targets stay ≥44px. */
