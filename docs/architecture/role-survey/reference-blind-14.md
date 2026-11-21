@@ -88,3 +88,24 @@ Rank is for a typical hiring manager of that org type. 1 = better fit, 2 = worse
 None. The thinnest duties still name an object and, on most lines, a frequency or a deadline. No draft is thin enough on decision facts or duties to fall under its threshold.
 
 Lowest totals, still keeps: both MEAL local drafts at 19 (threshold 15), and the French communications INGO profile at 19 (threshold 12). Correct « plan social » and « Briefing » before a French hiring manager uses that INGO profile; on the numeric rule it still keeps.
+
+## Forced choice (separate ranker, no guide)
+Reviewer: Grok 4.7 (forced-choice only)
+
+Rank 1 is the stronger house pattern for a typical hiring manager of that org type. Rank 2 is still usable. This pass did not use the score table above.
+
+### Programme management
+- EN: **1** `ingo_role_profile`, **2** `local_ngo_concise` — A programme manager can hire on time, budget, quality and safeguarding, with a variance window, a risk register and documented community feedback; the concise purpose stops at “on track” and the budget duty is “keep current”.
+- FR: **1** `ingo_role_profile`, **2** `local_ngo_concise` — The French profile keeps those same tests; « sur la bonne voie » and « tenir le budget à jour » are too soft to hand on as the house pattern.
+
+### MEAL
+- EN: **1** `ingo_role_profile`, **2** `local_ngo_concise` — The profile names baseline, target and source, access lists, and owners after the learning session; the concise purpose covers monitoring, and the tool line only says maintain.
+- FR: **1** `ingo_role_profile`, **2** `local_ngo_concise` — The profile still shows that cycle; clean « baselines », « managers » and « brief » before it is copied, and the concise draft leaves « briefs » in English with no named user of the findings.
+
+### Communications and advocacy
+- EN: **1** `ingo_role_profile`, **2** `local_ngo_concise` — Embargo timing, journalist follow-up within a set number of days, partner updates that include results and risks, and one required change when a metric misses are the hiring tests; the concise draft has no journalist line and sends partner updates with no content.
+- FR: **1** `ingo_role_profile`, **2** `local_ngo_concise` — The French profile now reads as communications work (contenus, embargo, couverture sous un délai); the concise draft is clear, includes pay and a close date, and still omits journalist follow-up and the content of partner updates.
+
+### Finance
+- EN: **1** `ingo_role_profile`, **2** `local_ngo_concise` — Close day, same-day breaks, ledger-tied donor reports, an audit pack and the statutory deadline are what a finance manager screens on; the concise cash-flow line only says “early” and leaves out the audit pack and the filing.
+- FR: **1** `ingo_role_profile`, **2** `local_ngo_concise` — Same order; « investigant » is in both French drafts, and the concise text still says only « tôt » for cash shortfalls.
