@@ -738,8 +738,9 @@ export function AddPanel({ job, s, at, onClose, lang }: { job: DemoJob; s: State
   const view = viewOf(job, lang);
   const g = { ...(view?.grouping ?? groupingOf(job)), customGroups: view?.customGroups ?? job.customGroups };
   const keys = view?.keys ?? job.tags;
-  // Catalog group order (employer → job → …); mark the group of the + as “here” instead of promoting it to the top.
-  const groups = groupOrderOf(g);
+  // Always list the five catalog groups in fixed order (employer → job → …), then any added groups; mark the + place as “here”.
+  const catalog = GROUPS.map((x) => x.key);
+  const groups = [...catalog, ...groupOrderOf(g).filter((k) => !catalog.includes(k))];
   const here = at.after ? groupOfKey(g, at.after) : groups[0];
   const format = formatOf(s, job.format);
   const rec = recommendSections(format, job.facts);

@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { applyFormat, changeSub, editSection, formatOf, groupingOf, outlineOp, renameSection } from '../../components/employer-demo/actions';
 import { PROJECT_SECTION, savePageFieldText } from '../../components/employer-demo/context';
-import { headingFor, titleSuggestions } from '../../components/employer-demo/engine';
+import { GROUPS, headingFor, titleSuggestions } from '../../components/employer-demo/engine';
 import { groupOfKey, groupOrderOf } from '../../components/employer-demo/outline';
 import { getState, resetDemo, update } from '../../components/employer-demo/store';
 
@@ -98,18 +98,22 @@ describe('R2-P0-4: Project Save heading and grip About the project sub', () => {
     expect(sec('job-comms', PROJECT_SECTION)?.subs?.some((sb) => sb.title === PROJECT_SUB)).toBe(true);
   });
 
-  it('other-title chips include Project brief / About the programme / Background; Add panel groups stay in catalog order', () => {
+  it('other-title chips include Project brief / About the programme / Background; Add panel uses fixed GROUPS order even if the job regrouped', () => {
     const formats = getState().formats;
     const chips = titleSuggestions(formats, PROJECT_SECTION, 'Something else');
     expect(chips).toEqual(expect.arrayContaining(['Project brief', 'About the programme', 'Background']));
     applyFormat('job-comms', 'house');
+    // Simulate a job that put The job before About the employer in its own outline.
+    update((s) => ({
+      ...s,
+      jobs: s.jobs.map((j) => (j.id === 'job-comms' ? { ...j, groupOrder: ['job', 'employer', 'person', 'offer', 'apply'] } : j)),
+    }));
     const g = groupingOf(job('job-comms'));
-    const order = groupOrderOf(g);
-    expect(order.slice(0, 5)).toEqual(['employer', 'job', 'person', 'offer', 'apply']);
-    const afterPurpose = job('job-comms').tags.find((k) => groupOfKey(g, k) === 'job') ?? job('job-comms').tags[0];
-    expect(groupOfKey(g, afterPurpose)).toBe('job');
-    // Place of + is job, but catalog order still starts with employer (Add panel no longer promotes “here” to the top).
-    expect(order[0]).toBe('employer');
-    expect(order.indexOf('job')).toBeGreaterThan(order.indexOf('employer'));
+    expect(groupOrderOf(g)[0]).toBe('job');
+    // Add panel ignores that and always lists GROUPS first (employer → job → …).
+    const catalog = GROUPS.map((x) => x.key);
+    const panelGroups = [...catalog, ...groupOrderOf(g).filter((k) => !catalog.includes(k))];
+    expect(panelGroups.slice(0, 5)).toEqual(['employer', 'job', 'person', 'offer', 'apply']);
+    expect(groupOfKey(g, 'purpose')).toBe('job');
   });
 });
