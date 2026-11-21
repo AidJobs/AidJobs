@@ -1,5 +1,5 @@
 {
-  "built_at": "wave1a-0.3.0-5a63eb99ba72",
+  "built_at": "wave1a-0.3.0-4f33ce8a640f",
   "built_from": {
     "duty_group_names_sha256": "53b6ed7d17ed3a8930d71bfde7cc727971caf7df7b4bf8c060270d6e96ac8d09",
     "duty_group_row_count": 213,
@@ -8,8 +8,8 @@
     "measured_generated_at": "2026-11-15T14:27:26Z",
     "normative_row_count": 13,
     "normative_sources_sha256": "bb505ba7997de7dea1ea79d785cae84ee756c4ca3621d691ba9bb4a3b6942868",
-    "reference_jd_count": 0,
-    "reference_jds_sha256": "",
+    "reference_jd_count": 16,
+    "reference_jds_sha256": "2a1d035e39dd0c6dc81ffd8dc1576d0b0931fedabb32b692ad868761436a94bc",
     "signature_fact_row_count": 22,
     "signature_facts_sha256": "01c039c530463c0ce3360f7f7f74a30c8daebdff57af5d85aced3c32c761cc96",
     "wave_1a_broad_measured_sha256": "d9abc8fc085aa9d699e01b5f0b1545e310ee0e5ddc5284ca69f03d06e98abd51",
@@ -23,7 +23,7 @@
   "deep_fields_ready": {
     "duty_bank_naming": true,
     "duty_bank_phrasing": true,
-    "reference_jds": false,
+    "reference_jds": true,
     "signature_fact_questions": true
   },
   "deep_option_a_scores": {
@@ -1365,7 +1365,52 @@
     "label": "Estimate",
     "status": "pending"
   },
-  "reference_jds": [],
+  "reference_jds": [
+    {
+      "family_id": "finance",
+      "format": "ingo_role_profile",
+      "format_label": "INGO role profile",
+      "label": "Estimate",
+      "language": "en",
+      "level": "officer",
+      "path": "role-survey/library/reference/finance-ingo_role_profile.en.md",
+      "sha256": "48d19f411533bce02eba5747111ab2ac493a3486a32aedc899961dba6e3eb1fd",
+      "status": "kept_after_blind_scoring"
+    },
+    {
+      "family_id": "finance",
+      "format": "ingo_role_profile",
+      "format_label": "INGO role profile",
+      "label": "Estimate",
+      "language": "fr",
+      "level": "officer",
+      "path": "role-survey/library/reference/finance-ingo_role_profile.fr.md",
+      "sha256": "d2e60b08703fcda337f6dbd8cf32b23287899054db8f523dbc6bcfa4a6fa9338",
+      "status": "kept_after_blind_scoring"
+    },
+    {
+      "family_id": "finance",
+      "format": "local_ngo_concise",
+      "format_label": "local NGO concise",
+      "label": "Estimate",
+      "language": "en",
+      "level": "officer",
+      "path": "role-survey/library/reference/finance-local_ngo_concise.en.md",
+      "sha256": "ca88b1e683d2f8caa2cb52ef9c008af9acd1ee0ce8f64cdea8a8aa2499cb8401",
+      "status": "kept_after_blind_scoring"
+    },
+    {
+      "family_id": "finance",
+      "format": "local_ngo_concise",
+      "format_label": "local NGO concise",
+      "label": "Estimate",
+      "language": "fr",
+      "level": "officer",
+      "path": "role-survey/library/reference/finance-local_ngo_concise.fr.md",
+      "sha256": "3bbdf77513ad842991e93bddeee5ece543876239b1c6615945260d40d88de1cc",
+      "status": "kept_after_blind_scoring"
+    }
+  ],
   "requirements_by_level": {
     "label": "Estimate",
     "status": "pending"

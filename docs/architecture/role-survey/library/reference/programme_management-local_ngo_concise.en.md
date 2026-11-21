@@ -1,5 +1,5 @@
 <!--
-aidjobs-reference-status: draft
+aidjobs-reference-status: kept
 family_id: programme_management
 format: local_ngo_concise
 language: en

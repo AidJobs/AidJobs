@@ -1,5 +1,5 @@
 <!--
-aidjobs-reference-status: draft
+aidjobs-reference-status: kept
 family_id: meal
 format: local_ngo_concise
 language: en
@@ -24,7 +24,7 @@ Keep [project] monitoring honest and usable: clean data, clear indicators, timel
 - Apply confidentiality rules to [dataset].
 
 ## Must-haves
-- MEAL or M&E field experience.
+- MEAL or M&E experience on programme data.
 - Indicator plans with baselines and targets.
 - [Language] for work with [audience].
 - Careful with data protection.

@@ -1,5 +1,5 @@
 <!--
-aidjobs-reference-status: draft
+aidjobs-reference-status: kept
 family_id: finance
 format: local_ngo_concise
 language: en

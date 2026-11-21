@@ -1,5 +1,5 @@
 <!--
-aidjobs-reference-status: draft
+aidjobs-reference-status: kept
 family_id: meal
 format: ingo_role_profile
 language: en
@@ -27,7 +27,7 @@ Make monitoring, evaluation, accountability and learning usable for [project]: c
 8. Engage [stakeholder] on findings from [study] at least [frequency], adapting messages to their decisions.
 
 ## Essential requirements
-- Hands-on MEAL or M&E experience on multi-site programmes.
+- Hands-on MEAL or M&E experience on programme monitoring.
 - Experience designing or applying indicator plans with baselines and targets.
 - Experience with [tool] or a comparable data system.
 - Clear writing for non-specialist managers.

@@ -1,5 +1,5 @@
 <!--
-aidjobs-reference-status: draft
+aidjobs-reference-status: kept
 family_id: meal
 format: local_ngo_concise
 language: fr
@@ -24,8 +24,8 @@ Garder le suivi de [projet] fiable et utile : données propres, indicateurs clai
 - Appliquer les règles de confidentialité à [dataset].
 
 ## Profil — indispensable
-- Expérience MEAL ou S&E sur le terrain.
-- Plans d’indicateurs avec baselines et cibles.
+- Expérience MEAL ou S&E sur les données de programme.
+- Plans d’indicateurs avec valeurs de référence et cibles.
 - [Language] pour le travail avec [audience].
 - Rigoureux·se sur la protection des données.
 

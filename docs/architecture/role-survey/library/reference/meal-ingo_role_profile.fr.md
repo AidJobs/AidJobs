@@ -1,5 +1,5 @@
 <!--
-aidjobs-reference-status: draft
+aidjobs-reference-status: kept
 family_id: meal
 format: ingo_role_profile
 language: fr
@@ -23,11 +23,11 @@ Rendre le suivi, l’évaluation, la redevabilité et l’apprentissage utilisab
 4. Définir et suivre [indicator] pour [outcome], avec baseline, cible et source de données nommées.
 5. Préparer le brief MEAL pour [audience] chaque [frequency] avec chiffres vérifiés et constats en langage clair.
 6. Appliquer les règles de confidentialité convenues à [dataset], y compris listes d’accès et stockage sécurisé.
-7. Animer une session d’apprentissage sur [topic] après [milestone], en consignants enseignements et responsables.
+7. Animer une session d’apprentissage sur [topic] après [milestone], en consignant enseignements et responsables.
 8. Impliquer [stakeholder] sur les résultats de [study] au moins [frequency], en adaptant les messages à leurs décisions.
 
 ## Profil recherché — essentiel
-- Expérience concrète MEAL ou S&E sur des programmes multi-sites.
+- Expérience concrète MEAL ou S&E sur le suivi de programme.
 - Expérience de plans d’indicateurs avec baselines et cibles.
 - Expérience de [tool] ou d’un système de données comparable.
 - Rédaction claire pour des managers non spécialistes.

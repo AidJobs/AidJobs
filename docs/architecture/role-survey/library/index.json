@@ -1,11 +1,11 @@
 {
-  "built_at": "wave1a-0.3.0-5a63eb99ba72",
+  "built_at": "wave1a-0.3.0-4f33ce8a640f",
   "families": [
     {
       "deep_fields_ready": {
         "duty_bank_naming": true,
         "duty_bank_phrasing": true,
-        "reference_jds": false,
+        "reference_jds": true,
         "signature_fact_questions": true
       },
       "family_id": "programme_management",
@@ -16,7 +16,7 @@
       "deep_fields_ready": {
         "duty_bank_naming": true,
         "duty_bank_phrasing": true,
-        "reference_jds": false,
+        "reference_jds": true,
         "signature_fact_questions": true
       },
       "family_id": "meal",
@@ -27,7 +27,7 @@
       "deep_fields_ready": {
         "duty_bank_naming": true,
         "duty_bank_phrasing": true,
-        "reference_jds": false,
+        "reference_jds": true,
         "signature_fact_questions": true
       },
       "family_id": "communications_advocacy",
@@ -38,7 +38,7 @@
       "deep_fields_ready": {
         "duty_bank_naming": true,
         "duty_bank_phrasing": true,
-        "reference_jds": false,
+        "reference_jds": true,
         "signature_fact_questions": true
       },
       "family_id": "finance",

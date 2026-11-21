@@ -1,5 +1,5 @@
 <!--
-aidjobs-reference-status: draft
+aidjobs-reference-status: kept
 family_id: communications_advocacy
 format: ingo_role_profile
 language: fr
@@ -18,8 +18,8 @@ Planifier et produire une communication claire pour [audience] afin que résulta
 
 ## Principales responsabilités
 1. Fixer les priorités de communication pour [period] visant [audience], en reliant les messages aux résultats de programme.
-2. Briefing des journalistes sur [story] avec éléments de langage approuvés et suivi de la couverture sous [days] jours.
-3. Mener le plan social de [campaign] sur [channel], avec calendrier éditorial, règles de modération et indicateurs hebdomadaires.
+2. Briefier les journalistes sur [story] avec éléments de langage approuvés et suivre la couverture sous [days] jours.
+3. Mener le plan de contenus sur les réseaux pour [campaign] sur [channel], avec calendrier éditorial, règles de modération et indicateurs hebdomadaires.
 4. Préparer les mises à jour partenaires pour [donor] chaque [frequency] sur résultats, risques et jalons.
 5. Rédiger et faire valider les supports presse sur [story] pour [outlet], avec citations, faits et timing d’embargo.
 6. Maintenir la cohérence de la voix de marque sur [channel] pour [campaign] via la fiche messages approuvée.

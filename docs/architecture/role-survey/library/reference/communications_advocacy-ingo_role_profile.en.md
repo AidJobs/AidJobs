@@ -1,5 +1,5 @@
 <!--
-aidjobs-reference-status: draft
+aidjobs-reference-status: kept
 family_id: communications_advocacy
 format: ingo_role_profile
 language: en
