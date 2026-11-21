@@ -1,11 +1,15 @@
 {
-  "built_at": "wave1a-0.2.0-7466f847b07b",
+  "built_at": "wave1a-0.3.0-4f33ce8a640f",
   "built_from": {
     "duty_group_names_sha256": "53b6ed7d17ed3a8930d71bfde7cc727971caf7df7b4bf8c060270d6e96ac8d09",
     "duty_group_row_count": 213,
+    "duty_phrasing_row_count": 98,
+    "duty_phrasing_sha256": "117920c0d4455219c876f942c6e317e8c25a2cbb8f29db0c15fc29fd5180b52f",
     "measured_generated_at": "2026-11-15T14:27:26Z",
     "normative_row_count": 13,
     "normative_sources_sha256": "bb505ba7997de7dea1ea79d785cae84ee756c4ca3621d691ba9bb4a3b6942868",
+    "reference_jd_count": 16,
+    "reference_jds_sha256": "2a1d035e39dd0c6dc81ffd8dc1576d0b0931fedabb32b692ad868761436a94bc",
     "signature_fact_row_count": 22,
     "signature_facts_sha256": "01c039c530463c0ce3360f7f7f74a30c8daebdff57af5d85aced3c32c761cc96",
     "wave_1a_broad_measured_sha256": "d9abc8fc085aa9d699e01b5f0b1545e310ee0e5ddc5284ca69f03d06e98abd51",
@@ -18,8 +22,8 @@
   },
   "deep_fields_ready": {
     "duty_bank_naming": true,
-    "duty_bank_phrasing": false,
-    "reference_jds": false,
+    "duty_bank_phrasing": true,
+    "reference_jds": true,
     "signature_fact_questions": true
   },
   "deep_option_a_scores": {
@@ -31,7 +35,7 @@
   },
   "duty_bank": {
     "archive_measured_pointer": "survey-raw-archive/role-survey-reading/work/measured.jsonl",
-    "deep_fields_ready": false,
+    "deep_fields_ready": true,
     "grouping_counts": {
       "archive_pointer": "survey-raw-archive/role-survey-reading/work/stage2/measured/meal/duty-banks.jsonl",
       "evidence_note": "Counts only from the broad-layer duty-line grouping run; paraphrases stay in the archive (stage2/measured/{family}/duty-banks.jsonl).",
@@ -461,9 +465,165 @@
         "stable_id": null
       }
     ],
-    "naming_note": "AidJobs names for groups with advert_count >= 5; thinner groups keep heuristic names only (named false). Best-quarter phrasing deferred.",
+    "naming_note": "AidJobs names for groups with advert_count >= 5; thinner groups keep heuristic names only (named false). Best-quarter lines live in phrasing_lines; groups[].phrasing stays null.",
     "naming_ready": true,
-    "phrasing": null
+    "phrasing": null,
+    "phrasing_lines": [
+      {
+        "best_en": "Facilitate a learning session on [topic] after [milestone], capturing lessons and owners for follow-up.",
+        "best_fr": "Animer une session d’apprentissage sur [topic] après [milestone], en consignants enseignements et responsables du suivi.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "topic",
+          "milestone"
+        ],
+        "stable_id": "meal-collaborative-learning",
+        "weak_en": "Promote learning' as a slogan with no session or follow-up.",
+        "weak_fr": "« Promouvoir l’apprentissage » comme slogan sans session ni suivi."
+      },
+      {
+        "best_en": "Apply agreed confidentiality rules to [dataset], including access lists and secure storage checks.",
+        "best_fr": "Appliquer les règles de confidentialité convenues à [dataset], y compris listes d’accès et contrôles de stockage sécurisé.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "dataset"
+        ],
+        "stable_id": "meal-data-confidentiality",
+        "weak_en": "Ensure confidentiality' as a label with no dataset or controls.",
+        "weak_fr": "« Assurer la confidentialité » comme étiquette sans jeu de données ni contrôles."
+      },
+      {
+        "best_en": "Maintain definitions and reporting rules for [indicator] so country teams enter data the same way.",
+        "best_fr": "Maintenir les définitions et règles de reporting pour [indicator] afin que les équipes pays saisissent les données de la même façon.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "indicator"
+        ],
+        "stable_id": "meal-data-definitions",
+        "weak_en": "Define data' without which indicators or who must follow the rules.",
+        "weak_fr": "« Définir les données » sans indicateurs ni utilisateurs concernés."
+      },
+      {
+        "best_en": "Check [dataset] quality for [indicator] each [frequency], correcting gaps before reports leave the team.",
+        "best_fr": "Contrôler la qualité de [dataset] pour [indicator] chaque [frequency], en corrigeant les lacunes avant envoi des rapports.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "dataset",
+          "indicator",
+          "frequency"
+        ],
+        "stable_id": "meal-data-quality-collection",
+        "weak_en": "Ensure data quality' with no dataset, checks or timing.",
+        "weak_fr": "« Assurer la qualité des données » sans jeu de données, contrôles ni calendrier."
+      },
+      {
+        "best_en": "Configure and maintain [tool] for [project] data entry, with user guidance and access control.",
+        "best_fr": "Configurer et maintenir [tool] pour la saisie des données du [projet], avec guide utilisateur et contrôle d’accès.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "tool",
+          "project"
+        ],
+        "stable_id": "meal-data-tools",
+        "weak_en": "Use data tools' with no named system or ownership.",
+        "weak_fr": "« Utiliser les outils de données » sans système nommé ni responsabilité."
+      },
+      {
+        "best_en": "Define and track [indicator] for [outcome], with baseline, target and data source named.",
+        "best_fr": "Définir et suivre [indicator] pour [outcome], avec baseline, cible et source de données nommées.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "indicator",
+          "outcome"
+        ],
+        "stable_id": "meal-impact-indicators",
+        "weak_en": "Track impact' without named indicators or sources.",
+        "weak_fr": "« Suivre l’impact » sans indicateurs ni sources nommés."
+      },
+      {
+        "best_en": null,
+        "best_fr": null,
+        "label": "Estimate",
+        "skip": "noise_or_catchall",
+        "slots": [],
+        "stable_id": "meal-main-responsibilities",
+        "weak_en": null,
+        "weak_fr": null
+      },
+      {
+        "best_en": "Monitor [project] against the indicator plan each [frequency] and brief the manager on off-track results.",
+        "best_fr": "Suivre le [projet] selon le plan d’indicateurs chaque [frequency] et informer le responsable des résultats hors trajectoire.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "project",
+          "frequency"
+        ],
+        "stable_id": "meal-project-monitoring",
+        "weak_en": "Monitor the project' without indicators or briefing.",
+        "weak_fr": "« Suivre le projet » sans indicateurs ni briefing."
+      },
+      {
+        "best_en": "Lead the research data team of [number] on [study], setting coding standards and delivery dates.",
+        "best_fr": "Diriger l’équipe de données de recherche de [number] personnes sur [study], en fixant normes de codage et dates de livraison.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "number",
+          "study"
+        ],
+        "stable_id": "meal-research-data",
+        "weak_en": "Lead research data' with no team size or study product.",
+        "weak_fr": "« Diriger les données de recherche » sans taille d’équipe ni produit d’étude."
+      },
+      {
+        "best_en": "Engage [stakeholder] on findings from [study] at least [frequency], adapting messages to their decisions.",
+        "best_fr": "Impliquer [stakeholder] sur les résultats de [study] au moins [frequency], en adaptant les messages à leurs décisions.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "stakeholder",
+          "study",
+          "frequency"
+        ],
+        "stable_id": "meal-stakeholder-engagement",
+        "weak_en": "Engage stakeholders' with no who, on what or how often.",
+        "weak_fr": "« Impliquer les parties prenantes » sans qui, sur quoi ni à quelle fréquence."
+      },
+      {
+        "best_en": "Prepare the [audience] MEAL brief each [frequency] with verified figures and plain-language findings.",
+        "best_fr": "Préparer le brief MEAL pour [audience] chaque [frequency] avec chiffres vérifiés et constats en langage clair.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "audience",
+          "frequency"
+        ],
+        "stable_id": "meal-stakeholder-reporting",
+        "weak_en": "Report to stakeholders' with no product or cadence.",
+        "weak_fr": "« Rapporter aux parties prenantes » sans produit ni cadence."
+      },
+      {
+        "best_en": "Represent the organisation in the [group] on [topic], feeding decisions back to the team within [days] days.",
+        "best_fr": "Représenter l’organisation dans le [group] sur [topic], en rapportant les décisions à l’équipe sous [days] jours.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "group",
+          "topic",
+          "days"
+        ],
+        "stable_id": "meal-working-group-representation",
+        "weak_en": "Participate in working groups' with no feedback loop.",
+        "weak_fr": "« Participer aux groupes de travail » sans boucle de retour."
+      }
+    ]
   },
   "family_id": "meal",
   "measured_broad": {
@@ -613,12 +773,57 @@
     "label": "Estimate",
     "status": "pending"
   },
-  "reference_jds": [],
+  "reference_jds": [
+    {
+      "family_id": "meal",
+      "format": "ingo_role_profile",
+      "format_label": "INGO role profile",
+      "label": "Estimate",
+      "language": "en",
+      "level": "officer",
+      "path": "role-survey/library/reference/meal-ingo_role_profile.en.md",
+      "sha256": "0ecfe75140b06080c000afc23e893fea215b118c684cb48d44aa75896cb1d090",
+      "status": "kept_after_blind_scoring"
+    },
+    {
+      "family_id": "meal",
+      "format": "ingo_role_profile",
+      "format_label": "INGO role profile",
+      "label": "Estimate",
+      "language": "fr",
+      "level": "officer",
+      "path": "role-survey/library/reference/meal-ingo_role_profile.fr.md",
+      "sha256": "b91eb8c1406924bd52be5c61d75b64220f228f3b6ed9698171787e8bbe862cd6",
+      "status": "kept_after_blind_scoring"
+    },
+    {
+      "family_id": "meal",
+      "format": "local_ngo_concise",
+      "format_label": "local NGO concise",
+      "label": "Estimate",
+      "language": "en",
+      "level": "officer",
+      "path": "role-survey/library/reference/meal-local_ngo_concise.en.md",
+      "sha256": "cbbe5997357b5afe2a39aacbe0765e21ba236f7740244bff9a40b90539fb35c4",
+      "status": "kept_after_blind_scoring"
+    },
+    {
+      "family_id": "meal",
+      "format": "local_ngo_concise",
+      "format_label": "local NGO concise",
+      "label": "Estimate",
+      "language": "fr",
+      "level": "officer",
+      "path": "role-survey/library/reference/meal-local_ngo_concise.fr.md",
+      "sha256": "82af19de045e3e305fec22c7c0fca480a10662d82013e1a2286d3821024f5a78",
+      "status": "kept_after_blind_scoring"
+    }
+  ],
   "requirements_by_level": {
     "label": "Estimate",
     "status": "pending"
   },
-  "schema_version": "0.2.0",
+  "schema_version": "0.3.0",
   "signature_fact_questions": [
     {
       "bottom_count": 1,

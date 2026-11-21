@@ -1,4 +1,4 @@
-"""Tests for Stage 3 wave-1a library fill (signature facts + duty naming)."""
+"""Tests for Stage 3b wave-1a library (phrasing_lines + reference JDs, schema 0.3.0)."""
 from __future__ import annotations
 
 import hashlib
@@ -19,16 +19,17 @@ def test_wave_1a_families_match_deep():
 
 def test_build_writes_schema_index_and_ready_flags(tmp_path, monkeypatch):
     monkeypatch.setattr(library, "LIBRARY", tmp_path / "library")
+    monkeypatch.setattr(library, "REFERENCE_DIR", tmp_path / "library" / "reference")
     assert library.build() == 0
     assert (library.LIBRARY / "schema.json").is_file()
     assert (library.LIBRARY / "index.json").is_file()
     schema = json.loads((library.LIBRARY / "schema.json").read_text(encoding="utf-8"))
-    assert schema["schema_version"] == "0.2.0"
+    assert schema["schema_version"] == "0.3.0"
     assert "family" in schema["$defs"]
     assert "index" in schema["$defs"]
     for fid in library.WAVE_1A_FAMILIES:
         doc = json.loads((library.LIBRARY / f"{fid}.json").read_text(encoding="utf-8"))
-        assert doc["schema_version"] == "0.2.0"
+        assert doc["schema_version"] == "0.3.0"
         assert doc["normative_sources"]["default_source_ids"] == list(
             library.DEFAULT_NORMATIVE_SOURCE_IDS
         )
@@ -37,24 +38,37 @@ def test_build_writes_schema_index_and_ready_flags(tmp_path, monkeypatch):
         ready = doc["deep_fields_ready"]
         assert ready["signature_fact_questions"] is True
         assert ready["duty_bank_naming"] is True
-        assert ready["duty_bank_phrasing"] is False
-        assert ready["reference_jds"] is False
+        assert "duty_bank_phrasing" in ready
+        assert "reference_jds" in ready
         assert len(doc["signature_fact_questions"]) >= library.MIN_SIGNATURE_FACTS
         named = [g for g in doc["duty_bank"]["groups"] if g["named"]]
         assert named
         assert all(g["phrasing"] is None for g in doc["duty_bank"]["groups"])
         assert doc["duty_bank"]["phrasing"] is None
+        assert isinstance(doc["duty_bank"]["phrasing_lines"], list)
+        if ready["duty_bank_phrasing"]:
+            assert len(doc["duty_bank"]["phrasing_lines"]) == len(named)
+        else:
+            assert doc["duty_bank"]["phrasing_lines"] == []
+        if ready["reference_jds"]:
+            assert len(doc["reference_jds"]) == len(library.REFERENCE_FORMATS) * len(
+                library.REFERENCE_LANGUAGES
+            )
+        else:
+            assert doc["reference_jds"] == []
         assert library.validate_schema_subset(doc, library.family_schema(), fid) == []
 
 
 def test_check_passes_on_built_output(tmp_path, monkeypatch):
     monkeypatch.setattr(library, "LIBRARY", tmp_path / "library")
+    monkeypatch.setattr(library, "REFERENCE_DIR", tmp_path / "library" / "reference")
     assert library.build() == 0
     assert library.check() == 0
 
 
 def test_validate_refuses_un_values_in_default_sources(tmp_path, monkeypatch):
     monkeypatch.setattr(library, "LIBRARY", tmp_path / "library")
+    monkeypatch.setattr(library, "REFERENCE_DIR", tmp_path / "library" / "reference")
     assert library.build() == 0
     path = library.LIBRARY / "meal.json"
     doc = json.loads(path.read_text(encoding="utf-8"))
@@ -63,26 +77,27 @@ def test_validate_refuses_un_values_in_default_sources(tmp_path, monkeypatch):
     assert any("un-values-behaviours" in p for p in problems)
 
 
-def test_validate_refuses_non_null_phrasing(tmp_path, monkeypatch):
+def test_validate_refuses_non_null_group_phrasing(tmp_path, monkeypatch):
     monkeypatch.setattr(library, "LIBRARY", tmp_path / "library")
+    monkeypatch.setattr(library, "REFERENCE_DIR", tmp_path / "library" / "reference")
     assert library.build() == 0
     path = library.LIBRARY / "programme_management.json"
     doc = json.loads(path.read_text(encoding="utf-8"))
-    doc["duty_bank"]["phrasing"] = [{"text": "should not appear yet"}]
+    doc["duty_bank"]["phrasing"] = [{"text": "should not appear"}]
     problems = library.validate_deep_fields_ready(doc, "programme_management")
-    assert any("phrasing" in p for p in problems)
+    assert any("phrasing must stay null" in p for p in problems)
     doc["duty_bank"]["phrasing"] = None
     doc["duty_bank"]["groups"][0]["phrasing"] = "not null"
     problems = library.validate_deep_fields_ready(doc, "programme_management")
-    assert any("phrasing" in p for p in problems)
+    assert any("phrasing null" in p for p in problems)
 
 
 def test_validate_refuses_ready_when_seal_not_ok(tmp_path, monkeypatch):
     monkeypatch.setattr(library, "LIBRARY", tmp_path / "library")
+    monkeypatch.setattr(library, "REFERENCE_DIR", tmp_path / "library" / "reference")
     assert library.build() == 0
     doc = json.loads((library.LIBRARY / "finance.json").read_text(encoding="utf-8"))
     monkeypatch.setattr(library, "deep_scores_ok_for_ready", lambda _f: False)
-    # Isolate the signature flag so the seal message is about that claim
     doc["deep_fields_ready"] = {
         "duty_bank_naming": False,
         "duty_bank_phrasing": False,
@@ -111,7 +126,6 @@ def test_raw_seal_accepts_crlf_and_rejects_tamper(tmp_path, monkeypatch):
     monkeypatch.setitem(library.DEEP_SEAL_PREFIX, "finance", digest[:12])
     assert library.deep_reconciled_seal_prefix("finance") == digest[:12]
     assert library.deep_scores_ok_for_ready("finance") is True
-    # LF-normalised hash must not be used for seals
     assert library.sha256_file(root / "reconciled.json") != digest
     (root / "reconciled.json").write_bytes(body + b" ")
     assert library.deep_reconciled_seal_prefix("finance") is None
@@ -168,6 +182,14 @@ def test_deterministic_built_at_stable():
         "wave_1a_broad_measured_sha256": "b" * 64,
         "signature_facts_sha256": "c" * 64,
         "duty_group_names_sha256": "d" * 64,
+        "duty_phrasing_sha256": "",
+        "reference_jds_sha256": "",
     }
     assert library.deterministic_built_at(bf) == library.deterministic_built_at(bf)
-    assert library.deterministic_built_at(bf).startswith("wave1a-0.2.0-")
+    assert library.deterministic_built_at(bf).startswith("wave1a-0.3.0-")
+
+
+def test_noise_name_detection():
+    assert library.is_noise_group_name("CPS requirements (employer noise)")
+    assert library.is_noise_group_name("Main responsibilities heading (catch-all)")
+    assert not library.is_noise_group_name("Project implementation")

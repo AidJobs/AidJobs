@@ -1,4 +1,4 @@
-"""Role-content survey (W-54), Stage 3: wave-1a role library (role-survey.md 19.23; section 9).
+"""Role-content survey (W-54), Stage 3b: wave-1a phrasing + reference JDs (role-survey.md 19.24).
 
 Run on the user's machine; CI runs `build`, `check` and the tests:
 
@@ -6,11 +6,11 @@ Run on the user's machine; CI runs `build`, `check` and the tests:
   python tools/survey/library.py check
 
 Builds JSON under docs/architecture/role-survey/library/ from normative-sources.csv,
-wave-1a-broad-measured.json, signature-facts.csv and duty-group-names.csv.
-Measured broad-layer figures are copied with Fact labels; deep full scores stay sealed in the
-archive (reconciled.json is never committed). Deep written fields flip deep_fields_ready only when
-the committed inputs prove the content is present. Duty-bank phrasing and reference JDs stay
-unready in this stage.
+wave-1a-broad-measured.json, signature-facts.csv, duty-group-names.csv, duty-phrasing.csv
+and library/reference/*.md. Measured broad-layer figures are copied with Fact labels; deep full
+scores stay sealed in the archive (reconciled.json is never committed). Deep written fields flip
+deep_fields_ready only when the committed inputs prove the content is present. groups[].phrasing
+stays null; AidJobs best-quarter lines live in duty_bank.phrasing_lines (schema 0.3.0 additive).
 """
 from __future__ import annotations
 
@@ -28,13 +28,15 @@ import deep
 HERE = Path(__file__).resolve().parent
 ROLES = adverts.ROLES_DIR
 LIBRARY = ROLES / "library"
+REFERENCE_DIR = LIBRARY / "reference"
 NORMATIVE = ROLES / "normative-sources.csv"
 MEASURED = ROLES / "wave-1a-broad-measured.json"
 SIGNATURE_FACTS = ROLES / "signature-facts.csv"
 DUTY_GROUP_NAMES = ROLES / "duty-group-names.csv"
+DUTY_PHRASING = ROLES / "duty-phrasing.csv"
 SCHEMA_PATH = LIBRARY / "schema.json"
 
-SCHEMA_VERSION = "0.2.0"
+SCHEMA_VERSION = "0.3.0"
 WAVE = "1a"
 MIN_SIGNATURE_FACTS = 3
 DUTY_NAME_ADVERT_FLOOR = 5
@@ -43,6 +45,19 @@ WAVE_1A_FAMILIES = list(deep.FAMILIES)
 
 DEFAULT_NORMATIVE_SOURCE_IDS = ("chcf", "chs-2024", "un-generic-job-profiles")
 UN_VARIANT_SOURCE_ID = "un-values-behaviours"
+
+REFERENCE_FORMATS = ("ingo_role_profile", "local_ngo_concise")
+REFERENCE_LANGUAGES = ("en", "fr")
+FAMILY_REFERENCE_LEVEL: dict[str, str] = {
+    "programme_management": "coordinator_manager",
+    "meal": "officer",
+    "communications_advocacy": "officer",
+    "finance": "officer",
+}
+FORMAT_LABELS: dict[str, str] = {
+    "ingo_role_profile": "INGO role profile",
+    "local_ngo_concise": "local NGO concise",
+}
 
 DEEP_FIELDS_READY_KEYS = (
     "duty_bank_naming",
@@ -106,7 +121,20 @@ DUTY_GROUP_FIELDS = [
     "label",
 ]
 
+DUTY_PHRASING_FIELDS = [
+    "stable_id",
+    "family_id",
+    "skip",
+    "best_en",
+    "best_fr",
+    "slots",
+    "weak_en",
+    "weak_fr",
+    "label",
+]
+
 STABLE_ID_RE = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
+NOISE_NAME_MARKERS = ("noise", "catch-all")
 
 
 def sha256_file(path: Path) -> str:
@@ -275,6 +303,106 @@ def read_duty_group_names(path: Path = DUTY_GROUP_NAMES) -> list[dict]:
     return out
 
 
+def is_noise_group_name(name_en: str | None) -> bool:
+    text = (name_en or "").lower()
+    return any(marker in text for marker in NOISE_NAME_MARKERS)
+
+
+def read_duty_phrasing(path: Path = DUTY_PHRASING) -> list[dict]:
+    if not path.is_file():
+        return []
+    with path.open(encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        header = list(reader.fieldnames or [])
+        rows = list(reader)
+    if not rows:
+        return []
+    missing = [c for c in DUTY_PHRASING_FIELDS if c not in header]
+    if missing:
+        raise ValueError(f"duty-phrasing.csv missing columns: {', '.join(missing)}")
+    out = []
+    seen: set[str] = set()
+    for i, row in enumerate(rows, 1):
+        stable_id = (row.get("stable_id") or "").strip()
+        family_id = (row.get("family_id") or "").strip()
+        if family_id not in WAVE_1A_FAMILIES:
+            raise ValueError(f"duty-phrasing.csv row {i}: unknown family_id {family_id!r}")
+        if not stable_id or not STABLE_ID_RE.match(stable_id):
+            raise ValueError(f"duty-phrasing.csv row {i}: bad stable_id {stable_id!r}")
+        if stable_id in seen:
+            raise ValueError(f"duty-phrasing.csv duplicate stable_id {stable_id}")
+        seen.add(stable_id)
+        skip = (row.get("skip") or "").strip()
+        best_en = (row.get("best_en") or "").strip()
+        best_fr = (row.get("best_fr") or "").strip()
+        weak_en = (row.get("weak_en") or "").strip()
+        weak_fr = (row.get("weak_fr") or "").strip()
+        slots = [s.strip() for s in (row.get("slots") or "").split(";") if s.strip()]
+        label = (row.get("label") or "Estimate").strip() or "Estimate"
+        if skip:
+            if best_en or best_fr:
+                raise ValueError(
+                    f"duty-phrasing.csv row {i}: skip set but best_en/best_fr filled"
+                )
+        else:
+            if not best_en or not best_fr:
+                raise ValueError(f"duty-phrasing.csv row {i}: needs best_en and best_fr")
+            if not weak_en or not weak_fr:
+                raise ValueError(f"duty-phrasing.csv row {i}: needs weak_en and weak_fr")
+        out.append(
+            {
+                "stable_id": stable_id,
+                "family_id": family_id,
+                "skip": skip,
+                "best_en": best_en or None,
+                "best_fr": best_fr or None,
+                "slots": slots,
+                "weak_en": weak_en or None,
+                "weak_fr": weak_fr or None,
+                "label": label,
+            }
+        )
+    return out
+
+
+def reference_path(family_id: str, fmt: str, language: str) -> Path:
+    return REFERENCE_DIR / f"{family_id}-{fmt}.{language}.md"
+
+
+def read_reference_jds() -> list[dict]:
+    """Load kept reference JD metadata from committed markdown under library/reference/."""
+    if not REFERENCE_DIR.is_dir():
+        return []
+    out: list[dict] = []
+    for family_id in WAVE_1A_FAMILIES:
+        for fmt in REFERENCE_FORMATS:
+            for language in REFERENCE_LANGUAGES:
+                path = reference_path(family_id, fmt, language)
+                if not path.is_file():
+                    continue
+                text = path.read_text(encoding="utf-8")
+                if not text.strip():
+                    raise ValueError(f"empty reference file: {path.name}")
+                if "aidjobs-reference-status: kept" not in text.lower():
+                    # Drafts may exist before blind scoring; they do not flip ready.
+                    continue
+                relative = f"role-survey/library/reference/{path.name}"
+                out.append(
+                    {
+                        "family_id": family_id,
+                        "format": fmt,
+                        "format_label": FORMAT_LABELS[fmt],
+                        "language": language,
+                        "level": FAMILY_REFERENCE_LEVEL[family_id],
+                        "path": relative,
+                        "sha256": sha256_file(path),
+                        "status": "kept_after_blind_scoring",
+                        "label": "Estimate",
+                    }
+                )
+    return out
+
+
 def normative_catalog(rows: list[dict], source_ids: tuple[str, ...]) -> list[dict]:
     by_id = {r["source_id"]: r for r in rows}
     out = []
@@ -436,10 +564,46 @@ def duty_groups_for_family(groups: list[dict], family_id: str) -> list[dict]:
     ]
 
 
+def phrasing_lines_for_family(phrasing_rows: list[dict], family_id: str) -> list[dict]:
+    rows = [r for r in phrasing_rows if r["family_id"] == family_id]
+    rows.sort(key=lambda r: r["stable_id"])
+    out = []
+    for r in rows:
+        if r["skip"]:
+            out.append(
+                {
+                    "stable_id": r["stable_id"],
+                    "skip": r["skip"],
+                    "best_en": None,
+                    "best_fr": None,
+                    "slots": [],
+                    "weak_en": None,
+                    "weak_fr": None,
+                    "label": r["label"],
+                }
+            )
+        else:
+            out.append(
+                {
+                    "stable_id": r["stable_id"],
+                    "skip": None,
+                    "best_en": r["best_en"],
+                    "best_fr": r["best_fr"],
+                    "slots": list(r["slots"]),
+                    "weak_en": r["weak_en"],
+                    "weak_fr": r["weak_fr"],
+                    "label": r["label"],
+                }
+            )
+    return out
+
+
 def deep_fields_ready_for(
     family_id: str,
     signature_questions: list[dict],
     duty_groups: list[dict],
+    phrasing_rows: list[dict],
+    reference_rows: list[dict],
 ) -> dict[str, bool]:
     seals_ok = deep_scores_ok_for_ready(family_id)
     named = [g for g in duty_groups if g["named"]]
@@ -450,11 +614,33 @@ def deep_fields_ready_for(
         and all(g["stable_id"] and g["name_en"] and g["name_fr"] for g in named)
     )
     facts_ok = seals_ok and len(signature_questions) >= MIN_SIGNATURE_FACTS
+    by_stable = {r["stable_id"]: r for r in phrasing_rows if r["family_id"] == family_id}
+    phrasing_ok = False
+    if seals_ok and naming_ok and named:
+        complete = True
+        for g in named:
+            row = by_stable.get(g["stable_id"])
+            if row is None:
+                complete = False
+                break
+            noise = is_noise_group_name(g["name_en"])
+            if noise:
+                if not row["skip"]:
+                    complete = False
+                    break
+            else:
+                if row["skip"] or not row["best_en"] or not row["best_fr"]:
+                    complete = False
+                    break
+        phrasing_ok = complete and len(by_stable) == len(named)
+    expected_refs = len(REFERENCE_FORMATS) * len(REFERENCE_LANGUAGES)
+    family_refs = [r for r in reference_rows if r["family_id"] == family_id]
+    reference_ok = seals_ok and len(family_refs) == expected_refs
     return {
         "duty_bank_naming": naming_ok,
-        "duty_bank_phrasing": False,
+        "duty_bank_phrasing": phrasing_ok,
         "signature_fact_questions": facts_ok,
-        "reference_jds": False,
+        "reference_jds": reference_ok,
     }
 
 
@@ -466,11 +652,22 @@ def build_family(
     built_at: str,
     signature_facts: list[dict],
     duty_groups: list[dict],
+    phrasing_rows: list[dict],
+    reference_rows: list[dict],
 ) -> dict:
     un_variant = normative_catalog(norm_rows, (UN_VARIANT_SOURCE_ID,))
     questions = signature_questions_for_family(signature_facts, family_id)
     groups = duty_groups_for_family(duty_groups, family_id)
-    ready = deep_fields_ready_for(family_id, questions, groups)
+    ready = deep_fields_ready_for(
+        family_id, questions, groups, phrasing_rows, reference_rows
+    )
+    phrasing_lines = (
+        phrasing_lines_for_family(phrasing_rows, family_id)
+        if ready["duty_bank_phrasing"]
+        else []
+    )
+    refs = [r for r in reference_rows if r["family_id"] == family_id]
+    refs.sort(key=lambda r: (r["format"], r["language"]))
     return {
         "schema_version": SCHEMA_VERSION,
         "family_id": family_id,
@@ -502,13 +699,15 @@ def build_family(
             "grouping_counts": duty_grouping_counts(measured, family_id),
             "groups": groups,
             "phrasing": None,
+            "phrasing_lines": phrasing_lines,
             "naming_note": (
                 f"AidJobs names for groups with advert_count >= {DUTY_NAME_ADVERT_FLOOR}; "
-                "thinner groups keep heuristic names only (named false). Best-quarter phrasing deferred."
+                "thinner groups keep heuristic names only (named false). "
+                "Best-quarter lines live in phrasing_lines; groups[].phrasing stays null."
             ),
         },
         "signature_fact_questions": questions if ready["signature_fact_questions"] else [],
-        "reference_jds": [],
+        "reference_jds": refs if ready["reference_jds"] else [],
         "recognition": {"status": "pending", "label": "Estimate"},
         "requirements_by_level": {"status": "pending", "label": "Estimate"},
         "standards_application": {
@@ -534,16 +733,27 @@ def input_built_from(
     measured: dict,
     signature_facts: list[dict],
     duty_groups: list[dict],
+    phrasing_rows: list[dict],
+    reference_rows: list[dict],
 ) -> dict:
+    phrasing_hash = sha256_file(DUTY_PHRASING) if DUTY_PHRASING.is_file() else ""
+    ref_material = "|".join(
+        sorted(f"{r['path']}:{r['sha256']}" for r in reference_rows)
+    )
+    ref_hash = hashlib.sha256(ref_material.encode("utf-8")).hexdigest() if reference_rows else ""
     return {
         "normative_sources_sha256": sha256_file(NORMATIVE),
         "wave_1a_broad_measured_sha256": sha256_file(MEASURED),
         "signature_facts_sha256": sha256_file(SIGNATURE_FACTS),
         "duty_group_names_sha256": sha256_file(DUTY_GROUP_NAMES),
+        "duty_phrasing_sha256": phrasing_hash,
+        "reference_jds_sha256": ref_hash,
         "wave_1a_families": WAVE_1A_FAMILIES,
         "normative_row_count": len(norm_rows),
         "signature_fact_row_count": len(signature_facts),
         "duty_group_row_count": len(duty_groups),
+        "duty_phrasing_row_count": len(phrasing_rows),
+        "reference_jd_count": len(reference_rows),
         "measured_generated_at": measured.get("generated_at"),
     }
 
@@ -556,6 +766,8 @@ def deterministic_built_at(built_from: dict) -> str:
             built_from["wave_1a_broad_measured_sha256"],
             built_from["signature_facts_sha256"],
             built_from["duty_group_names_sha256"],
+            built_from.get("duty_phrasing_sha256") or "",
+            built_from.get("reference_jds_sha256") or "",
             SCHEMA_VERSION,
         ]
     )
@@ -568,8 +780,14 @@ def build_family_files(
     measured: dict,
     signature_facts: list[dict],
     duty_groups: list[dict],
+    phrasing_rows: list[dict] | None = None,
+    reference_rows: list[dict] | None = None,
 ) -> dict[str, dict]:
-    built_from = input_built_from(norm_rows, measured, signature_facts, duty_groups)
+    phrasing_rows = [] if phrasing_rows is None else phrasing_rows
+    reference_rows = [] if reference_rows is None else reference_rows
+    built_from = input_built_from(
+        norm_rows, measured, signature_facts, duty_groups, phrasing_rows, reference_rows
+    )
     built_at = deterministic_built_at(built_from)
     families = measured.get("families") or {}
     missing = [f for f in WAVE_1A_FAMILIES if f not in families]
@@ -578,6 +796,16 @@ def build_family_files(
     extra = sorted(set(families) - set(WAVE_1A_FAMILIES))
     if extra:
         raise ValueError(f"wave-1a families list does not match measured keys: extra {extra!r}")
+    named_ids = {
+        g["stable_id"]
+        for g in duty_groups
+        if g["named"] and g["stable_id"]
+    }
+    for row in phrasing_rows:
+        if row["stable_id"] not in named_ids:
+            raise ValueError(
+                f"duty-phrasing.csv stable_id {row['stable_id']} is not a named duty group"
+            )
     for fid in WAVE_1A_FAMILIES:
         n_facts = sum(1 for r in signature_facts if r["family_id"] == fid)
         if n_facts < MIN_SIGNATURE_FACTS:
@@ -606,7 +834,15 @@ def build_family_files(
         raise ValueError("; ".join(seal_problems))
     return {
         fid: build_family(
-            fid, norm_rows, measured, built_from, built_at, signature_facts, duty_groups
+            fid,
+            norm_rows,
+            measured,
+            built_from,
+            built_at,
+            signature_facts,
+            duty_groups,
+            phrasing_rows,
+            reference_rows,
         )
         for fid in WAVE_1A_FAMILIES
     }
@@ -632,6 +868,8 @@ def build_index(family_docs: dict[str, dict], measured: dict) -> dict:
             "wave_1a_broad_measured": "role-survey/wave-1a-broad-measured.json",
             "signature_facts": "role-survey/signature-facts.csv",
             "duty_group_names": "role-survey/duty-group-names.csv",
+            "duty_phrasing": "role-survey/duty-phrasing.csv",
+            "reference_dir": "role-survey/library/reference/",
             "wave_1a_families": WAVE_1A_FAMILIES,
         },
     }
@@ -722,7 +960,13 @@ def family_schema() -> dict:
             },
             "duty_bank": {
                 "type": "object",
-                "required": ["groups", "phrasing", "naming_ready", "deep_fields_ready"],
+                "required": [
+                    "groups",
+                    "phrasing",
+                    "phrasing_lines",
+                    "naming_ready",
+                    "deep_fields_ready",
+                ],
                 "properties": {
                     "deep_fields_ready": {"type": "boolean"},
                     "naming_ready": {"type": "boolean"},
@@ -730,12 +974,67 @@ def family_schema() -> dict:
                     "grouping_counts": {"type": ["object", "null"]},
                     "groups": {"type": "array", "items": _group_schema()},
                     "phrasing": {"type": "null"},
+                    "phrasing_lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "stable_id",
+                                "skip",
+                                "best_en",
+                                "best_fr",
+                                "slots",
+                                "weak_en",
+                                "weak_fr",
+                                "label",
+                            ],
+                            "properties": {
+                                "stable_id": {"type": "string"},
+                                "skip": {"type": ["string", "null"]},
+                                "best_en": {"type": ["string", "null"]},
+                                "best_fr": {"type": ["string", "null"]},
+                                "slots": {"type": "array", "items": {"type": "string"}},
+                                "weak_en": {"type": ["string", "null"]},
+                                "weak_fr": {"type": ["string", "null"]},
+                                "label": {"type": "string"},
+                            },
+                            "additionalProperties": False,
+                        },
+                    },
                     "naming_note": {"type": "string"},
                 },
                 "additionalProperties": False,
             },
             "signature_fact_questions": {"type": "array"},
-            "reference_jds": {"type": "array"},
+            "reference_jds": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": [
+                        "family_id",
+                        "format",
+                        "format_label",
+                        "language",
+                        "level",
+                        "path",
+                        "sha256",
+                        "status",
+                        "label",
+                    ],
+                    "properties": {
+                        "family_id": {"type": "string"},
+                        "format": {"type": "string"},
+                        "format_label": {"type": "string"},
+                        "language": {"type": "string"},
+                        "level": {"type": "string"},
+                        "path": {"type": "string"},
+                        "sha256": {"type": "string"},
+                        "status": {"type": "string"},
+                        "label": {"type": "string"},
+                    },
+                    "additionalProperties": False,
+                },
+            },
             "recognition": {"type": "object"},
             "requirements_by_level": {"type": "object"},
             "standards_application": {"type": "object"},
@@ -914,12 +1213,13 @@ def validate_deep_fields_ready(doc: dict, family_id: str) -> list[str]:
             f"(expected prefix {DEEP_SEAL_PREFIX[family_id]})"
         )
     phrasing = duty_bank.get("phrasing")
-    if phrasing:
-        problems.append(f"{family_id}: duty_bank.phrasing must stay empty until phrasing stage")
-    if ready.get("duty_bank_phrasing"):
-        problems.append(f"{family_id}: duty_bank_phrasing must stay false in this stage")
-    if ready.get("reference_jds"):
-        problems.append(f"{family_id}: reference_jds ready must stay false in this stage")
+    if phrasing is not None:
+        problems.append(f"{family_id}: duty_bank.phrasing must stay null (use phrasing_lines)")
+    phrasing_lines = duty_bank.get("phrasing_lines") or []
+    if phrasing_lines and not ready.get("duty_bank_phrasing"):
+        problems.append(f"{family_id}: phrasing_lines present but duty_bank_phrasing not ready")
+    if ready.get("duty_bank_phrasing") and not phrasing_lines:
+        problems.append(f"{family_id}: duty_bank_phrasing ready without phrasing_lines")
     questions = doc.get("signature_fact_questions") or []
     if questions and not ready.get("signature_fact_questions"):
         problems.append(f"{family_id}: signature_fact_questions present but not marked ready")
@@ -927,8 +1227,14 @@ def validate_deep_fields_ready(doc: dict, family_id: str) -> list[str]:
         problems.append(
             f"{family_id}: signature_fact_questions ready needs >= {MIN_SIGNATURE_FACTS} questions"
         )
-    if doc.get("reference_jds") and not ready.get("reference_jds"):
+    refs = doc.get("reference_jds") or []
+    if refs and not ready.get("reference_jds"):
         problems.append(f"{family_id}: reference_jds present but not marked ready")
+    expected_refs = len(REFERENCE_FORMATS) * len(REFERENCE_LANGUAGES)
+    if ready.get("reference_jds") and len(refs) != expected_refs:
+        problems.append(
+            f"{family_id}: reference_jds ready needs {expected_refs} kept files, found {len(refs)}"
+        )
     groups = duty_bank.get("groups") or []
     named = [g for g in groups if g.get("named")]
     if ready.get("duty_bank_naming"):
@@ -941,6 +1247,32 @@ def validate_deep_fields_ready(doc: dict, family_id: str) -> list[str]:
                 problems.append(
                     f"{family_id}: named group advert_count below {DUTY_NAME_ADVERT_FLOOR}"
                 )
+    if ready.get("duty_bank_phrasing"):
+        by_line = {line.get("stable_id"): line for line in phrasing_lines}
+        if len(by_line) != len(named):
+            problems.append(
+                f"{family_id}: phrasing_lines count {len(by_line)} != named groups {len(named)}"
+            )
+        for g in named:
+            line = by_line.get(g.get("stable_id"))
+            if line is None:
+                problems.append(f"{family_id}: missing phrasing_lines for {g.get('stable_id')}")
+                continue
+            noise = is_noise_group_name(g.get("name_en"))
+            if noise:
+                if not line.get("skip"):
+                    problems.append(
+                        f"{family_id}: noise group {g.get('stable_id')} must set skip"
+                    )
+            else:
+                if line.get("skip"):
+                    problems.append(
+                        f"{family_id}: phraseable group {g.get('stable_id')} must not skip"
+                    )
+                if not line.get("best_en") or not line.get("best_fr"):
+                    problems.append(
+                        f"{family_id}: phraseable group {g.get('stable_id')} needs best_en/fr"
+                    )
     for g in groups:
         if g.get("phrasing") is not None:
             problems.append(f"{family_id}: group {g.get('group_id')} must keep phrasing null")
@@ -963,7 +1295,16 @@ def check_problems(dest: Path | None = None) -> list[str]:
         measured = load_measured()
         signature_facts = read_signature_facts()
         duty_groups = read_duty_group_names()
-        built = build_family_files(norm_rows, measured, signature_facts, duty_groups)
+        phrasing_rows = read_duty_phrasing()
+        reference_rows = read_reference_jds()
+        built = build_family_files(
+            norm_rows,
+            measured,
+            signature_facts,
+            duty_groups,
+            phrasing_rows,
+            reference_rows,
+        )
         fresh_index = build_index(built, measured)
         fresh_schema = schema_document()
     except (FileNotFoundError, KeyError, ValueError) as exc:
@@ -1009,14 +1350,29 @@ def build(_args=None, dest: Path | None = None) -> int:
     measured = load_measured()
     signature_facts = read_signature_facts()
     duty_groups = read_duty_group_names()
-    family_docs = build_family_files(norm_rows, measured, signature_facts, duty_groups)
+    phrasing_rows = read_duty_phrasing()
+    reference_rows = read_reference_jds()
+    family_docs = build_family_files(
+        norm_rows,
+        measured,
+        signature_facts,
+        duty_groups,
+        phrasing_rows,
+        reference_rows,
+    )
     index = build_index(family_docs, measured)
     write_library(family_docs, index, dest)
     try:
         where = dest.relative_to(ROLES.parent)
     except ValueError:
         where = dest
-    print(f"build: wrote schema.json, index.json and {len(family_docs)} family files under {where}")
+    ready = {
+        fid: family_docs[fid]["deep_fields_ready"] for fid in WAVE_1A_FAMILIES
+    }
+    print(
+        f"build: wrote schema.json, index.json and {len(family_docs)} family files under {where}; "
+        f"phrasing_rows={len(phrasing_rows)} reference_kept={len(reference_rows)} ready={ready}"
+    )
     return 0
 
 

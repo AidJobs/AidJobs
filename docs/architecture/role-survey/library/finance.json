@@ -1,11 +1,15 @@
 {
-  "built_at": "wave1a-0.2.0-7466f847b07b",
+  "built_at": "wave1a-0.3.0-4f33ce8a640f",
   "built_from": {
     "duty_group_names_sha256": "53b6ed7d17ed3a8930d71bfde7cc727971caf7df7b4bf8c060270d6e96ac8d09",
     "duty_group_row_count": 213,
+    "duty_phrasing_row_count": 98,
+    "duty_phrasing_sha256": "117920c0d4455219c876f942c6e317e8c25a2cbb8f29db0c15fc29fd5180b52f",
     "measured_generated_at": "2026-11-15T14:27:26Z",
     "normative_row_count": 13,
     "normative_sources_sha256": "bb505ba7997de7dea1ea79d785cae84ee756c4ca3621d691ba9bb4a3b6942868",
+    "reference_jd_count": 16,
+    "reference_jds_sha256": "2a1d035e39dd0c6dc81ffd8dc1576d0b0931fedabb32b692ad868761436a94bc",
     "signature_fact_row_count": 22,
     "signature_facts_sha256": "01c039c530463c0ce3360f7f7f74a30c8daebdff57af5d85aced3c32c761cc96",
     "wave_1a_broad_measured_sha256": "d9abc8fc085aa9d699e01b5f0b1545e310ee0e5ddc5284ca69f03d06e98abd51",
@@ -18,8 +22,8 @@
   },
   "deep_fields_ready": {
     "duty_bank_naming": true,
-    "duty_bank_phrasing": false,
-    "reference_jds": false,
+    "duty_bank_phrasing": true,
+    "reference_jds": true,
     "signature_fact_questions": true
   },
   "deep_option_a_scores": {
@@ -31,7 +35,7 @@
   },
   "duty_bank": {
     "archive_measured_pointer": "survey-raw-archive/role-survey-reading/work/measured.jsonl",
-    "deep_fields_ready": false,
+    "deep_fields_ready": true,
     "grouping_counts": {
       "archive_pointer": "survey-raw-archive/role-survey-reading/work/stage2/measured/finance/duty-banks.jsonl",
       "evidence_note": "Counts only from the broad-layer duty-line grouping run; paraphrases stay in the archive (stage2/measured/{family}/duty-banks.jsonl).",
@@ -825,9 +829,395 @@
         "stable_id": null
       }
     ],
-    "naming_note": "AidJobs names for groups with advert_count >= 5; thinner groups keep heuristic names only (named false). Best-quarter phrasing deferred.",
+    "naming_note": "AidJobs names for groups with advert_count >= 5; thinner groups keep heuristic names only (named false). Best-quarter lines live in phrasing_lines; groups[].phrasing stays null.",
     "naming_ready": true,
-    "phrasing": null
+    "phrasing": null,
+    "phrasing_lines": [
+      {
+        "best_en": "Keep accounting records for [entity] complete and coded to the chart, ready for the [frequency] close.",
+        "best_fr": "Tenir la comptabilité de [entity] complète et codée selon le plan comptable, prête pour la clôture [frequency].",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "entity",
+          "frequency"
+        ],
+        "stable_id": "fn-accounting",
+        "weak_en": "Handle accounting' with no entity or close link.",
+        "weak_fr": "« Assurer la comptabilité » sans entité ni lien à la clôture."
+      },
+      {
+        "best_en": null,
+        "best_fr": null,
+        "label": "Estimate",
+        "skip": "noise_or_catchall",
+        "slots": [],
+        "stable_id": "fn-assigned-duties",
+        "weak_en": null,
+        "weak_fr": null
+      },
+      {
+        "best_en": "Complete bank and cash reconciliations for [account] each [frequency], investigating differences the same day.",
+        "best_fr": "Achever les rapprochements bancaires et de caisse pour [account] chaque [frequency], en investigant les écarts le jour même.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "account",
+          "frequency"
+        ],
+        "stable_id": "fn-bank-reconciliation",
+        "weak_en": "Do bank reconciliations' with no accounts or timing.",
+        "weak_fr": "« Faire les rapprochements bancaires » sans comptes ni calendrier."
+      },
+      {
+        "best_en": "Maintain the [horizon] cash-flow forecast for [entity] and flag shortfalls [days] days ahead.",
+        "best_fr": "Tenir la prévision de trésorerie sur [horizon] pour [entity] et signaler les manques [days] jours à l’avance.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "horizon",
+          "entity",
+          "days"
+        ],
+        "stable_id": "fn-cash-flow",
+        "weak_en": "Manage cash flow' without forecast horizon or alert rule.",
+        "weak_fr": "« Gérer la trésorerie » sans horizon de prévision ni règle d’alerte."
+      },
+      {
+        "best_en": "Deliver one finance improvement on [process] each quarter, measured against a baseline time or error rate.",
+        "best_fr": "Livrer une amélioration finance sur [process] chaque trimestre, mesurée par rapport à un temps ou taux d’erreur de référence.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "process"
+        ],
+        "stable_id": "fn-continuous-improvement",
+        "weak_en": "Continuous improvement' as a slogan with no measure.",
+        "weak_fr": "« Amélioration continue » comme slogan sans mesure."
+      },
+      {
+        "best_en": "Support country finance for [country] on closes, donor packs and control questions within agreed SLAs.",
+        "best_fr": "Appuyer la finance pays pour [country] sur clôtures, dossiers bailleurs et questions de contrôle dans les délais convenus.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "country"
+        ],
+        "stable_id": "fn-country-finance",
+        "weak_en": "Support country finance' with no country or SLA.",
+        "weak_fr": "« Appuyer la finance pays » sans pays ni engagement de délai."
+      },
+      {
+        "best_en": "Prepare [donor] financial reports for [grant] by [deadline], reconciling to the ledger before submission.",
+        "best_fr": "Préparer les rapports financiers [donor] pour [grant] pour le [deadline], en rapprochant au grand livre avant envoi.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "donor",
+          "grant",
+          "deadline"
+        ],
+        "stable_id": "fn-donor-financial-reporting",
+        "weak_en": "Donor financial reporting' with no grant, deadline or reconciliation.",
+        "weak_fr": "« Rapports financiers aux bailleurs » sans subvention, échéance ni rapprochement."
+      },
+      {
+        "best_en": "Coordinate finance inputs for [process] with named counterparts and a shared tracker updated each [frequency].",
+        "best_fr": "Coordonner les contributions finance pour [process] avec interlocuteurs nommés et un suivi partagé mis à jour chaque [frequency].",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "process",
+          "frequency"
+        ],
+        "stable_id": "fn-effective-coordination",
+        "weak_en": "Ensure effective coordination' as filler with no process or tracker.",
+        "weak_fr": "« Assurer une coordination efficace » comme formule vide sans processus ni suivi."
+      },
+      {
+        "best_en": "Coordinate the external audit for [entity], delivering PBC lists on time and tracking open points to clearance.",
+        "best_fr": "Coordonner l’audit externe pour [entity], en livrant les listes PBC à temps et suivant les points ouverts jusqu’à clôture.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "entity"
+        ],
+        "stable_id": "fn-external-audit",
+        "weak_en": "Support external audit' without PBC or tracking.",
+        "weak_fr": "« Soutenir l’audit externe » sans PBC ni suivi."
+      },
+      {
+        "best_en": "Lead the finance function of [number] staff for [entity], setting priorities and review rhythms.",
+        "best_fr": "Diriger la fonction finance de [number] personnes pour [entity], en fixant priorités et rythmes de revue.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "number",
+          "entity"
+        ],
+        "stable_id": "fn-finance-leadership",
+        "weak_en": "Provide finance leadership' without team size or rhythms.",
+        "weak_fr": "« Assurer le leadership finance » sans taille d’équipe ni rythmes."
+      },
+      {
+        "best_en": "Document and run the finance process for [process] end to end, with a named owner at each step.",
+        "best_fr": "Documenter et exécuter le processus finance pour [process] de bout en bout, avec un responsable nommé à chaque étape.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "process"
+        ],
+        "stable_id": "fn-finance-processes",
+        "weak_en": "Improve finance processes' as a broad label with no process named.",
+        "weak_fr": "« Améliorer les processus finance » comme étiquette large sans processus nommé."
+      },
+      {
+        "best_en": "Deliver finance training on [topic] to [audience] and keep case files of questions and answers.",
+        "best_fr": "Dispenser une formation finance sur [topic] à [audience] et conserver des dossiers de questions-réponses.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "topic",
+          "audience"
+        ],
+        "stable_id": "fn-finance-training",
+        "weak_en": "Train staff' without topic, audience or records.",
+        "weak_fr": "« Former le personnel » sans sujet, public ni dossiers."
+      },
+      {
+        "best_en": "Update the [horizon] forecast for [entity] each [frequency], showing drivers of change versus the last version.",
+        "best_fr": "Mettre à jour la prévision sur [horizon] pour [entity] chaque [frequency], en montrant les moteurs de changement par rapport à la version précédente.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "horizon",
+          "entity",
+          "frequency"
+        ],
+        "stable_id": "fn-financial-forecasting",
+        "weak_en": "Forecast finances' without horizon or drivers.",
+        "weak_fr": "« Faire des prévisions » sans horizon ni moteurs."
+      },
+      {
+        "best_en": "Oversee financial management for [entity], including budgets, controls and monthly management pack.",
+        "best_fr": "Superviser la gestion financière de [entity], y compris budgets, contrôles et dossier de gestion mensuel.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "entity"
+        ],
+        "stable_id": "fn-financial-management",
+        "weak_en": "Manage finances' as a label with no entity or products.",
+        "weak_fr": "« Gérer les finances » comme étiquette sans entité ni produits."
+      },
+      {
+        "best_en": "Produce the [period] financial plan and variance analysis for [entity], with clear assumptions.",
+        "best_fr": "Produire le plan financier [period] et l’analyse des écarts pour [entity], avec hypothèses explicites.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "period",
+          "entity"
+        ],
+        "stable_id": "fn-financial-planning",
+        "weak_en": "Do FP&A' without period, entity or assumptions.",
+        "weak_fr": "« Faire du FP&A » sans période, entité ni hypothèses."
+      },
+      {
+        "best_en": "Post and file [transaction] records for [entity] daily, with supporting documents complete.",
+        "best_fr": "Comptabiliser et classer les enregistrements de [transaction] pour [entity] chaque jour, avec pièces justificatives complètes.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "transaction",
+          "entity"
+        ],
+        "stable_id": "fn-financial-records",
+        "weak_en": "Maintain financial records' with no transaction type or filing rule.",
+        "weak_fr": "« Tenir les dossiers financiers » sans type de transaction ni règle de classement."
+      },
+      {
+        "best_en": "Monitor [risk] for [entity] each [frequency] and escalate breaches under the agreed threshold.",
+        "best_fr": "Surveiller [risk] pour [entity] chaque [frequency] et escalader les dépassements selon le seuil convenu.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "risk",
+          "entity",
+          "frequency"
+        ],
+        "stable_id": "fn-financial-risk",
+        "weak_en": "Monitor financial risk' with no risk type or escalation.",
+        "weak_fr": "« Surveiller le risque financier » sans type de risque ni escalade."
+      },
+      {
+        "best_en": "Maintain [system] master data and access for [entity], testing changes before go-live.",
+        "best_fr": "Maintenir les données de référence et les accès de [system] pour [entity], en testant les changements avant mise en production.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "system",
+          "entity"
+        ],
+        "stable_id": "fn-financial-systems",
+        "weak_en": "Support financial systems' with no system or testing.",
+        "weak_fr": "« Soutenir les systèmes financiers » sans système ni tests."
+      },
+      {
+        "best_en": "Oversee general ledger integrity for [entity], clearing open items older than [days] days each close.",
+        "best_fr": "Superviser l’intégrité du grand livre pour [entity], en soldant les postes ouverts de plus de [days] jours à chaque clôture.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "entity",
+          "days"
+        ],
+        "stable_id": "fn-general-ledger",
+        "weak_en": "Oversee the GL' without open-item rule.",
+        "weak_fr": "« Superviser le grand livre » sans règle sur les postes ouverts."
+      },
+      {
+        "best_en": "Log and resolve finance incidents for [type] within [days] days, with root cause and control fix noted.",
+        "best_fr": "Enregistrer et résoudre les incidents finance de type [type] sous [days] jours, avec cause et correctif de contrôle notés.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "type",
+          "days"
+        ],
+        "stable_id": "fn-incident-handling",
+        "weak_en": "Handle exceptions' with no logging or fix.",
+        "weak_fr": "« Traiter les exceptions » sans journalisation ni correctif."
+      },
+      {
+        "best_en": "Prepare the internal audit pack for [scope] by [deadline], with samples, reconciliations and management responses.",
+        "best_fr": "Préparer le dossier d’audit interne pour [scope] pour le [deadline], avec échantillons, rapprochements et réponses de la direction.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "scope",
+          "deadline"
+        ],
+        "stable_id": "fn-internal-audit",
+        "weak_en": "Support internal audit' with no scope or pack contents.",
+        "weak_fr": "« Soutenir l’audit interne » sans périmètre ni contenu de dossier."
+      },
+      {
+        "best_en": "Close the books for [entity] each month by [day], including reconciliations and management pack.",
+        "best_fr": "Clôturer les comptes de [entity] chaque mois pour le [day], y compris rapprochements et dossier de gestion.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "entity",
+          "day"
+        ],
+        "stable_id": "fn-monthly-close",
+        "weak_en": "Support month-end' without a day or pack.",
+        "weak_fr": "« Soutenir la clôture mensuelle » sans jour ni dossier."
+      },
+      {
+        "best_en": "Review payment requests for [entity] against budget and supporting documents before approval routing.",
+        "best_fr": "Examiner les demandes de paiement pour [entity] par rapport au budget et aux pièces avant circuit d’approbation.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "entity"
+        ],
+        "stable_id": "fn-payment-requests",
+        "weak_en": "Review payments' with no checks named.",
+        "weak_fr": "« Examiner les paiements » sans contrôles nommés."
+      },
+      {
+        "best_en": "Run the [cycle] close for [entity] to the agreed calendar, including reconciliations and review sign-off.",
+        "best_fr": "Exécuter la clôture [cycle] pour [entity] selon le calendrier convenu, y compris rapprochements et visa de revue.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "cycle",
+          "entity"
+        ],
+        "stable_id": "fn-periodic-cycles",
+        "weak_en": "Support monthly and annual cycles' as a list with no owned steps.",
+        "weak_fr": "« Soutenir les cycles mensuels et annuels » comme liste sans étapes prises en charge."
+      },
+      {
+        "best_en": "Document controls for [process] and test a sample each [frequency], recording exceptions and fixes.",
+        "best_fr": "Documenter les contrôles pour [process] et tester un échantillon chaque [frequency], en enregistrant exceptions et correctifs.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "process",
+          "frequency"
+        ],
+        "stable_id": "fn-process-controls",
+        "weak_en": "Strengthen controls' without process, test or record.",
+        "weak_fr": "« Renforcer les contrôles » sans processus, test ni enregistrement."
+      },
+      {
+        "best_en": "Implement agreed finance requirements for [change] by [deadline], with user testing before go-live.",
+        "best_fr": "Mettre en œuvre les exigences finance convenues pour [change] pour le [deadline], avec tests utilisateurs avant mise en production.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "change",
+          "deadline"
+        ],
+        "stable_id": "fn-requirements-implementation",
+        "weak_en": "Implement requirements' as a broad duty with no change or testing.",
+        "weak_fr": "« Mettre en œuvre les exigences » comme tâche large sans changement ni tests."
+      },
+      {
+        "best_en": "File [filing] for [entity] by the statutory deadline and keep working papers for audit.",
+        "best_fr": "Déposer [filing] pour [entity] avant l’échéance légale et conserver les dossiers de travail pour l’audit.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "filing",
+          "entity"
+        ],
+        "stable_id": "fn-tax-statutory",
+        "weak_en": "Ensure tax compliance' without named filings.",
+        "weak_fr": "« Assurer la conformité fiscale » sans déclarations nommées."
+      },
+      {
+        "best_en": "Verify team submissions for [process] before posting, returning incomplete packs within [days] days.",
+        "best_fr": "Vérifier les soumissions de l’équipe pour [process] avant comptabilisation, en renvoyant les dossiers incomplets sous [days] jours.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "process",
+          "days"
+        ],
+        "stable_id": "fn-team-verification",
+        "weak_en": "Support and verify the team' without process or turnaround.",
+        "weak_fr": "« Soutenir et vérifier l’équipe » sans processus ni délai."
+      },
+      {
+        "best_en": "Issue the management report for [entity] by [day] each month with variances explained.",
+        "best_fr": "Émettre le rapport de gestion pour [entity] pour le [day] chaque mois avec écarts expliqués.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "entity",
+          "day"
+        ],
+        "stable_id": "fn-timely-reporting",
+        "weak_en": "Ensure timely reporting' without report or deadline.",
+        "weak_fr": "« Assurer des rapports en temps voulu » sans rapport ni échéance."
+      },
+      {
+        "best_en": "Automate the [workflow] steps that are stable, with controls retained and a rollback plan.",
+        "best_fr": "Automatiser les étapes stables du [workflow], en conservant les contrôles et un plan de retour arrière.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "workflow"
+        ],
+        "stable_id": "fn-workflow-automation",
+        "weak_en": "Drive automation' without naming which workflow or controls.",
+        "weak_fr": "« Pousser l’automatisation » sans nommer le workflow ni les contrôles."
+      }
+    ]
   },
   "family_id": "finance",
   "measured_broad": {
@@ -975,12 +1365,57 @@
     "label": "Estimate",
     "status": "pending"
   },
-  "reference_jds": [],
+  "reference_jds": [
+    {
+      "family_id": "finance",
+      "format": "ingo_role_profile",
+      "format_label": "INGO role profile",
+      "label": "Estimate",
+      "language": "en",
+      "level": "officer",
+      "path": "role-survey/library/reference/finance-ingo_role_profile.en.md",
+      "sha256": "48d19f411533bce02eba5747111ab2ac493a3486a32aedc899961dba6e3eb1fd",
+      "status": "kept_after_blind_scoring"
+    },
+    {
+      "family_id": "finance",
+      "format": "ingo_role_profile",
+      "format_label": "INGO role profile",
+      "label": "Estimate",
+      "language": "fr",
+      "level": "officer",
+      "path": "role-survey/library/reference/finance-ingo_role_profile.fr.md",
+      "sha256": "d2e60b08703fcda337f6dbd8cf32b23287899054db8f523dbc6bcfa4a6fa9338",
+      "status": "kept_after_blind_scoring"
+    },
+    {
+      "family_id": "finance",
+      "format": "local_ngo_concise",
+      "format_label": "local NGO concise",
+      "label": "Estimate",
+      "language": "en",
+      "level": "officer",
+      "path": "role-survey/library/reference/finance-local_ngo_concise.en.md",
+      "sha256": "ca88b1e683d2f8caa2cb52ef9c008af9acd1ee0ce8f64cdea8a8aa2499cb8401",
+      "status": "kept_after_blind_scoring"
+    },
+    {
+      "family_id": "finance",
+      "format": "local_ngo_concise",
+      "format_label": "local NGO concise",
+      "label": "Estimate",
+      "language": "fr",
+      "level": "officer",
+      "path": "role-survey/library/reference/finance-local_ngo_concise.fr.md",
+      "sha256": "3bbdf77513ad842991e93bddeee5ece543876239b1c6615945260d40d88de1cc",
+      "status": "kept_after_blind_scoring"
+    }
+  ],
   "requirements_by_level": {
     "label": "Estimate",
     "status": "pending"
   },
-  "schema_version": "0.2.0",
+  "schema_version": "0.3.0",
   "signature_fact_questions": [
     {
       "bottom_count": 2,

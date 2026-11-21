@@ -203,11 +203,73 @@
             },
             "phrasing": {
               "type": "null"
+            },
+            "phrasing_lines": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "best_en": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "best_fr": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "skip": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "slots": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "stable_id": {
+                    "type": "string"
+                  },
+                  "weak_en": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "weak_fr": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "stable_id",
+                  "skip",
+                  "best_en",
+                  "best_fr",
+                  "slots",
+                  "weak_en",
+                  "weak_fr",
+                  "label"
+                ],
+                "type": "object"
+              },
+              "type": "array"
             }
           },
           "required": [
             "groups",
             "phrasing",
+            "phrasing_lines",
             "naming_ready",
             "deep_fields_ready"
           ],
@@ -250,13 +312,57 @@
           "type": "object"
         },
         "reference_jds": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "family_id": {
+                "type": "string"
+              },
+              "format": {
+                "type": "string"
+              },
+              "format_label": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "level": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "family_id",
+              "format",
+              "format_label",
+              "language",
+              "level",
+              "path",
+              "sha256",
+              "status",
+              "label"
+            ],
+            "type": "object"
+          },
           "type": "array"
         },
         "requirements_by_level": {
           "type": "object"
         },
         "schema_version": {
-          "const": "0.2.0",
+          "const": "0.3.0",
           "type": "string"
         },
         "signature_fact_questions": {
@@ -346,7 +452,7 @@
           "type": "object"
         },
         "schema_version": {
-          "const": "0.2.0",
+          "const": "0.3.0",
           "type": "string"
         },
         "wave": {
@@ -366,7 +472,7 @@
   },
   "$id": "https://aidjobs.app/role-survey/library/schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Family files use $defs.family; index.json uses $defs.index. schema_version 0.2.0. built_at is a deterministic id from input hashes, not an ISO timestamp. CI walks type/required/const/items/additionalProperties:false.",
-  "schema_version": "0.2.0",
+  "description": "Family files use $defs.family; index.json uses $defs.index. schema_version 0.3.0. built_at is a deterministic id from input hashes, not an ISO timestamp. CI walks type/required/const/items/additionalProperties:false.",
+  "schema_version": "0.3.0",
   "title": "AidJobs role library (wave 1a)"
 }
