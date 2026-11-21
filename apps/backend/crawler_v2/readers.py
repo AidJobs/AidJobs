@@ -386,10 +386,12 @@ class TeamtailorFeedReader(Reader):
     async def read(self, first: Response, source: Dict, fetch: Optional[Fetch] = None):
         del fetch
         recognised = self.first_request(source) is not None
+        if not recognised:
+            return None
         if first.stop or first.status != 200 or not (first.body or "").strip():
-            return ListingResult(self.name) if recognised else None
+            return ListingResult(self.name)
         if not looks_like_teamtailor(first.body):
-            return ListingResult(self.name) if recognised else None
+            return ListingResult(self.name)
         jobs = jobs_from_teamtailor(first.body)
         logger.info("Teamtailor feed reader found %s jobs", len(jobs))
         return ListingResult(self.name, jobs)
@@ -424,16 +426,18 @@ class LeverFeedReader(Reader):
     async def read(self, first: Response, source: Dict, fetch: Optional[Fetch] = None):
         del fetch
         recognised = self.first_request(source) is not None
+        if not recognised:
+            return None
         if first.stop or first.status != 200 or not (first.body or "").strip():
-            return ListingResult(self.name) if recognised else None
+            return ListingResult(self.name)
         try:
             data = json.loads(first.body)
         except (TypeError, ValueError):
-            return ListingResult(self.name) if recognised else None
+            return ListingResult(self.name)
         if not isinstance(data, list):
-            return ListingResult(self.name) if recognised else None
+            return ListingResult(self.name)
         if data and not looks_like_lever(data):
-            return ListingResult(self.name) if recognised else None
+            return ListingResult(self.name)
         jobs = jobs_from_lever(data)
         logger.info("Lever feed reader found %s jobs", len(jobs))
         return ListingResult(self.name, jobs)
@@ -464,11 +468,15 @@ class PersonioFeedReader(Reader):
     async def read(self, first: Response, source: Dict, fetch: Optional[Fetch] = None):
         del fetch
         recognised = self.first_request(source) is not None
+        if not recognised:
+            return None
         if first.stop or first.status != 200 or not (first.body or "").strip():
-            return ListingResult(self.name) if recognised else None
+            return ListingResult(self.name)
         if not looks_like_personio(first.body):
-            return ListingResult(self.name) if recognised else None
-        parsed = personio_account(source.get("careers_url") or "") or ("unknown", "com")
+            return ListingResult(self.name)
+        parsed = personio_account(source.get("careers_url") or "")
+        if not parsed:
+            return ListingResult(self.name)
         account, tld = parsed
         jobs = jobs_from_personio(first.body, account, tld)
         logger.info("Personio feed reader found %s jobs", len(jobs))

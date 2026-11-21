@@ -358,13 +358,10 @@ def teamtailor_feed_url(account: str) -> str:
 
 
 def teamtailor_request_url(careers_url: str) -> Optional[str]:
-    """Feed URL for a Teamtailor board, or the URL itself when it is already jobs.rss."""
+    """Canonical jobs.rss URL for a Teamtailor board (https, no query)."""
     account = teamtailor_account(careers_url)
     if not account:
         return None
-    path = _path(careers_url).rstrip("/").lower()
-    if path.endswith("jobs.rss"):
-        return careers_url.split("#", 1)[0]
     return teamtailor_feed_url(account)
 
 

@@ -330,8 +330,14 @@ def test_ats_url_helpers():
         "https://example-aid.teamtailor.com/jobs"
     ) == "https://example-aid.teamtailor.com/jobs.rss"
     assert ats_feeds.teamtailor_request_url(
-        "https://example-aid.teamtailor.com/jobs.rss"
+        "https://example-aid.teamtailor.com/jobs.rss?per_page=100"
     ) == "https://example-aid.teamtailor.com/jobs.rss"
+    assert ats_feeds.teamtailor_request_url(
+        "http://example-aid.teamtailor.com/en/jobs.rss"
+    ) == "https://example-aid.teamtailor.com/jobs.rss"
+    assert ats_feeds.teamtailor_account("https://app.teamtailor.com/") is None
+    assert ats_feeds.teamtailor_account("https://api.teamtailor.com/") is None
+    assert ats_feeds.teamtailor_account("https://career.teamtailor.com/") is None
     assert ats_feeds.lever_site("https://jobs.lever.co/wr") == ("wr", "api.lever.co")
     assert ats_feeds.lever_site("https://jobs.eu.lever.co/acme") == (
         "acme",
@@ -526,6 +532,40 @@ def test_recognised_non_feed_body_stays_on_ats_reader():
     )
     assert result.reader == "teamtailor-feed"
     assert result.jobs == []
+
+
+def test_unrecognised_rss_body_does_not_claim_teamtailor():
+    rss = (
+        '<?xml version="1.0"?><rss version="2.0"><channel>'
+        "<item><title>X</title><link>https://example.org/jobs/1</link></item>"
+        "</channel></rss>"
+    )
+    source = {"careers_url": "https://boards.example.org/jobs.json"}
+    assert TeamtailorFeedReader().first_request(source) is None
+    assert asyncio.run(TeamtailorFeedReader().read(Response(200, rss), source)) is None
+    # Fall-through reaches JsonApiReader, which refuses a non-JSON body.
+    with pytest.raises(ValueError, match="not JSON"):
+        asyncio.run(read_listing(api_readers(), Response(200, rss), source))
+
+
+def test_lever_eu_full_feed_url():
+    req = LeverFeedReader().first_request(
+        {"careers_url": "https://jobs.eu.lever.co/example-aid"}
+    )
+    assert req == Request(
+        "https://api.eu.lever.co/v0/postings/example-aid?mode=json",
+        accept="application/json",
+    )
+
+
+def test_personio_de_feed_url():
+    req = PersonioFeedReader().first_request(
+        {"careers_url": "https://acme.jobs.personio.de/"}
+    )
+    assert req == Request(
+        "https://acme.jobs.personio.de/xml",
+        accept="application/xml",
+    )
 
 
 def test_simulate_api_names_teamtailor_reader():
