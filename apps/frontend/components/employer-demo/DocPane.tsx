@@ -356,6 +356,12 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
             <Check size={12} strokeWidth={2} aria-hidden /> Approve
           </button>
         )}
+        {/* R2-P0-5 / R1-19: after Approve, keep a quiet mark so the section does not look untouched. */}
+        {job.walk && !job.setup && !reviewing && !editing && sec.lines.length > 0 && job.walk.approved.includes(sec.key) && (
+          <span className="aj-chip" aria-label={`${sec.title} approved`}>
+            <Check size={11} strokeWidth={2} aria-hidden /> Approved
+          </span>
+        )}
         {noteText && (
           <>
             <span className="ej-change-text" title={noteText}>

@@ -65,7 +65,7 @@
 | R1-16 | **Fixed** (U-3 Step A, 20 Nov 2026; grip naming remains U-4) | Save no longer renames; shared `pageIntake` for JD + chat; Accept/Reject/skip clear intake so a dirty box cannot overwrite. |
 | R1-17 | **Fixed** (U-3 Step B, 20 Nov 2026) | Bullets/short paste fixed in Step A. Sub-insert stays by design. Accept no longer auto-approves; Undo restores pack, body, and draft card. |
 | R1-18 | OPEN | Free plan hides Languages; Amplify/market/Reach sit in front of a small NGO post. |
-| R1-19 | OPEN | Approve vanishes with no “Approved” mark on the section. |
+| R1-19 | **Fixed** (R2-P0-5, 21 Nov 2026) | After Approve, section header shows an **Approved** chip while `walk` is active; Edit+Save that changes text clears approval (R1-06) and Approve returns. |
 | R1-20 | OPEN | Phone: template picker has no Cancel during first template choice; parts button label paints over Eye/History. |
 | R1-28 | **Fixed** (20–21 Nov 2026; `97e7fde`) | Pencil Save on How to apply no longer opens the How to apply fields card (`editSection` leaves `part` alone when that part has fields). Other sections still pin the progress line when the chat notices the edit. | User confirmed on preview, 21 Nov 2026 |
 
@@ -240,7 +240,7 @@ Full **icon inventory table** (Eye, History, progress, tabs, X, Approve, pencil,
 | R2-P0-2 | ~~**Sample org (Riverstone) on local NGO path**~~ **Fixed 21 Nov 2026** (Tumaini preset + recommendation ranking; user confirmed on preview, including live Key responsibilities local-scale) | Novice #1,5,7,14 |
 | R2-P0-3 | ~~**About/Project setup leftovers**~~ **Fixed 21 Nov 2026** (user confirmed on preview, including Urmul **Read this page** → Accept → `pack.about`) | Design, Chat, Chrome, Novice, Sam; R1-03 |
 | R2-P0-4 | ~~**Project Save renames heading; grip has no Project when `background` exists**~~ **Fixed 21 Nov 2026** (project Save body-only / no Heading rename; grip **Add About the project** when background exists without that sub; confirmed on preview) | U-4, all persona chrome |
-| R2-P0-5 | **Approve ignores pencil / PageField; section Approve vanishes with no mark** | Chrome, Design, Sam, Novice |
+| R2-P0-5 | ~~**Approve ignores pencil / PageField; section Approve vanishes with no mark**~~ **Fixed 21 Nov 2026** (R1-06 already covered pencil/buffer; R1-19 **Approved** chip on section header). Confirm on preview. | Chrome, Design, Sam, Novice |
 | R2-P0-6 | ~~**Remove Undo deleted at 2s** (`dismissChange`)~~ **Fixed with U-2 (20 Nov 2026)** | Chrome, Chat, Design, UN, Novice |
 | R2-P0-7 | ~~**Undo / chat undo / `lastChange` → Market or stuck progress line**~~ **Fixed with U-2 (20 Nov 2026)** | U-2, Chat #7, Sam #9 |
 
@@ -252,7 +252,7 @@ Full **icon inventory table** (Eye, History, progress, tabs, X, Approve, pencil,
 | R2-P1-2 | **(2) Fixed with U-2** | Chat `undo` vs `undoStep`; remove dismiss |
 | R2-P1-3 | **(3)** | Save/Cancel semantics; setup card no Save; 40-char draft rule |
 | R2-P1-4 | **(4)/(5) partial Fixed** | Grip click Fixed (U-4 B); Add blur/Escape Fixed (R1-11). Still open: Move at end lies |
-| R2-P1-5 | **(5) partial Fixed** | Approve vs buffer Fixed (R1-06). Still open: triple meaning / no “Approved” mark (R1-19) |
+| R2-P1-5 | **(5) partial Fixed** | Approve vs buffer Fixed (R1-06); Approved mark Fixed (R1-19 / R2-P0-5). Still open: Approve triple meaning across chat / fixed texts |
 | R2-P1-6 | NEW | **Opening brief facts wrong** (pay/date on AI path) — Sam, verify with tests |
 | R2-P1-7 | NEW | **House format + UN chips before NGO template** — Sam, Novice |
 | R2-P1-8 | NEW | **Check “done” vs empty Qualifications** — progress vs `walk.approved` — Novice #11, R1-14 |
@@ -315,6 +315,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 21 Nov 2026 | R2-P0-2 | `b7a1787` | Tumaini Community Trust sample preset (local NGO); demo chrome switch; template `others` prefer org-type family; apply email / Tumaini commitments / AI `orgType: ngo` / Google title. User confirmed on preview the same day (preset switch, Local NGO concise path, live Key responsibilities without cluster/Sphere/donor/MEAL). |
 | 21 Nov 2026 | R2-P0-3, R1-03 | `cb78694` (+ `aa3a008` Use-as-it-is) | `keepProfileAbout` sets `pack.about`; setup About/Project chips/sticky card; user confirmed on preview (incl. Urmul Read this page → Accept). |
 | 21 Nov 2026 | R2-P0-4 | `b4a4185` | Project pencil Save no longer renames the Background/Project brief heading (body via `savePageFieldText` / `intoSection` only; Heading hidden in project editor). Grip offers **Add About the project** when `background` exists without that sub. Confirm on preview. |
+| 21 Nov 2026 | R2-P0-5, R1-19 | *(this commit)* | Section header shows **Approved** chip after Approve while walk is active; R1-06 already hid Approve during pencil and cleared approval on Save. Confirm on preview. |
 
 ---
 
