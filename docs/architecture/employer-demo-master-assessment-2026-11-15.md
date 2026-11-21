@@ -239,7 +239,7 @@ Full **icon inventory table** (Eye, History, progress, tabs, X, Approve, pencil,
 | R2-P0-1 | ~~**Free publish with empty / placeholder sections**~~ **Fixed 21 Nov 2026** (user confirmed on preview) | [Novice NGO R2](8442906c-3d03-4b4a-8a45-575f31966a17) #6 |
 | R2-P0-2 | ~~**Sample org (Riverstone) on local NGO path**~~ **Fixed 21 Nov 2026** (Tumaini preset + recommendation ranking; user confirmed on preview, including live Key responsibilities local-scale) | Novice #1,5,7,14 |
 | R2-P0-3 | ~~**About/Project setup leftovers**~~ **Fixed 21 Nov 2026** (user confirmed on preview, including Urmul **Read this page** → Accept → `pack.about`) | Design, Chat, Chrome, Novice, Sam; R1-03 |
-| R2-P0-4 | ~~**Project Save renames heading; grip has no Project when `background` exists**~~ **Fixed 21 Nov 2026** (project Save body-only / no Heading rename; grip **Add About the project** when background exists without that sub). Confirm on preview. | U-4, all persona chrome |
+| R2-P0-4 | ~~**Project Save renames heading; grip has no Project when `background` exists**~~ **Fixed 21 Nov 2026** (project Save body-only / no Heading rename; grip **Add About the project** when background exists without that sub; confirmed on preview) | U-4, all persona chrome |
 | R2-P0-5 | **Approve ignores pencil / PageField; section Approve vanishes with no mark** | Chrome, Design, Sam, Novice |
 | R2-P0-6 | ~~**Remove Undo deleted at 2s** (`dismissChange`)~~ **Fixed with U-2 (20 Nov 2026)** | Chrome, Chat, Design, UN, Novice |
 | R2-P0-7 | ~~**Undo / chat undo / `lastChange` → Market or stuck progress line**~~ **Fixed with U-2 (20 Nov 2026)** | U-2, Chat #7, Sam #9 |
