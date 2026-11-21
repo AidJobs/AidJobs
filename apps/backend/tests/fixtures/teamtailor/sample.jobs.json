@@ -1,0 +1,26 @@
+{
+  "url": "https://example-aid.teamtailor.com/jobs",
+  "jobs": [
+    {
+      "title": "Senior Advisor",
+      "apply_url": "https://example-aid.teamtailor.com/jobs/4600123-senior-advisor",
+      "record_class": "api",
+      "reference": "14093550-daa8-41e6-8a60-0b9722d1d4db",
+      "posted_on": "2026-11-01",
+      "description": "<p>Advise country programmes.</p>",
+      "location_raw": "Geneva, Switzerland; Nairobi, Kenya",
+      "locations": ["Geneva, Switzerland", "Nairobi, Kenya"]
+    },
+    {
+      "title": "Remote Analyst",
+      "apply_url": "https://example-aid.teamtailor.com/jobs/4600999-remote-analyst",
+      "record_class": "api",
+      "reference": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      "posted_on": "2026-11-10",
+      "description": "Analyse programme data remotely.",
+      "is_remote": true,
+      "location_raw": "Remote",
+      "locations": ["Remote"]
+    }
+  ]
+}

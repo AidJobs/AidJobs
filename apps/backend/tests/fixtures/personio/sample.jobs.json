@@ -1,0 +1,27 @@
+{
+  "url": "https://example-aid.jobs.personio.com/",
+  "jobs": [
+    {
+      "title": "Marketing Manager",
+      "apply_url": "https://example-aid.jobs.personio.com/job/1001",
+      "record_class": "api",
+      "reference": "1001",
+      "posted_on": "2026-11-01",
+      "description": "<p>Lead regional marketing.</p>\n<p>Five years experience.</p>",
+      "employment_type": "permanent",
+      "location_raw": "Berlin; Brussels",
+      "locations": ["Berlin", "Brussels"]
+    },
+    {
+      "title": "Field Officer",
+      "apply_url": "https://example-aid.jobs.personio.com/job/1002",
+      "record_class": "api",
+      "reference": "1002",
+      "posted_on": "2026-11-10",
+      "description": "Support field teams.",
+      "employment_type": "temporary",
+      "location_raw": "Nairobi",
+      "locations": ["Nairobi"]
+    }
+  ]
+}

@@ -7,8 +7,10 @@ from __future__ import annotations
 
 import html
 import re
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import unquote, urlparse, urlunparse
+from xml.etree import ElementTree
 
 from crawler_v2.feed_fields import iso_day
 
@@ -18,6 +20,14 @@ _GREENHOUSE_BOARD_HOSTS = frozenset({
     "boards.greenhouse.io",
     "boards-api.greenhouse.io",
 })
+_TEAMTAILOR_BLOCKED = frozenset({"www", "app", "api", "career"})
+_LEVER_BOARD_HOSTS = {
+    "jobs.lever.co": "api.lever.co",
+    "jobs.eu.lever.co": "api.eu.lever.co",
+}
+_PERSONIO_HOST = re.compile(
+    r"^([a-z0-9][a-z0-9-]*)\.jobs\.personio\.(com|de)$", re.I
+)
 
 _WORKABLE_ACCOUNT = re.compile(
     r"^/(?:api/v1/widget/accounts/|api/accounts/)?([A-Za-z0-9][A-Za-z0-9_-]*)/?$",
@@ -27,6 +37,8 @@ _GREENHOUSE_TOKEN = re.compile(
     r"^/(?:v1/boards/)?([A-Za-z0-9][A-Za-z0-9_-]*)(?:/jobs(?:/(\d+))?)?/?$",
     re.I,
 )
+_LEVER_SITE = re.compile(r"^/([A-Za-z0-9][A-Za-z0-9_-]*)(?:/.*)?$", re.I)
+_REMOTE_STATUS = frozenset({"fully", "remote", "fully_remote", "fully-remote"})
 
 
 def _host(url: str) -> str:
@@ -294,3 +306,339 @@ def _workable_place(item: Dict) -> str:
 def _place_label(*parts: Any) -> str:
     bits = [str(part).strip() for part in parts if part not in (None, "")]
     return ", ".join(bits)
+
+
+def _local(tag: str) -> str:
+    return tag.rsplit("}", 1)[-1]
+
+
+def _child_text(element: ElementTree.Element, *names: str) -> str:
+    wanted = {name.lower() for name in names}
+    for child in list(element):
+        if _local(child.tag).lower() in wanted:
+            text = "".join(child.itertext()).strip()
+            if text:
+                return text
+    return ""
+
+
+def _epoch_day(value: Any) -> Optional[str]:
+    """YYYY-MM-DD from Lever's millisecond epoch, or iso_day for other shapes."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        try:
+            seconds = float(value)
+            if seconds > 1e12:
+                seconds /= 1000.0
+            return datetime.fromtimestamp(seconds, tz=timezone.utc).date().isoformat()
+        except (OverflowError, OSError, ValueError):
+            return None
+    text = str(value or "").strip()
+    if text.isdigit():
+        return _epoch_day(int(text))
+    return iso_day(value)
+
+
+def teamtailor_account(careers_url: str) -> Optional[str]:
+    """Subdomain of *.teamtailor.com; None for vendor labels or non-Teamtailor hosts."""
+    host = _host(careers_url)
+    if not host.endswith(".teamtailor.com"):
+        return None
+    label = host.split(".", 1)[0]
+    if not label or label in _TEAMTAILOR_BLOCKED:
+        return None
+    return label
+
+
+def teamtailor_feed_url(account: str) -> str:
+    return urlunparse(
+        ("https", f"{account}.teamtailor.com", "/jobs.rss", "", "", "")
+    )
+
+
+def teamtailor_request_url(careers_url: str) -> Optional[str]:
+    """Canonical jobs.rss URL for a Teamtailor board (https, no query)."""
+    account = teamtailor_account(careers_url)
+    if not account:
+        return None
+    return teamtailor_feed_url(account)
+
+
+def lever_site(careers_url: str) -> Optional[Tuple[str, str]]:
+    """(site, api_host) from jobs.lever.co/{site} or the EU board; None when not Lever."""
+    host = _host(careers_url)
+    api_host = _LEVER_BOARD_HOSTS.get(host)
+    if not api_host:
+        return None
+    match = _LEVER_SITE.match(_path(careers_url))
+    if not match:
+        return None
+    site = match.group(1)
+    if site.lower() in {"v0", "postings"}:
+        return None
+    return site, api_host
+
+
+def lever_feed_url(site: str, api_host: str = "api.lever.co") -> str:
+    return urlunparse(
+        ("https", api_host, f"/v0/postings/{site}", "", "mode=json", "")
+    )
+
+
+def personio_account(careers_url: str) -> Optional[Tuple[str, str]]:
+    """(account, tld) from {account}.jobs.personio.{com|de}; None when not Personio."""
+    host = _host(careers_url)
+    match = _PERSONIO_HOST.match(host)
+    if not match:
+        return None
+    return match.group(1), match.group(2).lower()
+
+
+def personio_feed_url(account: str, tld: str = "com") -> str:
+    return urlunparse(
+        ("https", f"{account}.jobs.personio.{tld}", "/xml", "", "", "")
+    )
+
+
+def looks_like_teamtailor(data: Any) -> bool:
+    """True when body is Teamtailor RSS (root rss with item children)."""
+    if isinstance(data, ElementTree.Element):
+        root = data
+    elif isinstance(data, str):
+        try:
+            root = ElementTree.fromstring(data)
+        except ElementTree.ParseError:
+            return False
+    else:
+        return False
+    if _local(root.tag).lower() != "rss":
+        return False
+    return any(_local(el.tag).lower() == "item" for el in root.iter())
+
+
+def looks_like_lever(data: Any) -> bool:
+    if not isinstance(data, list) or not data:
+        return False
+    return any(
+        isinstance(item, dict) and ("hostedUrl" in item or "text" in item)
+        for item in data
+    )
+
+
+def looks_like_personio(data: Any) -> bool:
+    if isinstance(data, ElementTree.Element):
+        root = data
+    elif isinstance(data, str):
+        try:
+            root = ElementTree.fromstring(data)
+        except ElementTree.ParseError:
+            return False
+    else:
+        return False
+    if _local(root.tag).lower() != "workzag-jobs":
+        return False
+    return any(_local(el.tag).lower() == "position" for el in root.iter())
+
+
+def jobs_from_teamtailor(body: str) -> List[Dict]:
+    """Candidates from a Teamtailor jobs.rss body. Links are not an admission family."""
+    try:
+        root = ElementTree.fromstring(body)
+    except ElementTree.ParseError:
+        return []
+    jobs: List[Dict] = []
+    for item in root.iter():
+        if _local(item.tag).lower() != "item":
+            continue
+        title = _child_text(item, "title")
+        apply_url = _child_text(item, "link")
+        if not title or not apply_url:
+            continue
+        job: Dict[str, Any] = {
+            "title": title,
+            "apply_url": apply_url,
+            "record_class": "api",
+        }
+        guid = _child_text(item, "guid")
+        if guid:
+            job["reference"] = guid
+        posted = iso_day(_child_text(item, "pubDate"))
+        if posted:
+            job["posted_on"] = posted
+        description = _child_text(item, "description")
+        if description:
+            job["description"] = html.unescape(description).strip()
+        place = _teamtailor_place(item)
+        remote = _teamtailor_remote(item)
+        if remote and not place:
+            place = "Remote"
+            job["is_remote"] = True
+        elif remote:
+            job["is_remote"] = True
+        if place:
+            places = [part.strip() for part in place.split(";") if part.strip()]
+            job["location_raw"] = place
+            if places:
+                job["locations"] = places
+        jobs.append(job)
+    return jobs
+
+
+def jobs_from_lever(data: List) -> List[Dict]:
+    """Candidates from Lever's public postings JSON array."""
+    jobs: List[Dict] = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("text") or "").strip()
+        apply_url = str(item.get("hostedUrl") or item.get("applyUrl") or "").strip()
+        if not title or not apply_url:
+            continue
+        job: Dict[str, Any] = {
+            "title": title,
+            "apply_url": apply_url,
+            "record_class": "api",
+        }
+        job_id = item.get("id")
+        if job_id not in (None, ""):
+            job["reference"] = str(job_id)
+        posted = _epoch_day(item.get("createdAt"))
+        if posted:
+            job["posted_on"] = posted
+        description = _lever_description(item)
+        if description:
+            job["description"] = description
+        categories = item.get("categories")
+        place = ""
+        if isinstance(categories, dict):
+            place = str(categories.get("location") or "").strip()
+            commitment = str(categories.get("commitment") or "").strip()
+            if commitment:
+                job["employment_type"] = commitment
+        workplace = str(item.get("workplaceType") or "").strip().lower()
+        if workplace == "remote":
+            job["is_remote"] = True
+            if not place:
+                place = "Remote"
+        if place:
+            job["location_raw"] = place
+            job["locations"] = [place]
+        jobs.append(job)
+    return jobs
+
+
+def jobs_from_personio(body: str, account: str, tld: str = "com") -> List[Dict]:
+    """Candidates from a Personio workzag-jobs XML body."""
+    try:
+        root = ElementTree.fromstring(body)
+    except ElementTree.ParseError:
+        return []
+    host = f"{account}.jobs.personio.{tld}"
+    jobs: List[Dict] = []
+    for position in root.iter():
+        if _local(position.tag).lower() != "position":
+            continue
+        title = _child_text(position, "name")
+        job_id = _child_text(position, "id")
+        if not title or not job_id:
+            continue
+        apply_url = f"https://{host}/job/{job_id}"
+        job: Dict[str, Any] = {
+            "title": title,
+            "apply_url": apply_url,
+            "record_class": "api",
+            "reference": job_id,
+        }
+        place = _personio_place(position)
+        if place:
+            places = [part.strip() for part in place.split(";") if part.strip()]
+            job["location_raw"] = place
+            if places:
+                job["locations"] = places
+        employment = _child_text(position, "employmentType")
+        if employment:
+            job["employment_type"] = employment
+        posted = iso_day(_child_text(position, "createdAt"))
+        if posted:
+            job["posted_on"] = posted
+        description = _personio_description(position)
+        if description:
+            job["description"] = description
+        jobs.append(job)
+    return jobs
+
+
+def _teamtailor_place(item: ElementTree.Element) -> str:
+    names: List[str] = []
+    for el in item.iter():
+        if _local(el.tag).lower() != "location":
+            continue
+        # Prefer the location's own name; else city, country.
+        label = _child_text(el, "name")
+        if not label:
+            label = _place_label(_child_text(el, "city"), _child_text(el, "country"))
+        if label and label not in names:
+            names.append(label)
+    return "; ".join(names)
+
+
+def _teamtailor_remote(item: ElementTree.Element) -> bool:
+    for el in item.iter():
+        if _local(el.tag).lower() != "remotestatus":
+            continue
+        value = "".join(el.itertext()).strip().lower().replace(" ", "_")
+        return value in _REMOTE_STATUS
+    return False
+
+
+def _lever_description(item: Dict) -> str:
+    parts: List[str] = []
+    for key in ("description", "descriptionPlain"):
+        text = str(item.get(key) or "").strip()
+        if text:
+            parts.append(html.unescape(text))
+            break
+    lists = item.get("lists")
+    if isinstance(lists, list):
+        for entry in lists:
+            if not isinstance(entry, dict):
+                continue
+            heading = str(entry.get("text") or "").strip()
+            content = str(entry.get("content") or "").strip()
+            if heading:
+                parts.append(f"<h3>{html.unescape(heading)}</h3>")
+            if content:
+                parts.append(html.unescape(content))
+    additional = str(item.get("additional") or "").strip()
+    if additional:
+        parts.append(html.unescape(additional))
+    return "\n".join(part for part in parts if part).strip()
+
+
+def _personio_place(position: ElementTree.Element) -> str:
+    places: List[str] = []
+    office = _child_text(position, "office")
+    if office:
+        places.append(office)
+    for el in position:
+        if _local(el.tag).lower() != "additionaloffices":
+            continue
+        for child in el:
+            if _local(child.tag).lower() != "office":
+                continue
+            name = "".join(child.itertext()).strip()
+            if name and name not in places:
+                places.append(name)
+    return "; ".join(places)
+
+
+def _personio_description(position: ElementTree.Element) -> str:
+    parts: List[str] = []
+    for el in position.iter():
+        if _local(el.tag).lower() != "value":
+            continue
+        text = "".join(el.itertext()).strip()
+        if text:
+            parts.append(html.unescape(text))
+    return "\n".join(parts).strip()

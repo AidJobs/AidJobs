@@ -95,9 +95,12 @@ def test_rss_and_api_reader_source_types():
     assert JsonApiReader.source_types == frozenset({"api", "json"})
     assert JsonApiReader.record_class == "api"
     # ATS feeds sit ahead of the generic JSON reader (W-38).
-    assert [r.name for r in api_readers()][:3] == [
+    assert [r.name for r in api_readers()] == [
         "workable-feed",
         "greenhouse-feed",
+        "teamtailor-feed",
+        "lever-feed",
+        "personio-feed",
         "json-api",
     ]
 

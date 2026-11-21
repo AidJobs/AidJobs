@@ -7,8 +7,10 @@ or reads no rows passes the page to the next; the general reader's own failure f
 RSS and API (pull request 3b): one feed reader and one generic JSON reader. Each turns the first
 response into field-contract candidates; completeness only when the listing states a total.
 
-Public ATS feeds (W-38): Workable and Greenhouse, recognised from the source's board address via
-`first_request` (contract §10 amendment), before the generic JSON reader.
+Public ATS feeds (W-38): Workable, Greenhouse, Teamtailor, Lever and Personio, recognised from
+the source's board address via `first_request` (contract §10 amendment), before the generic JSON
+reader. Teamtailor RSS and Personio XML are parsed here on the API path so board→feed rewrite
+works (the RSS crawler does not call `resolve_feed_request`).
 
 The HTML adapters call the crawler's own methods, looked up when they run, so the paging walks
 stay where they are (contract §11) and a test that replaces one of those methods still reaches it.
@@ -28,10 +30,21 @@ from crawler_v2.ats_feeds import (
     greenhouse_list_url,
     greenhouse_token,
     jobs_from_greenhouse,
+    jobs_from_lever,
+    jobs_from_personio,
+    jobs_from_teamtailor,
     jobs_from_workable,
+    lever_feed_url,
+    lever_site,
     looks_like_greenhouse,
+    looks_like_lever,
+    looks_like_personio,
+    looks_like_teamtailor,
     looks_like_workable,
     merge_greenhouse_detail,
+    personio_account,
+    personio_feed_url,
+    teamtailor_request_url,
     workable_account,
     workable_feed_url,
 )
@@ -345,12 +358,144 @@ async def _fill_greenhouse_posted_on(
         merge_greenhouse_detail(job, detail)
 
 
+class TeamtailorFeedReader(Reader):
+    """Teamtailor public jobs.rss (GET, no key). Recognised from *.teamtailor.com boards."""
+
+    name = "teamtailor-feed"
+    source_types = frozenset({"api", "json"})
+    record_class = "api"
+    budget_group = "teamtailor"
+    label = "Teamtailor feed reader"
+
+    def first_request(self, source: Dict) -> Optional[Request]:
+        feed = teamtailor_request_url(source.get("careers_url") or "")
+        if not feed:
+            return None
+        return Request(feed, accept="application/rss+xml")
+
+    def marks(self, page: str) -> bool:
+        if not page:
+            return False
+        lower = page.lower()
+        return (
+            "teamtailor.com" in lower
+            or "<rss" in lower and "jobs.rss" in lower
+            or "remotestatus" in lower
+        )
+
+    async def read(self, first: Response, source: Dict, fetch: Optional[Fetch] = None):
+        del fetch
+        recognised = self.first_request(source) is not None
+        if not recognised:
+            return None
+        if first.stop or first.status != 200 or not (first.body or "").strip():
+            return ListingResult(self.name)
+        if not looks_like_teamtailor(first.body):
+            return ListingResult(self.name)
+        jobs = jobs_from_teamtailor(first.body)
+        logger.info("Teamtailor feed reader found %s jobs", len(jobs))
+        return ListingResult(self.name, jobs)
+
+
+class LeverFeedReader(Reader):
+    """Lever public Postings API (GET, no key). Recognised from jobs.lever.co/{site}."""
+
+    name = "lever-feed"
+    source_types = frozenset({"api", "json"})
+    record_class = "api"
+    budget_group = "lever"
+    label = "Lever feed reader"
+
+    def first_request(self, source: Dict) -> Optional[Request]:
+        parsed = lever_site(source.get("careers_url") or "")
+        if not parsed:
+            return None
+        site, api_host = parsed
+        return Request(lever_feed_url(site, api_host), accept="application/json")
+
+    def marks(self, page: str) -> bool:
+        if not page:
+            return False
+        lower = page.lower()
+        return (
+            "hostedurl" in lower
+            or "api.lever.co" in lower
+            or "jobs.lever.co" in lower
+        )
+
+    async def read(self, first: Response, source: Dict, fetch: Optional[Fetch] = None):
+        del fetch
+        recognised = self.first_request(source) is not None
+        if not recognised:
+            return None
+        if first.stop or first.status != 200 or not (first.body or "").strip():
+            return ListingResult(self.name)
+        try:
+            data = json.loads(first.body)
+        except (TypeError, ValueError):
+            return ListingResult(self.name)
+        if not isinstance(data, list):
+            return ListingResult(self.name)
+        if data and not looks_like_lever(data):
+            return ListingResult(self.name)
+        jobs = jobs_from_lever(data)
+        logger.info("Lever feed reader found %s jobs", len(jobs))
+        return ListingResult(self.name, jobs)
+
+
+class PersonioFeedReader(Reader):
+    """Personio public XML feed (GET, no key). Recognised from *.jobs.personio.{com|de}."""
+
+    name = "personio-feed"
+    source_types = frozenset({"api", "json"})
+    record_class = "api"
+    budget_group = "personio"
+    label = "Personio feed reader"
+
+    def first_request(self, source: Dict) -> Optional[Request]:
+        parsed = personio_account(source.get("careers_url") or "")
+        if not parsed:
+            return None
+        account, tld = parsed
+        return Request(personio_feed_url(account, tld), accept="application/xml")
+
+    def marks(self, page: str) -> bool:
+        if not page:
+            return False
+        lower = page.lower()
+        return "workzag-jobs" in lower or "jobs.personio." in lower
+
+    async def read(self, first: Response, source: Dict, fetch: Optional[Fetch] = None):
+        del fetch
+        recognised = self.first_request(source) is not None
+        if not recognised:
+            return None
+        if first.stop or first.status != 200 or not (first.body or "").strip():
+            return ListingResult(self.name)
+        if not looks_like_personio(first.body):
+            return ListingResult(self.name)
+        parsed = personio_account(source.get("careers_url") or "")
+        if not parsed:
+            return ListingResult(self.name)
+        account, tld = parsed
+        jobs = jobs_from_personio(first.body, account, tld)
+        logger.info("Personio feed reader found %s jobs", len(jobs))
+        return ListingResult(self.name, jobs)
+
+
 def rss_readers(_crawler=None) -> List[Reader]:
     return [RssFeedReader()]
 
 
 def api_readers(_crawler=None) -> List[Reader]:
-    return [WorkableFeedReader(), GreenhouseFeedReader(), JsonApiReader()]
+    return [
+        WorkableFeedReader(),
+        GreenhouseFeedReader(),
+        TeamtailorFeedReader(),
+        LeverFeedReader(),
+        PersonioFeedReader(),
+        JsonApiReader(),
+    ]
 
 
 def resolve_feed_request(

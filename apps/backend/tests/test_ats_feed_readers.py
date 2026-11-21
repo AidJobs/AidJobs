@@ -1,4 +1,4 @@
-"""W-38: Workable and Greenhouse public feed readers, first_request, host groups."""
+"""W-38: Workable, Greenhouse, Teamtailor, Lever and Personio public feed readers."""
 from __future__ import annotations
 
 import asyncio
@@ -21,6 +21,9 @@ from crawler_v2.readers import (
     GREENHOUSE_DETAIL_CAP,
     GreenhouseFeedReader,
     JsonApiReader,
+    LeverFeedReader,
+    PersonioFeedReader,
+    TeamtailorFeedReader,
     WorkableFeedReader,
     api_readers,
     read_listing,
@@ -29,10 +32,12 @@ from crawler_v2.readers import (
 from crawler_v2.simulate import simulate_api
 
 _FIXTURES = Path(__file__).resolve().parent / "fixtures"
+_XML_SYSTEMS = frozenset({"teamtailor", "personio"})
 
 
 def _body(system: str, name: str = "sample") -> str:
-    return (_FIXTURES / system / f"{name}.json").read_text(encoding="utf-8")
+    ext = "xml" if system in _XML_SYSTEMS else "json"
+    return (_FIXTURES / system / f"{name}.{ext}").read_text(encoding="utf-8")
 
 
 def _record(system: str, name: str = "sample") -> dict:
@@ -43,10 +48,20 @@ def _record(system: str, name: str = "sample") -> dict:
 
 def test_api_readers_order_puts_ats_before_generic():
     names = [reader.name for reader in api_readers()]
-    assert names == ["workable-feed", "greenhouse-feed", "json-api"]
+    assert names == [
+        "workable-feed",
+        "greenhouse-feed",
+        "teamtailor-feed",
+        "lever-feed",
+        "personio-feed",
+        "json-api",
+    ]
     assert [type(r) for r in api_readers()] == [
         WorkableFeedReader,
         GreenhouseFeedReader,
+        TeamtailorFeedReader,
+        LeverFeedReader,
+        PersonioFeedReader,
         JsonApiReader,
     ]
 
@@ -268,6 +283,9 @@ def test_greenhouse_detail_cap_constant():
     assert HOST_GROUP_BUDGET_WINDOW_SECONDS == 60.0
     assert HOST_GROUP_LIMITS["workable"] == (12, 60.0)
     assert HOST_GROUP_LIMITS["greenhouse"] == (12, 60.0)
+    assert HOST_GROUP_LIMITS["teamtailor"] == (12, 60.0)
+    assert HOST_GROUP_LIMITS["lever"] == (12, 60.0)
+    assert HOST_GROUP_LIMITS["personio"] == (12, 60.0)
 
 
 def test_greenhouse_jobs_admit_with_location():
@@ -303,6 +321,259 @@ def test_ats_url_helpers():
         == "givedirectly"
     )
     assert ats_feeds.workable_account("https://boards.example.org/") is None
+    assert ats_feeds.teamtailor_account("https://example-aid.teamtailor.com/jobs") == (
+        "example-aid"
+    )
+    assert ats_feeds.teamtailor_account("https://www.teamtailor.com/") is None
+    assert ats_feeds.teamtailor_account("https://careers.bixal.com/jobs") is None
+    assert ats_feeds.teamtailor_request_url(
+        "https://example-aid.teamtailor.com/jobs"
+    ) == "https://example-aid.teamtailor.com/jobs.rss"
+    assert ats_feeds.teamtailor_request_url(
+        "https://example-aid.teamtailor.com/jobs.rss?per_page=100"
+    ) == "https://example-aid.teamtailor.com/jobs.rss"
+    assert ats_feeds.teamtailor_request_url(
+        "http://example-aid.teamtailor.com/en/jobs.rss"
+    ) == "https://example-aid.teamtailor.com/jobs.rss"
+    assert ats_feeds.teamtailor_account("https://app.teamtailor.com/") is None
+    assert ats_feeds.teamtailor_account("https://api.teamtailor.com/") is None
+    assert ats_feeds.teamtailor_account("https://career.teamtailor.com/") is None
+    assert ats_feeds.lever_site("https://jobs.lever.co/wr") == ("wr", "api.lever.co")
+    assert ats_feeds.lever_site("https://jobs.eu.lever.co/acme") == (
+        "acme",
+        "api.eu.lever.co",
+    )
+    assert ats_feeds.personio_account(
+        "https://technopolis-group.jobs.personio.com/"
+    ) == ("technopolis-group", "com")
+    assert ats_feeds.personio_feed_url("technopolis-group", "com") == (
+        "https://technopolis-group.jobs.personio.com/xml"
+    )
+    assert "language=" not in ats_feeds.personio_feed_url("acme", "de")
+
+
+def test_teamtailor_first_request_and_reader():
+    reader = TeamtailorFeedReader()
+    req = reader.first_request(
+        {"careers_url": "https://example-aid.teamtailor.com/jobs"}
+    )
+    assert req == Request(
+        "https://example-aid.teamtailor.com/jobs.rss",
+        accept="application/rss+xml",
+    )
+    assert reader.budget_group == "teamtailor"
+    record = _record("teamtailor")
+    result = asyncio.run(
+        read_listing(
+            api_readers(),
+            Response(200, _body("teamtailor")),
+            {"careers_url": record["url"]},
+        )
+    )
+    assert result.reader == "teamtailor-feed"
+    assert result.report() is None
+    assert result.jobs == record["jobs"]
+    admitted, rejected = admit_batch([dict(job) for job in result.jobs], "api")
+    assert len(admitted) == 2
+    assert rejected == []
+
+
+def test_teamtailor_slug_link_without_location_is_rejected():
+    job = {
+        "title": "Senior Advisor",
+        "apply_url": "https://example-aid.teamtailor.com/jobs/4600123-senior-advisor",
+        "record_class": "api",
+    }
+    admitted, rejected = admit_batch([job], "api")
+    assert admitted == []
+    assert rejected[0][1] == "no_qualifying_structured_evidence"
+
+
+def test_lever_first_request_and_reader():
+    reader = LeverFeedReader()
+    req = reader.first_request({"careers_url": "https://jobs.lever.co/example-aid"})
+    assert req == Request(
+        "https://api.lever.co/v0/postings/example-aid?mode=json",
+        accept="application/json",
+    )
+    eu = reader.first_request({"careers_url": "https://jobs.eu.lever.co/example-aid"})
+    assert eu.url.startswith("https://api.eu.lever.co/")
+    record = _record("lever")
+    result = asyncio.run(
+        read_listing(
+            api_readers(),
+            Response(200, _body("lever")),
+            {"careers_url": record["url"]},
+        )
+    )
+    assert result.reader == "lever-feed"
+    assert result.jobs == record["jobs"]
+    admitted, rejected = admit_batch([dict(job) for job in result.jobs], "api")
+    assert len(admitted) == 2
+    assert rejected == []
+
+
+def test_lever_uuid_family_admits_without_location_when_repeated():
+    jobs = [
+        {
+            "title": "A",
+            "apply_url": "https://jobs.lever.co/example-aid/aaaaaaaa-bbbb-cccc-dddd-111111111111",
+            "record_class": "api",
+        },
+        {
+            "title": "B",
+            "apply_url": "https://jobs.lever.co/example-aid/bbbbbbbb-cccc-dddd-eeee-222222222222",
+            "record_class": "api",
+        },
+    ]
+    admitted, rejected = admit_batch(jobs, "api")
+    assert len(admitted) == 2
+    assert rejected == []
+
+
+def test_lever_single_job_without_location_is_rejected():
+    job = {
+        "title": "A",
+        "apply_url": "https://jobs.lever.co/example-aid/aaaaaaaa-bbbb-cccc-dddd-111111111111",
+        "record_class": "api",
+    }
+    admitted, rejected = admit_batch([job], "api")
+    assert admitted == []
+    assert rejected[0][1] == "no_qualifying_structured_evidence"
+
+
+def test_personio_first_request_and_reader():
+    reader = PersonioFeedReader()
+    req = reader.first_request(
+        {"careers_url": "https://example-aid.jobs.personio.com/"}
+    )
+    assert req == Request(
+        "https://example-aid.jobs.personio.com/xml",
+        accept="application/xml",
+    )
+    assert "language=" not in req.url
+    record = _record("personio")
+    result = asyncio.run(
+        read_listing(
+            api_readers(),
+            Response(200, _body("personio")),
+            {"careers_url": record["url"]},
+        )
+    )
+    assert result.reader == "personio-feed"
+    assert result.jobs == record["jobs"]
+    admitted, rejected = admit_batch([dict(job) for job in result.jobs], "api")
+    assert len(admitted) == 2
+    assert rejected == []
+
+
+def test_personio_numeric_family_admits_two_without_office():
+    jobs = [
+        {
+            "title": "A",
+            "apply_url": "https://example-aid.jobs.personio.com/job/1001",
+            "record_class": "api",
+        },
+        {
+            "title": "B",
+            "apply_url": "https://example-aid.jobs.personio.com/job/1002",
+            "record_class": "api",
+        },
+    ]
+    admitted, rejected = admit_batch(jobs, "api")
+    assert len(admitted) == 2
+    assert rejected == []
+
+
+def test_recognised_empty_feeds_do_not_fall_through():
+    empty_rss = (
+        '<?xml version="1.0"?><rss version="2.0"><channel><title>x</title>'
+        "</channel></rss>"
+    )
+    result = asyncio.run(
+        read_listing(
+            api_readers(),
+            Response(200, empty_rss),
+            {"careers_url": "https://example-aid.teamtailor.com/jobs"},
+        )
+    )
+    assert result.reader == "teamtailor-feed"
+    assert result.jobs == []
+
+    result = asyncio.run(
+        read_listing(
+            api_readers(),
+            Response(200, "[]"),
+            {"careers_url": "https://jobs.lever.co/example-aid"},
+        )
+    )
+    assert result.reader == "lever-feed"
+    assert result.jobs == []
+
+    empty_personio = '<?xml version="1.0"?><workzag-jobs></workzag-jobs>'
+    result = asyncio.run(
+        read_listing(
+            api_readers(),
+            Response(200, empty_personio),
+            {"careers_url": "https://example-aid.jobs.personio.com/"},
+        )
+    )
+    assert result.reader == "personio-feed"
+    assert result.jobs == []
+
+
+def test_recognised_non_feed_body_stays_on_ats_reader():
+    result = asyncio.run(
+        read_listing(
+            api_readers(),
+            Response(200, "<html>not a feed</html>"),
+            {"careers_url": "https://example-aid.teamtailor.com/jobs"},
+        )
+    )
+    assert result.reader == "teamtailor-feed"
+    assert result.jobs == []
+
+
+def test_unrecognised_rss_body_does_not_claim_teamtailor():
+    rss = (
+        '<?xml version="1.0"?><rss version="2.0"><channel>'
+        "<item><title>X</title><link>https://example.org/jobs/1</link></item>"
+        "</channel></rss>"
+    )
+    source = {"careers_url": "https://boards.example.org/jobs.json"}
+    assert TeamtailorFeedReader().first_request(source) is None
+    assert asyncio.run(TeamtailorFeedReader().read(Response(200, rss), source)) is None
+    # Fall-through reaches JsonApiReader, which refuses a non-JSON body.
+    with pytest.raises(ValueError, match="not JSON"):
+        asyncio.run(read_listing(api_readers(), Response(200, rss), source))
+
+
+def test_lever_eu_full_feed_url():
+    req = LeverFeedReader().first_request(
+        {"careers_url": "https://jobs.eu.lever.co/example-aid"}
+    )
+    assert req == Request(
+        "https://api.eu.lever.co/v0/postings/example-aid?mode=json",
+        accept="application/json",
+    )
+
+
+def test_personio_de_feed_url():
+    req = PersonioFeedReader().first_request(
+        {"careers_url": "https://acme.jobs.personio.de/"}
+    )
+    assert req == Request(
+        "https://acme.jobs.personio.de/xml",
+        accept="application/xml",
+    )
+
+
+def test_simulate_api_names_teamtailor_reader():
+    record = _record("teamtailor")
+    result = asyncio.run(simulate_api(_body("teamtailor"), record["url"]))
+    assert result["ok"] is True
+    assert result["reader"] == "teamtailor-feed"
+    assert result["admitted"] == 2
 
 
 @pytest.mark.politeness

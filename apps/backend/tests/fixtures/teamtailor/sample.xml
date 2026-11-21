@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:tt="https://teamtailor.com/locations">
+  <channel>
+    <title>Example Aid</title>
+    <link>https://example-aid.teamtailor.com/jobs</link>
+    <item>
+      <title>Senior Advisor</title>
+      <description>&lt;p&gt;Advise country programmes.&lt;/p&gt;</description>
+      <pubDate>Sat, 01 Nov 2026 12:00:00 +0000</pubDate>
+      <link>https://example-aid.teamtailor.com/jobs/4600123-senior-advisor</link>
+      <guid>14093550-daa8-41e6-8a60-0b9722d1d4db</guid>
+      <remoteStatus>none</remoteStatus>
+      <tt:locations>
+        <tt:location>
+          <tt:name>Geneva, Switzerland</tt:name>
+          <tt:city>Geneva</tt:city>
+          <tt:country>Switzerland</tt:country>
+        </tt:location>
+        <tt:location>
+          <tt:name>Nairobi, Kenya</tt:name>
+          <tt:city>Nairobi</tt:city>
+          <tt:country>Kenya</tt:country>
+        </tt:location>
+      </tt:locations>
+    </item>
+    <item>
+      <title>Remote Analyst</title>
+      <description>Analyse programme data remotely.</description>
+      <pubDate>Mon, 10 Nov 2026 09:30:00 +0000</pubDate>
+      <link>https://example-aid.teamtailor.com/jobs/4600999-remote-analyst</link>
+      <guid>aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee</guid>
+      <remoteStatus>fully</remoteStatus>
+    </item>
+  </channel>
+</rss>

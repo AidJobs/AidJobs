@@ -1,0 +1,28 @@
+{
+  "url": "https://jobs.lever.co/example-aid",
+  "jobs": [
+    {
+      "title": "Programme Manager",
+      "apply_url": "https://jobs.lever.co/example-aid/aaaaaaaa-bbbb-cccc-dddd-111111111111",
+      "record_class": "api",
+      "reference": "aaaaaaaa-bbbb-cccc-dddd-111111111111",
+      "posted_on": "2026-11-01",
+      "description": "<p>Lead a field programme.</p>\n<h3>Responsibilities</h3>\n<ul><li>Plan activities</li></ul>\n<p>Apply by email.</p>",
+      "employment_type": "Full-time",
+      "location_raw": "Nairobi, Kenya",
+      "locations": ["Nairobi, Kenya"]
+    },
+    {
+      "title": "Remote Coordinator",
+      "apply_url": "https://jobs.lever.co/example-aid/bbbbbbbb-cccc-dddd-eeee-222222222222",
+      "record_class": "api",
+      "reference": "bbbbbbbb-cccc-dddd-eeee-222222222222",
+      "posted_on": "2026-11-10",
+      "description": "Coordinate remotely.",
+      "employment_type": "Contract",
+      "is_remote": true,
+      "location_raw": "Remote",
+      "locations": ["Remote"]
+    }
+  ]
+}
