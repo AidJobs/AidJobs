@@ -20,7 +20,7 @@
 
 5. ~~Approve vs unsaved buffers; Add-panel blur/Escape~~ — **Fixed 20 Nov 2026** (Step A R1-06; Step B R1-11; user confirmed on preview)
 
-**Next (21 Nov 2026, after R2-P1-8):** **R2-P1-9** (Preview tab leaves Eye hidden), or the user’s new priority. Phase 7 held.
+**Next (21 Nov 2026, after R2-P1-9):** **R2-P1-10** (mobile 44px+ targets), or the user’s new priority. Phase 7 held.
 
 ---
 
@@ -61,7 +61,7 @@
 | R1-10 | **Fixed** (21 Nov 2026; click/drag U-4 B; fake Moved `7475fda`; group drops + rehome; agent confirmed on preview) | Grip threshold 12px; fake “Moved” at ends closed; outline group drag shows `data-group-drop` insertion bar; `removeGroup` rehomes sections (catalog → own group; custom → previous/next/`job`); Undo restores; AI path same. Draft has no group grips (by design). |
 | R1-11 | **Fixed** (20 Nov 2026; Step B `732a06f`…`9e4ae13`) | Enter commits; blur/Escape cancel. Add your own under every group. After Enter-add, JD scroll preserved (no jump to top). | User confirmed on preview, 20 Nov 2026 |
 | R1-12 | OPEN | Section header row: Approve/Undo/Also-in clip; pencil/grip hard on narrow/touch (opacity 0.45). |
-| R1-13 | OPEN | Preview Eye vanishes while Preview tab stays after picking a progress part. |
+| R1-13 | **Fixed** (R2-P1-9, 21 Nov 2026) | Leaving Preview (progress part, Job description tab, walk, open/close tab) clears `preview` so Eye returns; Preview tab no longer lingers. |
 | R1-14 | **Fixed** (R2-P1-8, 21 Nov 2026) | Walk Check card uses `checkPoints` (same as progress); outline gaps block Check; google stays facts-only. |
 | R1-15 | OPEN | Hide card + later ask leaves part highlighted with card shut. |
 | R1-16 | **Fixed** (U-3 Step A, 20 Nov 2026; grip naming remains U-4) | Save no longer renames; shared `pageIntake` for JD + chat; Accept/Reject/skip clear intake so a dirty box cannot overwrite. |
@@ -190,7 +190,7 @@ Full **icon inventory table** (Eye, History, progress, tabs, X, Approve, pencil,
 
 | # | Status | Summary | R1 |
 | --- | --- | --- | --- |
-| 1 | Broken | Progress part while Preview open hides Eye; preview flag not cleared | R1-13 |
+| 1 | **Fixed** (R2-P1-9) | Progress part while Preview open hides Eye; preview flag not cleared | R1-13 |
 | 2–3 | Partial | Progress not under header; label clip; phone parts over icons | U-1, R1-09,20 |
 | 4–7 | Broken/Partial | 3px grip; fake “Moved”; invisible group join; 2s dismiss | R1-10,05 |
 | 8–10 | Broken/Partial | Approve ignores buffer; Project Save rename; no Approved mark | R1-06,16,19 |
@@ -258,7 +258,7 @@ Full **icon inventory table** (Eye, History, progress, tabs, X, Approve, pencil,
 | R2-P1-6 | **Fixed** (21 Nov 2026) | Opening brief pay/date on AI path — `groundPayDeadline` refuses invented pay; user’s `extractFacts` deadline wins |
 | R2-P1-7 | **Fixed** (21 Nov 2026) | House vs org type + UN chips — ngo/charity type wins over house; chips National then INGO, UN only in See all |
 | R2-P1-8 | **Fixed** (21 Nov 2026) | Check done vs empty Qualifications — outline gaps in `checkPoints`; card matches progress; gaps not skippable — Novice #11, R1-14 |
-| R2-P1-9 | NEW | **Preview tab leaves Eye hidden** — R1-13 — Chrome, Novice |
+| R2-P1-9 | **Fixed** (21 Nov 2026) | Preview tab leaves Eye hidden — leave Preview clears flag; Eye returns — R1-13 |
 | R2-P1-10 | NEW | **Mobile not viable for polish** — [Phone R2](033c02d6-9e1f-40bd-a8a5-4e71b6565a6a) — 44px+ targets |
 
 **P2 — after English (langs, UN content, Amplify, mobile polish detail)**
@@ -324,6 +324,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 21 Nov 2026 | Background / Project heading polish (user) | `d16b5b1`…`9301374` | Restore Heading + other-title chips on project pencil (Save body still no force-rename). Formats without a `background` slot add **Project brief**. Grip: `Add Project brief` / `Add “About the project” under …`. Add panel: fixed `GROUPS` order even if the job regrouped. **Agent confirmed on preview** (Add Project brief; pencil Heading + Background / About the programme chips; Add panel About the employer → The job → …). |
 | 21 Nov 2026 | R2-P1-7 | `c90cf88`…`d698879` | `recommendation` / `familiesForOrg`: ngo/charity chips National then INGO, UN excluded from quick chips; See all + phone strip org-aware. `defaultFormatKey`: ngo/charity use `FORMAT_FOR_TYPE`, not house. Tests `employerDemoR2P17.test.ts`. **Agent confirmed on preview** (Tumaini: chips Local NGO concise → Domestic charity → About you narrative; phone strip National/INGO/donors then UN last). |
 | 21 Nov 2026 | R2-P1-8, R1-14 | `e7c5c4b`…`58deeba` | `checkPoints` includes outline gaps from `sectionOutlineGaps`; leave cannot skip them; walk Check card lists `checkPoints` (not `openPoints`). Tests `employerDemoR2P18.test.ts`. **Agent confirmed on preview** (pencil-clear Qualifications → Save → Check to do; card: “Qualifications and experience: still empty or unfinished”; earlier: inclusive point matched progress, no Google). |
+| 21 Nov 2026 | R2-P1-9, R1-13 | *(this commit)* | `Window.tsx`: `pickPanelTab` + `setPreview(false)` on progress part, Job description / other panel tabs, walk focus, open/close tab, toJob, version tab. Test in `employer-demo-no-fetch.test.tsx` (leave Preview → Eye back). Confirm on preview. |
 
 ---
 
@@ -331,7 +332,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 
 1. Read this file and `employer-side-plan.md` Phase 6 / polish status.  
 2. Confirm `demo/employer` tip and that English-first still holds.  
-3. **Default next:** **R2-P1-9** (Preview / Eye), after R2-P1-8 preview confirm. Or the user’s new priority.  
+3. **Default next:** **R2-P1-10** (mobile 44px+), after R2-P1-9 preview confirm. Or the user’s new priority.  
 4. Mark IDs Fixed in the tables and add a Fix log row in the same commit as the code.  
 5. Do not close Phase 7 until the user says English chrome is good enough.  
 6. Never stage leftover `apps/frontend/lib/__tests__/employerDemoPhase6Review.test.ts` or `apps/frontend/AGENTS.md` unless the user asks.

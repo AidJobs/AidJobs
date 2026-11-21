@@ -908,6 +908,7 @@ function JobWindow({ id }: { id: string }) {
   if (changeShown !== changeKey) {
     setChangeShown(changeKey);
     if (changeKey && job?.lastChange) {
+      setPreview(false);
       setTab('doc');
       setSaid(`Updated in the job description: ${job.lastChange.keys.map((k) => job.sections.find((x) => x.key === k)?.title ?? k).join(', ')}.`);
       if (phone) setUnseen(true);
@@ -1029,6 +1030,7 @@ function JobWindow({ id }: { id: string }) {
   const [versionShown, setVersionShown] = useState('');
   if (step?.kind === 'version' && versionShown !== stepNow && !reading) {
     setVersionShown(stepNow);
+    setPreview(false);
     setTab(`lang:${step.lang}`);
   }
   useEffect(() => {
@@ -1051,6 +1053,8 @@ function JobWindow({ id }: { id: string }) {
       return;
     }
     seenStep.current = stepNow;
+    // R2-P1-9: walk focus leaves the preview panel — clear the preview flag so Eye returns.
+    setPreview(false);
     setPart(job.id, p);
     const sec = sectionOf(p);
     scrollToId(sec && p !== 's:apply' ? `ej-sec-${sec}` : 'ej-part-card');
@@ -1135,7 +1139,10 @@ function JobWindow({ id }: { id: string }) {
     const name = langOf(t.lang).label;
     if (!window.confirm(`Remove the ${name} version? This deletes that language draft from this job.`)) return;
     removeTranslation(job.id, t.lang);
-    if (tab === t.key) setTab('doc');
+    if (tab === t.key) {
+      setPreview(false);
+      setTab('doc');
+    }
     notify(`Removed the ${name} version.`);
   };
   const active = tabs.some((t) => t.key === tab) ? tab : 'doc';
@@ -1145,6 +1152,17 @@ function JobWindow({ id }: { id: string }) {
   const openPick = (t: Pick['tab']) => {
     setPick(startPick(s, job, t));
     if (phone) setView('job');
+  };
+  /** R2-P1-9: opening Preview sets both flags; any other panel tab clears the preview flag so Eye returns. */
+  const pickPanelTab = (k: string) => {
+    if (k === 'preview') {
+      setPreview(true);
+      setTab('preview');
+      if (phone) setView('job');
+      return;
+    }
+    setPreview(false);
+    setTab(k);
   };
   const goPart = (key: string) => {
     settleAsk(job.id);
@@ -1161,6 +1179,7 @@ function JobWindow({ id }: { id: string }) {
       return scrollToId(`ej-ver-${sectionOf(key)}`);
     }
     setPart(job.id, key);
+    setPreview(false);
     setTab('doc');
     setHidden(null);
     if (phone) setView('job');
@@ -1194,17 +1213,20 @@ function JobWindow({ id }: { id: string }) {
   const openTab = (k: string) => {
     if (k === 'flyer' && reachOpen(job, s)) markFlyerMade(job.id);
     if (!k.startsWith('lang:') && !extra.includes(k)) setExtra((x) => (x.includes(k) ? x : [...x, k]));
+    setPreview(false);
     setTab(k);
     if (phone) setView('job');
     requestAnimationFrame(() => document.getElementById(`ej-wtab-${k}`)?.focus({ preventScroll: true }));
   };
   const closeTab = (k: string) => {
     setExtra((x) => x.filter((y) => y !== k));
+    setPreview(false);
     setTab('doc');
     requestAnimationFrame(() => (document.getElementById('ej-wtab-doc') ?? document.getElementById('ej-w-panel'))?.focus({ preventScroll: true }));
   };
   const opener: Opener = { tab: openTab, part: (k) => goPart(k), preview: openPreview };
   const toJob = () => {
+    setPreview(false);
     setTab('doc');
     if (phone) setView('job');
     requestAnimationFrame(() => document.getElementById('ej-w-panel')?.focus());
@@ -1563,7 +1585,7 @@ function JobWindow({ id }: { id: string }) {
             </div>
             {tabs.length > 1 && (
               <div className="shrink-0 border-b aj-hair">
-                <PanelTabs tabs={tabs} active={active} onPick={setTab} onRemove={removeLangTab} end={langs.length && !reviewing ? <LinkLangs job={job} disabled={false} /> : undefined} />
+                <PanelTabs tabs={tabs} active={active} onPick={pickPanelTab} onRemove={removeLangTab} end={langs.length && !reviewing ? <LinkLangs job={job} disabled={false} /> : undefined} />
               </div>
             )}
             {panel}
@@ -1639,7 +1661,7 @@ function JobWindow({ id }: { id: string }) {
           </div>
           {tabRow && (
             <div className="shrink-0 border-b aj-hair">
-              <PanelTabs tabs={tabs} active={active} onPick={setTab} onRemove={removeLangTab} end={langs.length && !reviewing ? <LinkLangs job={job} disabled={false} /> : undefined} />
+              <PanelTabs tabs={tabs} active={active} onPick={pickPanelTab} onRemove={removeLangTab} end={langs.length && !reviewing ? <LinkLangs job={job} disabled={false} /> : undefined} />
             </div>
           )}
           {panel}

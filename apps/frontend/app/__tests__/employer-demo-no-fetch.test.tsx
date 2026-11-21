@@ -1551,6 +1551,37 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     shows('Archived screen, kept for reference');
   });
 
+  // R2-P1-9 / R1-13: leaving Preview must clear the preview flag so Eye returns.
+  it('leaving Preview via a progress part or Job description restores Eye and drops the Preview tab', () => {
+    fresh();
+    let id = '';
+    act(() => {
+      id = startJob('Hiring a Shelter Officer in Goma, closing 30 December 2026, fixed-term');
+    });
+    phone = false;
+    render();
+    route(`#job/${id}`);
+    const tabs = () => Array.from(container.querySelectorAll('[role="tab"]')).map((t) => t.textContent);
+    expect(job(id).sections.length).toBeGreaterThan(0);
+    expect(byLabel('Preview')).not.toBeNull();
+
+    act(() => byLabel('Preview').click());
+    expect(tabs()).toContain('Preview');
+    expect(container.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Preview');
+    expect(byLabel('Preview')).toBeNull();
+
+    part(job(id).sections[0]!.title);
+    expect(tabs()).not.toContain('Preview');
+    expect(byLabel('Preview')).not.toBeNull();
+    expect(container.querySelector('[aria-label="Google result preview"]')).toBeNull();
+
+    act(() => byLabel('Preview').click());
+    expect(tabs()).toContain('Preview');
+    act(() => (Array.from(container.querySelectorAll('[role="tab"]')).find((t) => t.textContent === 'Job description') as HTMLElement).click());
+    expect(tabs()).not.toContain('Preview');
+    expect(byLabel('Preview')).not.toBeNull();
+  });
+
   it('on phones the chat fills the screen, the job is one tap away, and the line opens as a short list', () => {
     fresh();
     let id = '';
