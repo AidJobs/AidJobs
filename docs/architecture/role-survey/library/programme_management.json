@@ -1,11 +1,15 @@
 {
-  "built_at": "wave1a-0.2.0-7466f847b07b",
+  "built_at": "wave1a-0.3.0-5a63eb99ba72",
   "built_from": {
     "duty_group_names_sha256": "53b6ed7d17ed3a8930d71bfde7cc727971caf7df7b4bf8c060270d6e96ac8d09",
     "duty_group_row_count": 213,
+    "duty_phrasing_row_count": 98,
+    "duty_phrasing_sha256": "117920c0d4455219c876f942c6e317e8c25a2cbb8f29db0c15fc29fd5180b52f",
     "measured_generated_at": "2026-11-15T14:27:26Z",
     "normative_row_count": 13,
     "normative_sources_sha256": "bb505ba7997de7dea1ea79d785cae84ee756c4ca3621d691ba9bb4a3b6942868",
+    "reference_jd_count": 0,
+    "reference_jds_sha256": "",
     "signature_fact_row_count": 22,
     "signature_facts_sha256": "01c039c530463c0ce3360f7f7f74a30c8daebdff57af5d85aced3c32c761cc96",
     "wave_1a_broad_measured_sha256": "d9abc8fc085aa9d699e01b5f0b1545e310ee0e5ddc5284ca69f03d06e98abd51",
@@ -18,7 +22,7 @@
   },
   "deep_fields_ready": {
     "duty_bank_naming": true,
-    "duty_bank_phrasing": false,
+    "duty_bank_phrasing": true,
     "reference_jds": false,
     "signature_fact_questions": true
   },
@@ -31,7 +35,7 @@
   },
   "duty_bank": {
     "archive_measured_pointer": "survey-raw-archive/role-survey-reading/work/measured.jsonl",
-    "deep_fields_ready": false,
+    "deep_fields_ready": true,
     "grouping_counts": {
       "archive_pointer": "survey-raw-archive/role-survey-reading/work/stage2/measured/programme_management/duty-banks.jsonl",
       "evidence_note": "Counts only from the broad-layer duty-line grouping run; paraphrases stay in the archive (stage2/measured/{family}/duty-banks.jsonl).",
@@ -903,9 +907,403 @@
         "stable_id": null
       }
     ],
-    "naming_note": "AidJobs names for groups with advert_count >= 5; thinner groups keep heuristic names only (named false). Best-quarter phrasing deferred.",
+    "naming_note": "AidJobs names for groups with advert_count >= 5; thinner groups keep heuristic names only (named false). Best-quarter lines live in phrasing_lines; groups[].phrasing stays null.",
     "naming_ready": true,
-    "phrasing": null
+    "phrasing": null,
+    "phrasing_lines": [
+      {
+        "best_en": "Maintain the country risk register for [risks], updating likelihood and mitigations each [frequency].",
+        "best_fr": "Tenir le registre des risques pays pour [risks], en mettant à jour probabilités et mesures chaque [frequency].",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "risks",
+          "frequency"
+        ],
+        "stable_id": "pm-country-risk-management",
+        "weak_en": "Manage risks' with no register, types or update cycle.",
+        "weak_fr": "« Gérer les risques » sans registre, types ni cycle de mise à jour."
+      },
+      {
+        "best_en": null,
+        "best_fr": null,
+        "label": "Estimate",
+        "skip": "noise_or_catchall",
+        "slots": [],
+        "stable_id": "pm-cps-financial-aspects",
+        "weak_en": null,
+        "weak_fr": null
+      },
+      {
+        "best_en": null,
+        "best_fr": null,
+        "label": "Estimate",
+        "skip": "noise_or_catchall",
+        "slots": [],
+        "stable_id": "pm-cps-requirements",
+        "weak_en": null,
+        "weak_fr": null
+      },
+      {
+        "best_en": "Supervise delivery of [investment] milestones with the investee and record covenant status each quarter.",
+        "best_fr": "Superviser les jalons de [investment] avec l’entité financée et consigner le respect des engagements chaque trimestre.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "investment"
+        ],
+        "stable_id": "pm-development-investments",
+        "weak_en": "Manage investments' with no milestone or covenant tracking.",
+        "weak_fr": "« Gérer les investissements » sans jalons ni suivi des engagements."
+      },
+      {
+        "best_en": "Submit [donor] narrative and results reports by [deadline], using verified figures from MEAL.",
+        "best_fr": "Soumettre les rapports narratifs et de résultats à [donor] pour le [deadline], avec chiffres vérifiés par le MEAL.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "donor",
+          "deadline"
+        ],
+        "stable_id": "pm-donor-reporting",
+        "weak_en": "Donor reporting' as a label with no product, deadline or data source.",
+        "weak_fr": "« Rapports aux bailleurs » comme étiquette sans produit, échéance ni source de données."
+      },
+      {
+        "best_en": "Coordinate field activities for [project] across [sites], aligning schedules with logistics and security.",
+        "best_fr": "Coordonner les activités terrain du [projet] sur [sites], en alignant les calendriers avec logistique et sécurité.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "project",
+          "sites"
+        ],
+        "stable_id": "pm-field-programme-coordination",
+        "weak_en": "Coordinate in the field' with no sites or support functions named.",
+        "weak_fr": "« Coordonner sur le terrain » sans sites ni fonctions d’appui nommées."
+      },
+      {
+        "best_en": "Draft proposal sections for [donor] covering results, budget narrative and risk for [project].",
+        "best_fr": "Rédiger les sections de proposition pour [donor] couvrant résultats, narratif budgétaire et risques pour le [projet].",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "donor",
+          "project"
+        ],
+        "stable_id": "pm-funding-proposals",
+        "weak_en": "Support fundraising' with no donor, product or section owned.",
+        "weak_fr": "« Soutenir la mobilisation de fonds » sans bailleur, produit ni section prise en charge."
+      },
+      {
+        "best_en": "Keep project files for [project] current: workplans, risk logs and decision notes accessible to the team.",
+        "best_fr": "Tenir à jour les dossiers du [projet] : plans de travail, registres des risques et notes de décision accessibles à l’équipe.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "project"
+        ],
+        "stable_id": "pm-internal-project-documents",
+        "weak_en": "Duty that only says 'prepare documents' with no which files or for whom.",
+        "weak_fr": "Tâche qui dit seulement « préparer les documents » sans préciser lesquels ni pour qui."
+      },
+      {
+        "best_en": "Carry out duties that require [language] at [level] when engaging [audience].",
+        "best_fr": "Assurer les tâches qui exigent [language] au niveau [level] lors des échanges avec [audience].",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "language",
+          "level",
+          "audience"
+        ],
+        "stable_id": "pm-language-requirements",
+        "weak_en": "Language listed as a duty instead of a requirement, with no context of use.",
+        "weak_fr": "Langue listée comme tâche plutôt que comme exigence, sans contexte d’usage."
+      },
+      {
+        "best_en": "Meet community representatives in [location] on [topic] at least [frequency], documenting feedback for the team.",
+        "best_fr": "Rencontrer les représentants communautaires à [location] sur [topic] au moins [frequency], en documentant les retours pour l’équipe.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "location",
+          "topic",
+          "frequency"
+        ],
+        "stable_id": "pm-local-community-liaison",
+        "weak_en": "Liaise with communities' with no place, topic or frequency.",
+        "weak_fr": "« Assurer la liaison avec les communautés » sans lieu, sujet ni fréquence."
+      },
+      {
+        "best_en": null,
+        "best_fr": null,
+        "label": "Estimate",
+        "skip": "noise_or_catchall",
+        "slots": [],
+        "stable_id": "pm-main-responsibilities",
+        "weak_en": null,
+        "weak_fr": null
+      },
+      {
+        "best_en": "Draft minutes for [meeting] within [days] days, listing decisions, actions, owners and due dates.",
+        "best_fr": "Rédiger le compte rendu de [meeting] sous [days] jours, listant décisions, actions, responsables et échéances.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "meeting",
+          "days"
+        ],
+        "stable_id": "pm-meeting-minutes",
+        "weak_en": "Take minutes' with no circulation deadline or action fields.",
+        "weak_fr": "« Prendre des notes » sans délai de diffusion ni champs d’action."
+      },
+      {
+        "best_en": "Attend [meeting] for [project], capture actions with owners and confirm completion by the next cycle.",
+        "best_fr": "Participer à [meeting] pour le [projet], consignant actions et responsables, et confirmer l’achèvement au cycle suivant.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "meeting",
+          "project"
+        ],
+        "stable_id": "pm-meetings-follow-up",
+        "weak_en": "Attend meetings' with no follow-up ownership.",
+        "weak_fr": "« Participer aux réunions » sans suivi des actions."
+      },
+      {
+        "best_en": "Identify one operational bottleneck in [process] each quarter and agree a fix with owners and a review date.",
+        "best_fr": "Identifier un goulot opérationnel dans [process] chaque trimestre et convenir d’une correction avec responsables et date de revue.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "process"
+        ],
+        "stable_id": "pm-operational-improvement",
+        "weak_en": "Drive continuous improvement' with no process, cadence or owners.",
+        "weak_fr": "« Favoriser l’amélioration continue » sans processus, cadence ni responsables."
+      },
+      {
+        "best_en": "Coordinate with [counterpart] on [topic] at least [frequency], recording decisions and follow-up owners.",
+        "best_fr": "Coordonner avec [counterpart] sur [topic] au moins [frequency], en consignant décisions et responsables du suivi.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "counterpart",
+          "topic",
+          "frequency"
+        ],
+        "stable_id": "pm-partner-government-relations",
+        "weak_en": "Catch-all 'liaise with stakeholders' with no counterpart, topic or frequency.",
+        "weak_fr": "Fourre-tout « assurer la liaison avec les parties prenantes » sans interlocuteur, sujet ni fréquence."
+      },
+      {
+        "best_en": "Supervise [company] portfolio milestones and escalate covenant breaches within [days] working days.",
+        "best_fr": "Superviser les jalons du portefeuille [company] et escalader les manquements aux engagements sous [days] jours ouvrés.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "company",
+          "days"
+        ],
+        "stable_id": "pm-portfolio-supervision",
+        "weak_en": "Supervise the portfolio' without milestones or escalation.",
+        "weak_fr": "« Superviser le portefeuille » sans jalons ni escalade."
+      },
+      {
+        "best_en": "Track [indicator] for [project] each [frequency] and flag variances to the manager within [days] days.",
+        "best_fr": "Suivre [indicator] pour le [projet] chaque [frequency] et signaler les écarts au responsable sous [days] jours.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "indicator",
+          "project",
+          "frequency",
+          "days"
+        ],
+        "stable_id": "pm-programme-data-monitoring",
+        "weak_en": "Monitoring named without indicators, frequency or escalation.",
+        "weak_fr": "Suivi nommé sans indicateurs, fréquence ni escalade."
+      },
+      {
+        "best_en": "Review [project] performance against targets each [frequency] and agree corrective actions with the team.",
+        "best_fr": "Examiner la performance du [projet] par rapport aux cibles chaque [frequency] et convenir d’actions correctives avec l’équipe.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "project",
+          "frequency"
+        ],
+        "stable_id": "pm-programme-performance",
+        "weak_en": "Review performance' without targets or agreed actions.",
+        "weak_fr": "« Examiner la performance » sans cibles ni actions convenues."
+      },
+      {
+        "best_en": "Run the agreed programme process for [step] on [project], including checks before each gate.",
+        "best_fr": "Exécuter le processus programme convenu pour [step] sur le [projet], avec contrôles avant chaque jalon.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "step",
+          "project"
+        ],
+        "stable_id": "pm-programme-processes",
+        "weak_en": "Follow processes' with no named step or gate.",
+        "weak_fr": "« Suivre les processus » sans étape ni jalon nommé."
+      },
+      {
+        "best_en": "Produce the [frequency] progress note for [audience] covering results, risks and next priorities.",
+        "best_fr": "Produire la note de progrès [frequency] pour [audience] couvrant résultats, risques et prochaines priorités.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "frequency",
+          "audience"
+        ],
+        "stable_id": "pm-progress-reporting",
+        "weak_en": "Write progress reports' without audience, cadence or content.",
+        "weak_fr": "« Rédiger des rapports d’avancement » sans destinataire, cadence ni contenu."
+      },
+      {
+        "best_en": "Update the implementation tracker for [deliverable] each [frequency] and note blockers with owners.",
+        "best_fr": "Mettre à jour le suivi de mise en œuvre pour [deliverable] chaque [frequency] et noter les blocages avec responsables.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "deliverable",
+          "frequency"
+        ],
+        "stable_id": "pm-progress-tracking",
+        "weak_en": "Track progress' with no deliverable, cadence or blocker handling.",
+        "weak_fr": "« Suivre les progrès » sans livrable, cadence ni traitement des blocages."
+      },
+      {
+        "best_en": "Prepare the [project] budget and revisions with finance, matching activities to [currency] lines.",
+        "best_fr": "Préparer le budget du [projet] et ses révisions avec la finance, en reliant activités et lignes en [currency].",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "project",
+          "currency"
+        ],
+        "stable_id": "pm-project-budgets",
+        "weak_en": "Handle budgets' without which project, who co-owns or currency.",
+        "weak_fr": "« Gérer les budgets » sans projet, co-responsable ni devise."
+      },
+      {
+        "best_en": "Plan and run [event] for [project], covering agenda, invites, logistics and a short outcome note.",
+        "best_fr": "Planifier et tenir [event] pour le [projet], couvrant ordre du jour, invitations, logistique et une courte note de résultats.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "event",
+          "project"
+        ],
+        "stable_id": "pm-project-events",
+        "weak_en": "Support events' with no owned products.",
+        "weak_fr": "« Soutenir les événements » sans produits pris en charge."
+      },
+      {
+        "best_en": "Apply the organisation's project standards on [project] for planning, risk and close-out, and coach staff where gaps appear.",
+        "best_fr": "Appliquer les normes de gestion de projet de l’organisation sur le [projet] pour planification, risques et clôture, et accompagner le personnel là où des écarts apparaissent.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "project"
+        ],
+        "stable_id": "pm-project-excellence",
+        "weak_en": "Ensure excellence' as a slogan with no standards or coaching.",
+        "weak_fr": "« Assurer l’excellence » comme slogan sans normes ni accompagnement."
+      },
+      {
+        "best_en": "Oversee project spending against the [project] budget with finance, including advances and liquidations.",
+        "best_fr": "Superviser les dépenses du [projet] par rapport au budget avec la finance, y compris avances et liquidations.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "project"
+        ],
+        "stable_id": "pm-project-finance-operations",
+        "weak_en": "Support project finance' with no spend controls named.",
+        "weak_fr": "« Soutenir les finances de projet » sans contrôles de dépenses nommés."
+      },
+      {
+        "best_en": "Deliver [project] activities across [sites] to the agreed workplan, quality checks and timeline.",
+        "best_fr": "Mettre en œuvre les activités du [projet] sur [sites] selon le plan de travail, les contrôles qualité et le calendrier.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "project",
+          "sites"
+        ],
+        "stable_id": "pm-project-implementation",
+        "weak_en": "Vague 'implement the project' with no sites, timeline or quality checks.",
+        "weak_fr": "Formulation vague « mettre en œuvre le projet » sans sites, calendrier ni contrôles qualité."
+      },
+      {
+        "best_en": null,
+        "best_fr": null,
+        "label": "Estimate",
+        "skip": "noise_or_catchall",
+        "slots": [],
+        "stable_id": "pm-sanaa-place-noise",
+        "weak_en": null,
+        "weak_fr": null
+      },
+      {
+        "best_en": "Prepare negotiation packs for [counterpart] on [topic], including options, risks and recommended positions.",
+        "best_fr": "Préparer les dossiers de négociation pour [counterpart] sur [topic], avec options, risques et positions recommandées.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "counterpart",
+          "topic"
+        ],
+        "stable_id": "pm-sponsor-lender-negotiations",
+        "weak_en": "Support negotiations' with no counterpart or topic.",
+        "weak_fr": "« Soutenir les négociations » sans interlocuteur ni sujet."
+      },
+      {
+        "best_en": "Produce technical briefing notes for staff on [topic] ahead of [use], in plain language.",
+        "best_fr": "Produire des notes techniques pour le personnel sur [topic] avant [use], en langage clair.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "topic",
+          "use"
+        ],
+        "stable_id": "pm-staff-technical-materials",
+        "weak_en": "Prepare materials' with no audience, topic or timing.",
+        "weak_fr": "« Préparer des supports » sans public, sujet ni calendrier."
+      },
+      {
+        "best_en": "Align [team] workplans each [frequency] so dependencies on [project] are visible and owned.",
+        "best_fr": "Aligner les plans de travail de [team] chaque [frequency] pour que les dépendances du [projet] soient visibles et prises en charge.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "team",
+          "frequency",
+          "project"
+        ],
+        "stable_id": "pm-team-coordination",
+        "weak_en": "Coordinate the team' with no cadence or dependency handling.",
+        "weak_fr": "« Coordonner l’équipe » sans cadence ni gestion des dépendances."
+      },
+      {
+        "best_en": "Lead a team of [number] staff on [function], with clear priorities, coaching and performance feedback.",
+        "best_fr": "Encadrer une équipe de [number] personnes sur [function], avec priorités claires, accompagnement et retours sur la performance.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "number",
+          "function"
+        ],
+        "stable_id": "pm-team-leadership",
+        "weak_en": "Generic 'manage the team' without size, function or how performance is reviewed.",
+        "weak_fr": "« Gérer l’équipe » générique sans taille, fonction ni modalité d’évaluation."
+      }
+    ]
   },
   "family_id": "programme_management",
   "measured_broad": {
@@ -1059,7 +1457,7 @@
     "label": "Estimate",
     "status": "pending"
   },
-  "schema_version": "0.2.0",
+  "schema_version": "0.3.0",
   "signature_fact_questions": [
     {
       "bottom_count": 1,

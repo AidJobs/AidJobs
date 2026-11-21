@@ -1,10 +1,10 @@
 {
-  "built_at": "wave1a-0.2.0-7466f847b07b",
+  "built_at": "wave1a-0.3.0-5a63eb99ba72",
   "families": [
     {
       "deep_fields_ready": {
         "duty_bank_naming": true,
-        "duty_bank_phrasing": false,
+        "duty_bank_phrasing": true,
         "reference_jds": false,
         "signature_fact_questions": true
       },
@@ -15,7 +15,7 @@
     {
       "deep_fields_ready": {
         "duty_bank_naming": true,
-        "duty_bank_phrasing": false,
+        "duty_bank_phrasing": true,
         "reference_jds": false,
         "signature_fact_questions": true
       },
@@ -26,7 +26,7 @@
     {
       "deep_fields_ready": {
         "duty_bank_naming": true,
-        "duty_bank_phrasing": false,
+        "duty_bank_phrasing": true,
         "reference_jds": false,
         "signature_fact_questions": true
       },
@@ -37,7 +37,7 @@
     {
       "deep_fields_ready": {
         "duty_bank_naming": true,
-        "duty_bank_phrasing": false,
+        "duty_bank_phrasing": true,
         "reference_jds": false,
         "signature_fact_questions": true
       },
@@ -48,7 +48,9 @@
   ],
   "inputs": {
     "duty_group_names": "role-survey/duty-group-names.csv",
+    "duty_phrasing": "role-survey/duty-phrasing.csv",
     "normative_sources": "role-survey/normative-sources.csv",
+    "reference_dir": "role-survey/library/reference/",
     "signature_facts": "role-survey/signature-facts.csv",
     "wave_1a_broad_measured": "role-survey/wave-1a-broad-measured.json",
     "wave_1a_families": [
@@ -58,6 +60,6 @@
       "finance"
     ]
   },
-  "schema_version": "0.2.0",
+  "schema_version": "0.3.0",
   "wave": "1a"
 }

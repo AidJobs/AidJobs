@@ -1,11 +1,15 @@
 {
-  "built_at": "wave1a-0.2.0-7466f847b07b",
+  "built_at": "wave1a-0.3.0-5a63eb99ba72",
   "built_from": {
     "duty_group_names_sha256": "53b6ed7d17ed3a8930d71bfde7cc727971caf7df7b4bf8c060270d6e96ac8d09",
     "duty_group_row_count": 213,
+    "duty_phrasing_row_count": 98,
+    "duty_phrasing_sha256": "117920c0d4455219c876f942c6e317e8c25a2cbb8f29db0c15fc29fd5180b52f",
     "measured_generated_at": "2026-11-15T14:27:26Z",
     "normative_row_count": 13,
     "normative_sources_sha256": "bb505ba7997de7dea1ea79d785cae84ee756c4ca3621d691ba9bb4a3b6942868",
+    "reference_jd_count": 0,
+    "reference_jds_sha256": "",
     "signature_fact_row_count": 22,
     "signature_facts_sha256": "01c039c530463c0ce3360f7f7f74a30c8daebdff57af5d85aced3c32c761cc96",
     "wave_1a_broad_measured_sha256": "d9abc8fc085aa9d699e01b5f0b1545e310ee0e5ddc5284ca69f03d06e98abd51",
@@ -18,7 +22,7 @@
   },
   "deep_fields_ready": {
     "duty_bank_naming": true,
-    "duty_bank_phrasing": false,
+    "duty_bank_phrasing": true,
     "reference_jds": false,
     "signature_fact_questions": true
   },
@@ -31,7 +35,7 @@
   },
   "duty_bank": {
     "archive_measured_pointer": "survey-raw-archive/role-survey-reading/work/measured.jsonl",
-    "deep_fields_ready": false,
+    "deep_fields_ready": true,
     "grouping_counts": {
       "archive_pointer": "survey-raw-archive/role-survey-reading/work/stage2/measured/communications_advocacy/duty-banks.jsonl",
       "evidence_note": "Counts only from the broad-layer duty-line grouping run; paraphrases stay in the archive (stage2/measured/{family}/duty-banks.jsonl).",
@@ -760,9 +764,333 @@
         "stable_id": null
       }
     ],
-    "naming_note": "AidJobs names for groups with advert_count >= 5; thinner groups keep heuristic names only (named false). Best-quarter phrasing deferred.",
+    "naming_note": "AidJobs names for groups with advert_count >= 5; thinner groups keep heuristic names only (named false). Best-quarter lines live in phrasing_lines; groups[].phrasing stays null.",
     "naming_ready": true,
-    "phrasing": null
+    "phrasing": null,
+    "phrasing_lines": [
+      {
+        "best_en": "Coordinate advocacy messages with [partner] on [issue], agreeing roles before public release.",
+        "best_fr": "Coordonner les messages de plaidoyer avec [partner] sur [issue], en convenant des rôles avant diffusion publique.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "partner",
+          "issue"
+        ],
+        "stable_id": "ca-advocacy-partner-relations",
+        "weak_en": "Work with advocacy partners' with no issue or role split.",
+        "weak_fr": "« Travailler avec les partenaires de plaidoyer » sans enjeu ni répartition des rôles."
+      },
+      {
+        "best_en": "Draft the [period] advocacy plan for [issue], with targets, audiences and success measures.",
+        "best_fr": "Rédiger le plan de plaidoyer [period] pour [issue], avec cibles, publics et mesures de succès.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "period",
+          "issue"
+        ],
+        "stable_id": "ca-advocacy-strategy",
+        "weak_en": "Lead advocacy strategy' without issue, targets or measures.",
+        "weak_fr": "« Diriger la stratégie de plaidoyer » sans enjeu, cibles ni mesures."
+      },
+      {
+        "best_en": null,
+        "best_fr": null,
+        "label": "Estimate",
+        "skip": "noise_or_catchall",
+        "slots": [],
+        "stable_id": "ca-assigned-duties",
+        "weak_en": null,
+        "weak_fr": null
+      },
+      {
+        "best_en": "Tailor messages for [audience] on [topic], testing clarity with one dry run before release.",
+        "best_fr": "Adapter les messages pour [audience] sur [topic], en testant la clarté par une répétition avant diffusion.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "audience",
+          "topic"
+        ],
+        "stable_id": "ca-audience-communications",
+        "weak_en": "Communicate with audiences' with no segment or topic.",
+        "weak_fr": "« Communiquer avec les publics » sans segment ni sujet."
+      },
+      {
+        "best_en": "Keep brand voice consistent across [channel] for [campaign], using the approved messaging sheet.",
+        "best_fr": "Maintenir la cohérence de la voix de marque sur [channel] pour [campaign], en utilisant la fiche messages approuvée.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "channel",
+          "campaign"
+        ],
+        "stable_id": "ca-brand-messaging",
+        "weak_en": "Protect the brand' as a slogan with no channels or controls.",
+        "weak_fr": "« Protéger la marque » comme slogan sans canaux ni contrôles."
+      },
+      {
+        "best_en": "Chair the communications committee for [period], circulating agenda, decisions and owners within [days] days.",
+        "best_fr": "Présider le comité communication pour [period], en diffusant ordre du jour, décisions et responsables sous [days] jours.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "period",
+          "days"
+        ],
+        "stable_id": "ca-communications-committee",
+        "weak_en": "Lead the committee' with no papers or decision trail.",
+        "weak_fr": "« Diriger le comité » sans documents ni trace des décisions."
+      },
+      {
+        "best_en": "Report [metric] for [channel] each [frequency] and recommend one change when targets are missed.",
+        "best_fr": "Rapporter [metric] pour [channel] chaque [frequency] et recommander un ajustement si les cibles ne sont pas atteintes.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "metric",
+          "channel",
+          "frequency"
+        ],
+        "stable_id": "ca-communications-metrics",
+        "weak_en": "Track communications metrics' with no named measures or actions.",
+        "weak_fr": "« Suivre les indicateurs de communication » sans mesures ni actions nommées."
+      },
+      {
+        "best_en": "Create [format] content on [topic] for [channel], cleared by the technical and brand owners.",
+        "best_fr": "Créer du contenu [format] sur [topic] pour [channel], validé par les responsables technique et marque.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "format",
+          "topic",
+          "channel"
+        ],
+        "stable_id": "ca-content-creation",
+        "weak_en": "Create content' with no format, topic or clearance.",
+        "weak_fr": "« Créer du contenu » sans format, sujet ni validation."
+      },
+      {
+        "best_en": "Prepare partner updates for [donor] each [frequency] on results, risks and upcoming milestones.",
+        "best_fr": "Préparer les mises à jour partenaires pour [donor] chaque [frequency] sur résultats, risques et prochains jalons.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "donor",
+          "frequency"
+        ],
+        "stable_id": "ca-donor-partner-communications",
+        "weak_en": "Communicate with donors' with no product or cadence.",
+        "weak_fr": "« Communiquer avec les bailleurs » sans produit ni cadence."
+      },
+      {
+        "best_en": "Plan [event] end to end: agenda, speakers, logistics and a post-event summary for [audience].",
+        "best_fr": "Planifier [event] de bout en bout : ordre du jour, intervenants, logistique et synthèse post-événement pour [audience].",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "event",
+          "audience"
+        ],
+        "stable_id": "ca-event-management",
+        "weak_en": "Support events' with no owned deliverables.",
+        "weak_fr": "« Soutenir les événements » sans livrables pris en charge."
+      },
+      {
+        "best_en": "Support director-level appearances for [event] with briefing notes, run-of-show and follow-up messages.",
+        "best_fr": "Appuyer les interventions de direction pour [event] avec notes de briefing, déroulé et messages de suivi.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "event"
+        ],
+        "stable_id": "ca-events-director-tasks",
+        "weak_en": "Support the director' mixed with unrelated admin and no event product.",
+        "weak_fr": "« Appuyer la direction » mélangé à de l’admin sans produit d’événement."
+      },
+      {
+        "best_en": "Advise [executive] on communications risks for [issue] before public statements are cleared.",
+        "best_fr": "Conseiller [executive] sur les risques de communication liés à [issue] avant validation des déclarations publiques.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "executive",
+          "issue"
+        ],
+        "stable_id": "ca-executive-advice",
+        "weak_en": "Advise leadership' with no issue or decision point.",
+        "weak_fr": "« Conseiller la direction » sans enjeu ni point de décision."
+      },
+      {
+        "best_en": "Manage a communications team of [number], setting weekly priorities and reviewing drafts before release.",
+        "best_fr": "Gérer une équipe communication de [number] personnes, en fixant les priorités hebdomadaires et en revoyant les brouillons avant diffusion.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "number"
+        ],
+        "stable_id": "ca-internal-team-management",
+        "weak_en": "Manage the team' without size, priorities or review step.",
+        "weak_fr": "« Gérer l’équipe » sans taille, priorités ni étape de relecture."
+      },
+      {
+        "best_en": "Monitor coverage of [topic] each [frequency] and alert spokespeople to inaccurate claims within [hours] hours.",
+        "best_fr": "Surveiller la couverture de [topic] chaque [frequency] et alerter les porte-parole des affirmations inexactes sous [hours] heures.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "topic",
+          "frequency",
+          "hours"
+        ],
+        "stable_id": "ca-media-monitoring",
+        "weak_en": "Monitor the media' with no topic, cadence or alert rule.",
+        "weak_fr": "« Surveiller les médias » sans sujet, cadence ni règle d’alerte."
+      },
+      {
+        "best_en": "Brief journalists on [story] with approved talking points and track coverage within [days] days.",
+        "best_fr": "Briefing des journalistes sur [story] avec éléments de langage approuvés et suivi de la couverture sous [days] jours.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "story",
+          "days"
+        ],
+        "stable_id": "ca-media-relations",
+        "weak_en": "Handle media relations' with no story, approvals or tracking.",
+        "weak_fr": "« Gérer les relations médias » sans sujet, validations ni suivi."
+      },
+      {
+        "best_en": "Produce the [frequency] media and communications report for [audience] with reach and message takeaways.",
+        "best_fr": "Produire le rapport médias et communication [frequency] pour [audience] avec portée et enseignements sur les messages.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "frequency",
+          "audience"
+        ],
+        "stable_id": "ca-media-reports",
+        "weak_en": "Prepare media reports' without metrics or audience.",
+        "weak_fr": "« Préparer des rapports médias » sans indicateurs ni destinataire."
+      },
+      {
+        "best_en": "Process meeting and travel expense packs for [event] within [days] days, with receipts complete.",
+        "best_fr": "Traiter les dossiers de frais de réunion et de déplacement pour [event] sous [days] jours, avec justificatifs complets.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "event",
+          "days"
+        ],
+        "stable_id": "ca-meeting-expenses",
+        "weak_en": "Handle expenses' as a catch-all admin duty without product or deadline.",
+        "weak_fr": "« Gérer les frais » comme fourre-tout administratif sans produit ni délai."
+      },
+      {
+        "best_en": "Produce the [newsletter] issue each [frequency] with cleared content and a short performance note.",
+        "best_fr": "Produire le numéro de [newsletter] chaque [frequency] avec contenus validés et une courte note de performance.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "newsletter",
+          "frequency"
+        ],
+        "stable_id": "ca-newsletters",
+        "weak_en": "Manage newsletters' without schedule or clearance.",
+        "weak_fr": "« Gérer les newsletters » sans calendrier ni validation."
+      },
+      {
+        "best_en": "Draft and clear press materials on [story] for [outlet], with quotes, facts and embargo timing.",
+        "best_fr": "Rédiger et faire valider les supports presse sur [story] pour [outlet], avec citations, faits et timing d’embargo.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "story",
+          "outlet"
+        ],
+        "stable_id": "ca-press-materials",
+        "weak_en": "Prepare press releases' without story, outlet or clearance.",
+        "weak_fr": "« Préparer des communiqués » sans sujet, média ni validation."
+      },
+      {
+        "best_en": "Deliver communications support for [project]: key messages, assets and a simple channel plan.",
+        "best_fr": "Fournir l’appui communication pour le [projet] : messages clés, supports et plan de canaux simple.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "project"
+        ],
+        "stable_id": "ca-project-communications",
+        "weak_en": "Support project communications' with no products named.",
+        "weak_fr": "« Soutenir la communication de projet » sans produits nommés."
+      },
+      {
+        "best_en": "Translate [finding] into plain-language products for [audience], checked with the technical lead.",
+        "best_fr": "Traduire [finding] en produits en langage clair pour [audience], validés avec le responsable technique.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "finding",
+          "audience"
+        ],
+        "stable_id": "ca-science-communication",
+        "weak_en": "Communicate science' without product, audience or technical check.",
+        "weak_fr": "« Communiquer la science » sans produit, public ni validation technique."
+      },
+      {
+        "best_en": "Run the [campaign] social plan for [channel], with content calendar, moderation rules and weekly metrics.",
+        "best_fr": "Mener le plan social de [campaign] sur [channel], avec calendrier éditorial, règles de modération et indicateurs hebdomadaires.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "campaign",
+          "channel"
+        ],
+        "stable_id": "ca-social-campaigns",
+        "weak_en": "Manage social campaigns' with no channel, calendar or metrics.",
+        "weak_fr": "« Gérer les campagnes sociales » sans canal, calendrier ni indicateurs."
+      },
+      {
+        "best_en": "Monitor [channel] content daily for [campaign], escalating harmful posts under the response protocol.",
+        "best_fr": "Surveiller quotidiennement le contenu de [channel] pour [campaign], en escaladant les publications nuisibles selon le protocole.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "channel",
+          "campaign"
+        ],
+        "stable_id": "ca-social-content-monitoring",
+        "weak_en": "Monitor social content' with no channel or escalation rule.",
+        "weak_fr": "« Surveiller le contenu social » sans canal ni règle d’escalade."
+      },
+      {
+        "best_en": "Set the [period] social strategy for [channel], with content pillars, posting cadence and metrics.",
+        "best_fr": "Définir la stratégie sociale [period] pour [channel], avec piliers éditoriaux, cadence de publication et indicateurs.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "period",
+          "channel"
+        ],
+        "stable_id": "ca-social-media-strategy",
+        "weak_en": "Own social strategy' without pillars, cadence or metrics.",
+        "weak_fr": "« Porter la stratégie sociale » sans piliers, cadence ni indicateurs."
+      },
+      {
+        "best_en": "Set the [period] communications priorities for [audience], linking messages to programme results.",
+        "best_fr": "Fixer les priorités de communication pour [period] visant [audience], en reliant les messages aux résultats de programme.",
+        "label": "Estimate",
+        "skip": null,
+        "slots": [
+          "period",
+          "audience"
+        ],
+        "stable_id": "ca-strategic-communications",
+        "weak_en": "Lead strategic communications' with no period, audience or link to results.",
+        "weak_fr": "« Diriger la communication stratégique » sans période, public ni lien aux résultats."
+      }
+    ]
   },
   "family_id": "communications_advocacy",
   "measured_broad": {
@@ -919,7 +1247,7 @@
     "label": "Estimate",
     "status": "pending"
   },
-  "schema_version": "0.2.0",
+  "schema_version": "0.3.0",
   "signature_fact_questions": [
     {
       "bottom_count": 2,
