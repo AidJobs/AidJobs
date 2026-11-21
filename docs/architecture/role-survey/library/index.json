@@ -1,11 +1,12 @@
 {
-  "built_at": "2026-11-15T14:27:26Z",
+  "built_at": "wave1a-0.2.0-7466f847b07b",
   "families": [
     {
       "deep_fields_ready": {
+        "duty_bank_naming": true,
         "duty_bank_phrasing": false,
         "reference_jds": false,
-        "signature_fact_questions": false
+        "signature_fact_questions": true
       },
       "family_id": "programme_management",
       "file": "programme_management.json",
@@ -13,9 +14,10 @@
     },
     {
       "deep_fields_ready": {
+        "duty_bank_naming": true,
         "duty_bank_phrasing": false,
         "reference_jds": false,
-        "signature_fact_questions": false
+        "signature_fact_questions": true
       },
       "family_id": "meal",
       "file": "meal.json",
@@ -23,9 +25,10 @@
     },
     {
       "deep_fields_ready": {
+        "duty_bank_naming": true,
         "duty_bank_phrasing": false,
         "reference_jds": false,
-        "signature_fact_questions": false
+        "signature_fact_questions": true
       },
       "family_id": "communications_advocacy",
       "file": "communications_advocacy.json",
@@ -33,9 +36,10 @@
     },
     {
       "deep_fields_ready": {
+        "duty_bank_naming": true,
         "duty_bank_phrasing": false,
         "reference_jds": false,
-        "signature_fact_questions": false
+        "signature_fact_questions": true
       },
       "family_id": "finance",
       "file": "finance.json",
@@ -43,7 +47,9 @@
     }
   ],
   "inputs": {
+    "duty_group_names": "role-survey/duty-group-names.csv",
     "normative_sources": "role-survey/normative-sources.csv",
+    "signature_facts": "role-survey/signature-facts.csv",
     "wave_1a_broad_measured": "role-survey/wave-1a-broad-measured.json",
     "wave_1a_families": [
       "programme_management",
@@ -52,6 +58,6 @@
       "finance"
     ]
   },
-  "schema_version": "0.1.0",
+  "schema_version": "0.2.0",
   "wave": "1a"
 }

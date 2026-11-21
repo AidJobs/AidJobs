@@ -1185,3 +1185,19 @@ Sealed sets are never edited. Packets, answers, disagreements and seals stay in 
 **Out of scope (unchanged):** the generator, the fairness-check product, nationality leftover wordings, headings / contract lengths / years re-rounds, re-measuring AidJobs crawled jobs, Option B, the US$5 model round (deferred until Stage 3 outputs are ready).
 
 **Next:** signature-fact questions and duty-bank naming from the sealed scores and groupings; fill library deep fields; reference job descriptions; then the deferred Phase 5 stop for the vault key.
+
+### 19.23 Stage 3 wave-1a library fill: signature facts and duty-bank naming (21 November 2026)
+
+**Verified first:** `origin/main` at `bcf2dc4` (PR #182 records of W-38 PR2 / #181); open PRs only demos #22 and #96; survey worktree on `w54/stage3-library`; no other chat building W-54. Stage 2 seals intact (PM `cfc5a6058309…`, ML `cc3f7f7e7711…`, CA `707a745d6cd2…`, FN `ea5ecc373c70…`); Phase 0 seals intact (`0e068308fdcf…`, `d35e4ecf5a85…`; guide `8f9ad292…`). No `adverts.py measure`; no production crawl; sealed archive files not edited.
+
+**Standards reopened before drafting** (19.21 / 19.14 / `normative-sources.csv`). No standards re-downloaded. No CIPD. Finance questions carry no invented ACCA competencies. Templates still do not insert standard names by default; CHS lines are accountability *questions*.
+
+**Signature-fact questions** (`role-survey/signature-facts.csv`; 22 rows: six programme management, five MEAL, five communications and advocacy, six finance). Method (section 8 keep-rule): compare sealed Option A pretags in the high-specificity band with the lower band; keep facts richer in the top band or required by `chcf` / `chs-2024`; calibrate with measured duty themes. English and French questions, section fed, why it matters, evidence counts and label (mostly Estimate; bottom bands are small). `library.py` loads the CSV and sets `deep_fields_ready.signature_fact_questions` only when each family has at least three rows and the deep seal rule passes.
+
+**Duty-bank naming** (`role-survey/duty-group-names.csv`; 213 reported groups from archive `stage2/measured/*/duty-banks.jsonl`). AidJobs EN/FR names and stable ids for every group with `advert_count >= 5` (98 named); thinner groups kept with heuristic name only (`named` false). No best-quarter phrasing; every group's `phrasing` stays null; `duty_bank_phrasing` stays false. New ready flag `duty_bank_naming`.
+
+**Library tooling.** `tools/survey/library.py` at `schema_version` 0.2.0: deterministic rebuild (LF-normalised hashes for committed inputs; raw-byte seal verify for archive reconciles); CI-safe seal check (live archive when present; committed `DEEP_SEAL_PREFIX` on CI); first `library/schema.json` with family and index shapes; subset schema walker in `check`; duty-bank completeness (named iff `advert_count >= 5`, row count = `n_groups_reported`); tests extended. Ready flags flip only when content is present. Independent review `review-13.md`: approve with changes; three should-fixes taken. `adverts.py measure` not run; no round-2/3 validated measure changed.
+
+**Out of scope (deferred):** duty-bank best-quarter phrasing / `template-lines.csv` prose; reference job descriptions and blind scoring; Phase 5 / vault key / OpenRouter; Option B; more families; Ashby; production crawls; generator wiring into the employer demo.
+
+**Next:** duty-bank phrasing and reference JDs (questions/checks first are now in the library); or crawl A2 if the user wants the mainline crawler step next.
