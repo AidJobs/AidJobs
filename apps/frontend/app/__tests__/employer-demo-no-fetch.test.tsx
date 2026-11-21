@@ -1798,6 +1798,28 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     phone = false;
   });
 
+  // R1-20: first setup template strip must offer Cancel, which returns to chat without applying.
+  it('on phones Cancel leaves the first template strip and returns to chat without applying', () => {
+    freshNew();
+    let id = '';
+    act(() => {
+      id = startJob("We're hiring a Nutrition Officer in Juba", undefined, [], true);
+    });
+    phone = true;
+    render();
+    route(`#job/${id}`);
+    const before = job(id).format;
+    click('Create my own');
+    expect(container.querySelector('[aria-label="Templates"]')).not.toBeNull();
+    click('Cancel');
+    expect(container.querySelector('[aria-label="Templates"]')).toBeNull();
+    expect(container.querySelector('textarea[aria-label="Message AidJobs about this job"]')).not.toBeNull();
+    expect(job(id).setup).toBe('template');
+    expect(job(id).format).toBe(before);
+    phone = false;
+    expect(network).toEqual([]);
+  });
+
   it('the chat and the job description share the width as dragged, and the message box grows or shrinks from its grip', () => {
     fresh();
     let id = '';

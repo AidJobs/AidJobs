@@ -1569,7 +1569,20 @@ function JobWindow({ id }: { id: string }) {
         {view === 'chat' ? (
           <div className="min-h-0 flex-1">{chat}</div>
         ) : choosing && pick ? (
-          <PhoneTemplate job={job} s={s} pick={pick} setPick={setPick} onApply={applyPick} onChat={() => setView('chat')} onCancel={job.setup ? undefined : () => setPick(null)} question={question} />
+          <PhoneTemplate
+            job={job}
+            s={s}
+            pick={pick}
+            setPick={setPick}
+            onApply={applyPick}
+            onChat={() => setView('chat')}
+            // R1-20: Cancel on first setup pick too — leave the strip without applying; return to chat while setup is open.
+            onCancel={() => {
+              setPick(null);
+              if (job.setup) setView('chat');
+            }}
+            question={question}
+          />
         ) : (
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex shrink-0 items-center gap-1.5 border-b px-3 py-1.5 aj-hair">
