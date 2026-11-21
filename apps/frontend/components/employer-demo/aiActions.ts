@@ -453,6 +453,39 @@ export function checkFacts(raw: unknown, job: DemoJob, today: number): { patch: 
 /** "2,500" and "2500" as the same number. */
 const plainNumbers = (t: string) => t.replace(/(\d)[,.\s](?=\d{3}\b)/g, '$1');
 
+/** Digits only, so "180,000" and "180000" match the same amount. */
+function payDigits(v: string): string {
+  return (plainNumbers(v).match(/\d+/g) ?? []).join('');
+}
+
+/**
+ * Ground AI set_facts pay and closing date to what the user (and the brief) already said.
+ * Invented pay is refused; a closing date the user's words yield wins over the AI's ISO.
+ */
+function groundPayDeadline(patch: Partial<Facts>, refused: string[], s: State, job: DemoJob, said: string | null): void {
+  const corpus = known(s, job, said ?? '');
+  const plain = plainNumbers(corpus);
+  const fromUser = extractFacts(corpus, s.today, emptyFacts()).facts;
+  const hadPay = Boolean(patch.salaryMin || patch.salaryMax);
+  for (const key of ['salaryMin', 'salaryMax'] as const) {
+    const v = patch[key];
+    if (!v) continue;
+    const digits = payDigits(v);
+    if (!digits || !plain.includes(digits)) {
+      delete patch[key];
+      if (!refused.includes('the salary (not what you wrote)')) refused.push('the salary (not what you wrote)');
+    }
+  }
+  if (hadPay && !patch.salaryMin && !patch.salaryMax) delete patch.salaryMode;
+  if (!patch.deadline) return;
+  if (fromUser.deadline) {
+    patch.deadline = fromUser.deadline;
+    return;
+  }
+  delete patch.deadline;
+  refused.push('the closing date (not what you wrote)');
+}
+
 /** Everything the job, the organisation, and the user already say, which a written section may quote; `said`: the message being answered. */
 function known(s: State, job: DemoJob, said = ''): string {
   // What the user gave, and what they accepted (section 19, phase 5, A): the About us and project text, and accepted suggestions.
@@ -535,6 +568,7 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         break;
       case 'set_facts': {
         const { patch, refused: no } = checkFacts(a.facts, j, s.today);
+        groundPayDeadline(patch, no, s, j, said);
         refused.push(...no);
         if (Object.keys(patch).length) setFactsFromChat(id, patch);
         // A fact given answers its question even when it is the default ("anyone can apply").

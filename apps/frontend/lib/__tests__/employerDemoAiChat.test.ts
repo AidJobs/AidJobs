@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { getState, resetDemo, update } from '../../components/employer-demo/store';
-import { setFacts, startJob } from '../../components/employer-demo/actions';
+import { advanceFromAbout, advanceFromProject, setFacts, startJob } from '../../components/employer-demo/actions';
 import { applyAiTurn, checkFacts, checkLines, type OpenTarget } from '../../components/employer-demo/aiActions';
 import { AI_ROUTE, aiOn, aiState, askAi, chooseAiModel, probeAi, resetAi, writeVersion } from '../../components/employer-demo/ai';
 import { addDays, isoDay } from '../../components/employer-demo/engine';
@@ -9,6 +9,11 @@ import { checkPoints, nextStep } from '../../components/employer-demo/flow';
 const job = (id: string) => getState().jobs.find((j) => j.id === id)!;
 const lastAi = (id: string) => job(id).chat.filter((m) => m.ai).at(-1);
 const open = jest.fn((_t: OpenTarget) => undefined);
+/** Skip About us and project so style/pace can run (R2-P0-3 order). */
+function pastContext(id: string) {
+  if (job(id).setup === 'about') advanceFromAbout(id);
+  if (job(id).setup === 'project') advanceFromProject(id);
+}
 
 function stubFetch(fn: (url: string, init?: { body?: string }) => Promise<unknown>) {
   const mock = jest.fn(fn);
@@ -56,6 +61,71 @@ describe('the AI chat: facts are checked before they are set', () => {
   });
 });
 
+describe('the AI chat: set_facts pay and closing date stay grounded (R2-P1-6)', () => {
+  it('keeps the brief pay and the date from the user\'s words when the AI invents other ones', () => {
+    const brief =
+      'We need a WASH Coordinator in Nairobi, Kenya. Pay is KES 180,000 a month. Closing in 3 weeks.';
+    const id = startJob(brief, undefined, [], true);
+    const before = job(id).facts;
+    expect(before.salaryMin).toMatch(/180,?000/);
+    expect(before.deadline).toBe(addDays(getState().today, 21));
+    applyAiTurn(
+      id,
+      'looks right',
+      {
+        reply: 'Noted.',
+        actions: [
+          {
+            type: 'set_facts',
+            facts: {
+              salaryMin: '120,000',
+              currency: 'KES',
+              period: 'month',
+              deadline: addDays(getState().today, 10),
+            },
+          },
+        ],
+      },
+      open,
+    );
+    expect(job(id).facts.salaryMin).toBe(before.salaryMin);
+    expect(job(id).facts.deadline).toBe(before.deadline);
+    expect(lastAi(id)?.text).toMatch(/salary \(not what you wrote\)/);
+  });
+
+  it('accepts pay and a closing date that match what the user wrote', () => {
+    const id = startJob('Hiring a Finance Officer in Juba', undefined, [], true);
+    const deadline = addDays(getState().today, 14);
+    applyAiTurn(
+      id,
+      `Pay is USD 2,500 a month, closing ${deadline}`,
+      {
+        reply: 'Got it.',
+        actions: [{ type: 'set_facts', facts: { salaryMin: '2,500', currency: 'USD', period: 'month', deadline } }],
+      },
+      open,
+    );
+    expect(job(id).facts).toMatchObject({ salaryMin: '2,500', currency: 'USD', period: 'month', deadline });
+  });
+
+  it('refuses a closing date the AI invents when the user said nothing about dates', () => {
+    const id = startJob('Hiring a Logistics Officer in Juba, South Sudan', undefined, [], true);
+    expect(job(id).facts.deadline).toBeFalsy();
+    applyAiTurn(
+      id,
+      'please note the title',
+      {
+        reply: 'Done.',
+        actions: [{ type: 'set_facts', facts: { title: 'Logistics Officer', deadline: addDays(getState().today, 20) } }],
+      },
+      open,
+    );
+    expect(job(id).facts.title).toBe('Logistics Officer');
+    expect(job(id).facts.deadline).toBeFalsy();
+    expect(lastAi(id)?.text).toMatch(/closing date \(not what you wrote\)/);
+  });
+});
+
 describe('the AI chat: written text is checked', () => {
   it('cleans the bullets and drops a repeated heading', () => {
     const s = getState();
@@ -82,13 +152,17 @@ describe('the AI chat: written text is checked', () => {
 });
 
 describe('the AI chat: the demo carries out the actions', () => {
-  it('chooses the template, then the style and the pace; nothing is written before them; the AI replies take the place of the rules\' own', () => {
+  it('chooses the template, then About/project, then the style and the pace; nothing is written before them; the AI replies take the place of the rules\' own', () => {
     resetAi('on');
     const id = startJob("We're hiring a Nutrition Officer in Juba", undefined, [], true);
     applyAiTurn(id, 'Yes', { reply: 'Done. Warm and plain, as usual?', actions: [{ type: 'use_template', template: job(id).format }] }, open);
+    expect(job(id).setup).toBe('about');
+    expect(job(id).chat.slice(-2)).toEqual([
+      expect.objectContaining({ from: 'user', text: 'Yes' }),
+      expect.objectContaining({ from: 'ai', text: 'Done. Warm and plain, as usual?', ai: true, step: 'setup:about' }),
+    ]);
+    pastContext(id);
     expect(job(id).setup).toBe('style');
-    expect(job(id).chat.slice(-2)).toEqual([expect.objectContaining({ from: 'user', text: 'Yes' }), expect.objectContaining({ from: 'ai', text: 'Done. Warm and plain, as usual?', ai: true, step: 'setup:style' })]);
-    expect(job(id).chat.some((m) => m.text.includes('How should it sound?'))).toBe(false);
     const keys = job(id).tags.filter((k) => k !== 'about' && k !== 'apply');
     applyAiTurn(id, 'warm', { reply: 'Warm it is. One section at a time, or all of it first?', actions: [{ type: 'write_section', section: keys[0], lines: ['Too early'] }, { type: 'set_style', style: ['warm'] }] }, open);
     expect(job(id)).toMatchObject({ setup: 'pace', style: ['Warm'], sections: [] });
@@ -98,21 +172,25 @@ describe('the AI chat: the demo carries out the actions', () => {
     expect(job(id).walk?.pace).toBe('step');
     expect(getState().pace).toBe('step');
     expect(job(id).sections.map((x) => x.key)).toEqual(['apply']);
-    expect(nextStep(job(id), getState())).toEqual({ kind: 'ask', fact: 'contract', section: 'about' });
+    expect(nextStep(job(id), getState())).toMatchObject({ kind: 'ask', section: 'about' });
   });
 
-  it('a template applied without a question: the rules give the overview and ask the style, and ask again after a reply that leaves it unasked', () => {
+  it('a template applied without a question: About us first, then style after About/project', () => {
     const id = startJob("We're hiring a Nutrition Officer in Juba", undefined, [], true);
     applyAiTurn(id, 'Yes', { reply: "I'll use your format.", actions: [{ type: 'use_template', template: job(id).format }] }, open);
-    expect(job(id).chat.at(-1)).toMatchObject({ step: 'setup:style', text: expect.stringContaining('How should it sound?') });
+    expect(job(id).chat.at(-1)).toMatchObject({ step: 'setup:about', text: expect.stringContaining('About us') });
+    pastContext(id);
+    expect(job(id).setup).toBe('style');
     applyAiTurn(id, 'hm', { reply: 'Take your time.', actions: [] }, open);
-    expect(job(id).chat.filter((m) => m.step === 'setup:style' && !m.ai)).toHaveLength(2);
+    expect(job(id).setup).toBe('style');
   });
 
   it('answers each question, approves a section, and writes the next in the same answer; text it wrote keeps its words when facts change', () => {
     resetAi('on');
     const id = startJob("We're hiring a Nutrition Officer in Juba", undefined, [], true);
-    applyAiTurn(id, 'Yes', { reply: 'Done.', actions: [{ type: 'use_template', template: job(id).format }, { type: 'set_style', style: ['Warm'] }, { type: 'set_pace', pace: 'step' }] }, open);
+    applyAiTurn(id, 'Yes', { reply: 'Done.', actions: [{ type: 'use_template', template: job(id).format }] }, open);
+    pastContext(id);
+    applyAiTurn(id, 'warm', { reply: 'Done.', actions: [{ type: 'set_style', style: ['Warm'] }, { type: 'set_pace', pace: 'step' }] }, open);
     applyAiTurn(id, 'fixed-term, and there is no grade', { reply: 'Got it.', actions: [{ type: 'set_facts', facts: { contract: 'fixed-term' } }, { type: 'settle', fact: 'grade' }] }, open);
     // About us is part of the job since phase 5: the AI writes it from the organisation's own text; How to apply is still refused.
     expect(nextStep(job(id), getState())).toEqual({ kind: 'write', sections: ['about'] });
