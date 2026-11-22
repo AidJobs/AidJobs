@@ -53,7 +53,8 @@ def test_rss_reader_matches_recorded_fixture():
         )
     )
     assert result.reader == "rss-feed"
-    assert result.report() is None
+    assert result.report() == record["report"]
+    assert result.complete is False
     assert result.jobs == record["jobs"]
     for job in result.jobs:
         assert set(job) <= (CANDIDATE_FIELDS | UNSAVED_FIELDS | {"record_class"})
@@ -75,7 +76,7 @@ def test_json_reader_reports_completeness_when_total_stated():
     assert result.jobs == record["jobs"]
 
 
-def test_json_reader_without_total_reports_no_completeness():
+def test_json_reader_without_total_reports_incomplete():
     record = _json_record("no_total")
     result = asyncio.run(
         read_listing(
@@ -85,7 +86,8 @@ def test_json_reader_without_total_reports_no_completeness():
         )
     )
     assert result.reader == "json-api"
-    assert result.report() is None
+    assert result.report() == record["report"]
+    assert result.complete is False
     assert result.jobs == record["jobs"]
 
 
@@ -145,7 +147,7 @@ def test_simulate_rss_names_feed_reader():
     assert result["reader"] == "rss-feed"
     assert result["count"] == 2
     assert result["admitted"] >= 1
-    assert result["complete"] is None
+    assert result["complete"] is False
     assert result["sample"][0]["title"] == "Programme Officer"
 
 
@@ -268,5 +270,7 @@ def test_bare_count_is_not_a_listing_total():
 
     data = {"count": 2, "jobs": [{"title": "A"}, {"title": "B"}]}
     assert stated_total(data) is None
-    assert json_listing_report([], data) is None
+    report = json_listing_report([], data)
+    assert report["complete"] is False
+    assert report["stop"] == "no stated total"
     assert stated_total({"total": 10, "jobs": []}) == 10

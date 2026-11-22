@@ -1,7 +1,12 @@
 {
   "url": "https://boards.example.org/api/jobs",
   "reader": "json-api",
-  "report": null,
+  "report": {
+    "pages": 1,
+    "expected": 1,
+    "complete": false,
+    "stop": "no stated total"
+  },
   "jobs": [
     {
       "title": "Logistics Coordinator",

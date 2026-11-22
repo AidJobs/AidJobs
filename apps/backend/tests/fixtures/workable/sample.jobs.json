@@ -10,7 +10,10 @@
       "posted_on": "2026-11-01",
       "description": "Lead a field programme in Nairobi.",
       "location_raw": "Nairobi, Kenya; Kampala, Uganda",
-      "locations": ["Nairobi, Kenya", "Kampala, Uganda"]
+      "locations": [
+        "Nairobi, Kenya",
+        "Kampala, Uganda"
+      ]
     },
     {
       "title": "Remote Analyst",
@@ -22,7 +25,15 @@
       "posted_on": "2026-11-10",
       "description": "Analyse programme data remotely.",
       "location_raw": "Remote",
-      "locations": ["Remote"]
+      "locations": [
+        "Remote"
+      ]
     }
-  ]
+  ],
+  "report": {
+    "pages": 1,
+    "expected": 2,
+    "complete": true,
+    "stop": null
+  }
 }

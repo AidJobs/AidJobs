@@ -9,7 +9,10 @@
       "posted_on": "2026-11-01",
       "description": "<p>Advise country programmes.</p>",
       "location_raw": "Geneva, Switzerland; Nairobi, Kenya",
-      "locations": ["Geneva, Switzerland", "Nairobi, Kenya"]
+      "locations": [
+        "Geneva, Switzerland",
+        "Nairobi, Kenya"
+      ]
     },
     {
       "title": "Remote Analyst",
@@ -20,7 +23,15 @@
       "description": "Analyse programme data remotely.",
       "is_remote": true,
       "location_raw": "Remote",
-      "locations": ["Remote"]
+      "locations": [
+        "Remote"
+      ]
     }
-  ]
+  ],
+  "report": {
+    "pages": 1,
+    "expected": 2,
+    "complete": false,
+    "stop": "rss has no catalogue total"
+  }
 }

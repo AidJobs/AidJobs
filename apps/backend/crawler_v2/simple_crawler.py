@@ -264,8 +264,16 @@ _LISTING_COMPLETE_STOP = 'no More Jobs link'
 _SITES_COMPLETE_STOP = 'no next-page link'
 
 
+# Stops that mean "cannot claim complete", not "we under-read the catalogue". Status stays ok so
+# health/scheduling are not punished; listing_complete stays false so absence never counts (W-39).
+_LISTING_UNKNOWN_STOPS = frozenset({
+    "no stated total",
+    "rss has no catalogue total",
+})
+
+
 def _listing_outcome(job_count: int, report: Optional[Dict]) -> Tuple[str, str]:
-    """Crawl status and message. A paged listing that stopped early is partial and reports warn."""
+    """Crawl status and message. A shortfall is partial (warn); unknown completeness stays ok."""
     if not job_count:
         return 'warn', 'No jobs found'
     message = f'Found {job_count} jobs'
@@ -275,8 +283,11 @@ def _listing_outcome(job_count: int, report: Optional[Dict]) -> Tuple[str, str]:
     pages = f"{report['pages']} page{'' if report['pages'] == 1 else 's'}"
     if report['complete']:
         return 'ok', f"{message}; listing complete: {pages}, expected {expected}"
+    stop = report.get('stop') or ''
+    if stop in _LISTING_UNKNOWN_STOPS:
+        return 'ok', f"{message}; listing not counted: {stop}"
     return 'warn', (
-        f"{message}; listing partial: {pages}, expected {expected}, stopped: {report['stop']}"
+        f"{message}; listing partial: {pages}, expected {expected}, stopped: {stop}"
     )
 
 
@@ -2234,8 +2245,8 @@ class SimpleCrawler:
     ) -> Tuple[List[Dict], Optional[Dict]]:
         """(jobs, listing report), from the first of the HTML readers (crawler_v2/readers.py)
         that reads rows: PageUp's job cards and the Sites engine's, page by page, each with a
-        report; any other page goes to the rule-based reader, with no report. The reader is
-        chosen by what the page shows, never by its address.
+        report; any other page goes to the rule-based reader, which always reports (W-39).
+        The reader is chosen by what the page shows, never by its address.
 
         The report is returned, never stored on the crawler: one instance serves concurrent
         crawls. The reader's name and strategy go to this crawl's own context.

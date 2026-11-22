@@ -177,8 +177,8 @@ def jobs_from_workable(data: Dict, account: str) -> List[Dict]:
     return [grouped[key] for key in order]
 
 
-def jobs_from_greenhouse(data: Dict, token: str) -> Tuple[List[Dict], Optional[Dict]]:
-    """Candidates from a Greenhouse list body, plus a completeness report when meta.total exists."""
+def jobs_from_greenhouse(data: Dict, token: str) -> Tuple[List[Dict], Dict]:
+    """Candidates from a Greenhouse list body, plus a completeness report (W-39)."""
     jobs: List[Dict] = []
     for item in data.get("jobs") or []:
         if not isinstance(item, dict):
@@ -268,24 +268,32 @@ def _greenhouse_office_place(item: Dict) -> str:
     return "; ".join(names)
 
 
-def _greenhouse_report(jobs: List[Dict], data: Dict) -> Optional[Dict]:
+def _greenhouse_report(jobs: List[Dict], data: Dict) -> Dict:
+    """Greenhouse list completeness: cover meta.total when present, else closed catalogue (W-39)."""
+    from crawler_v2.listing_completeness import (
+        closed_catalogue_report,
+        incomplete,
+        json_has_paging,
+    )
+
+    raw_items = [item for item in (data.get("jobs") or []) if isinstance(item, dict)]
     meta = data.get("meta")
-    if not isinstance(meta, dict):
-        return None
-    total = meta.get("total")
-    if isinstance(total, bool):
-        return None
-    if isinstance(total, str) and total.isdigit():
-        total = int(total)
-    if not isinstance(total, int) or total < 0:
-        return None
-    complete = len(jobs) >= total
-    return {
-        "pages": 1,
-        "expected": total,
-        "complete": complete,
-        "stop": None if complete else "fewer rows than stated",
-    }
+    if isinstance(meta, dict):
+        total = meta.get("total")
+        if isinstance(total, str) and total.isdigit():
+            total = int(total)
+        if isinstance(total, int) and not isinstance(total, bool) and total >= 0:
+            if json_has_paging(data):
+                return incomplete("paging not followed", expected=total)
+            if len(jobs) >= total:
+                return {
+                    "pages": 1,
+                    "expected": total,
+                    "complete": True,
+                    "stop": None,
+                }
+            return incomplete("fewer rows than stated", expected=total)
+    return closed_catalogue_report(jobs, data=data, raw_item_count=len(raw_items))
 
 
 def _workable_place(item: Dict) -> str:

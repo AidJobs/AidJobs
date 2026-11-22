@@ -37,7 +37,7 @@ def test_the_listing_step_reads_exactly_the_recorded_rows(name):
     html, record = _load(name)
     jobs, report = _listing(html, record["url"])
     assert jobs == record["jobs"]
-    assert report is None and record["report"] is None
+    assert report == record["report"]
 
 
 @pytest.mark.parametrize("name", _PAGES)

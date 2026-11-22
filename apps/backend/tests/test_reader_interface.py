@@ -199,7 +199,13 @@ def test_a_reader_that_fails_or_reads_nothing_passes_the_page_on():
         return jobs, report, LISTING_READER.get()
 
     jobs, report, reader = asyncio.run(listing())
-    assert jobs is general_rows and report is None and reader == "general"
+    assert jobs is general_rows and reader == "general"
+    assert report == {
+        "pages": 1,
+        "expected": 1,
+        "complete": False,
+        "stop": "no stated total",
+    }
 
 
 @pytest.mark.parametrize("stop", [asyncio.CancelledError, KeyboardInterrupt])
@@ -265,7 +271,13 @@ def test_a_general_reader_reading_nothing_gives_an_empty_listing():
     crawler = _crawler()
     crawler.extract_jobs_from_html = lambda html, url: []
     jobs, report = asyncio.run(crawler._listing_jobs("<html></html>", "https://jobs.example/"))
-    assert (jobs, report) == ([], None)
+    assert jobs == []
+    assert report == {
+        "pages": 1,
+        "expected": None,
+        "complete": False,
+        "stop": "no stated total",
+    }
 
 
 # The fetch handed in ------------------------------------------------------------------------
@@ -440,12 +452,13 @@ def test_the_general_readers_crawl_records_its_strategy(monkeypatch):
     result, _run, fields = _crawl(monkeypatch, html, record["url"])
     # Thin listing rows are not admitted without job pages, so the canary notes that
     # (W-35); status and the found count stay as before.
-    assert result["status"] == "ok"
-    assert result["message"].startswith("Found 32 jobs")
+    assert result["status"] == "warn"
+    assert result["message"].startswith("Found 32 jobs; listing partial:")
     assert "canary: rows read but none admitted or observed" in result["message"]
     assert (fields["reader"], fields["strategy"]) == ("general", "selector-links")
     assert fields.get("canary") == ["rows read but none admitted or observed"]
-    assert "listing_complete" not in fields
+    assert fields["listing_complete"] is False
+    assert fields["listing_expected"] == 12
 
 
 def test_canary_warnings_do_not_change_status_or_valid(monkeypatch):

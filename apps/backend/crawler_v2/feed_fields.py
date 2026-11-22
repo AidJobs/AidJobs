@@ -232,18 +232,28 @@ def stated_total(data: Any) -> Optional[int]:
     return None
 
 
-def json_listing_report(jobs: List[Dict], data: Any) -> Optional[Dict]:
-    """Completeness when the JSON states a total; None when it does not (never counts)."""
+def json_listing_report(jobs: List[Dict], data: Any) -> Dict:
+    """Completeness for a generic JSON listing (W-39).
+
+    When the body states a total, complete only if the candidates cover it and no paging
+    signal remains. Without a total, the report is incomplete (generic JSON is not a named
+    closed catalogue).
+    """
+    from crawler_v2.listing_completeness import incomplete, json_has_paging
+
     expected = stated_total(data)
     if expected is None:
-        return None
-    complete = len(jobs) >= expected
-    return {
-        "pages": 1,
-        "expected": expected,
-        "complete": complete,
-        "stop": None if complete else "fewer rows than stated",
-    }
+        return incomplete("no stated total", expected=len(jobs) if jobs else None)
+    if json_has_paging(data):
+        return incomplete("paging not followed", expected=expected)
+    if len(jobs) >= expected:
+        return {
+            "pages": 1,
+            "expected": expected,
+            "complete": True,
+            "stop": None,
+        }
+    return incomplete("fewer rows than stated", expected=expected)
 
 
 def _rss_published(entry: Any) -> Optional[str]:

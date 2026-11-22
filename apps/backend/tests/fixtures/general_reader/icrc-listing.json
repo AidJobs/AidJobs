@@ -1,6 +1,11 @@
 {
  "url": "https://careers.icrc.org/go/Global-Opportunities/8821501/",
- "report": null,
+ "report": {
+  "pages": 1,
+  "expected": 12,
+  "complete": false,
+  "stop": "showing 1 to 12 of 12, read 32 rows, 12 on-page"
+ },
  "jobs": [
   {
    "title": "Pashto Interpreter",

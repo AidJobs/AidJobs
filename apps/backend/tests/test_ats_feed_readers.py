@@ -108,7 +108,7 @@ def test_workable_reader_matches_fixture_and_groups_locations():
         )
     )
     assert result.reader == "workable-feed"
-    assert result.report() is None
+    assert result.report() == record["report"]
     assert result.jobs == record["jobs"]
     for job in result.jobs:
         assert set(job) <= (CANDIDATE_FIELDS | UNSAVED_FIELDS | {"record_class"})
@@ -371,7 +371,7 @@ def test_teamtailor_first_request_and_reader():
         )
     )
     assert result.reader == "teamtailor-feed"
-    assert result.report() is None
+    assert result.report() == record["report"]
     assert result.jobs == record["jobs"]
     admitted, rejected = admit_batch([dict(job) for job in result.jobs], "api")
     assert len(admitted) == 2
@@ -407,6 +407,7 @@ def test_lever_first_request_and_reader():
         )
     )
     assert result.reader == "lever-feed"
+    assert result.report() == record["report"]
     assert result.jobs == record["jobs"]
     admitted, rejected = admit_batch([dict(job) for job in result.jobs], "api")
     assert len(admitted) == 2
@@ -461,6 +462,7 @@ def test_personio_first_request_and_reader():
         )
     )
     assert result.reader == "personio-feed"
+    assert result.report() == record["report"]
     assert result.jobs == record["jobs"]
     admitted, rejected = admit_batch([dict(job) for job in result.jobs], "api")
     assert len(admitted) == 2
