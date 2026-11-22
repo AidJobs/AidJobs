@@ -2602,6 +2602,20 @@ button.ej-step:hover {
   text-transform: uppercase;
 }
 
+/* R1-27 Option A: quiet group labels in the draft JD (no grips). Preview / Eye omit these. */
+.ej-dgroup {
+  margin: 10px 12px 2px;
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.ej-dgroup:first-of-type {
+  margin-top: 4px;
+}
+
 .ej-ol-gtitle[data-drop='first'],
 .ej-ol-row[data-drop='after'] {
   box-shadow: 0 2px 0 0 var(--sage-5);

@@ -12,7 +12,7 @@ import { PageFillTools } from './ContextCards';
 import { viewOf } from './langs';
 import { jobLang, langOf } from './translate';
 import { placeFor } from './MenuButton';
-import { groupLabelOf, groupOfKey, groupOrderOf, grouped, KEPT, placeSaid } from './outline';
+import { draftGroupBreaks, groupLabelOf, groupOfKey, groupOrderOf, grouped, KEPT, placeSaid } from './outline';
 import { contractPicks, deadlinePicks, eligibilityPicks, gradePicks, languagePicks, methodPicks, placePatch, placePicks, salaryPicks, safeguardingPicks, type Pick } from './answers';
 import { DOCUMENTS } from './apply';
 import { PROJECT_SECTION, saveAboutForOrg, savePageFieldText } from './context';
@@ -1031,6 +1031,8 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inW
   const removedAt = removed ? (removed.after && keys.includes(removed.after) ? removed.after : null) : undefined;
   const note = icons && job.undoStep?.tab === 'doc' && !job.lastChange && !job.undoStep.removed && !job.undoStep.keys?.some((k) => keys.includes(k));
   const heading = (k: string) => job.renamed?.[k] ?? headingFor(k, formatOf(s, job.format));
+  // R1-27 Option A: quiet group labels while drafting; Preview / Eye (no draft icons) stay flat.
+  const breaks = icons ? draftGroupBreaks(keys, { ...g, customGroups: job.customGroups }) : null;
   return (
     <>
       <article ref={root} className="ej-doc aj-card flex flex-col gap-1 p-3 lg:p-5" aria-label="Job description" data-drop-top={dropAfter === null || undefined}>
@@ -1053,8 +1055,14 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inW
         {keys.map((k) => {
           const sec = job.sections.find((x) => x.key === k);
           const pageKind = k === 'about' ? 'about' : k === PROJECT_SECTION ? 'project' : null;
+          const br = breaks?.get(k);
           return (
             <Fragment key={k}>
+              {br && (
+                <div className="ej-dgroup" data-draft-group={br.group} data-drop-group={br.group}>
+                  {br.label}
+                </div>
+              )}
               {sec ? (
                 <SectionView job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === k)} onFlag={setFlag} onSeeChat={onSeeChat} current={current === k} noteEdits={noteEdits} since={since} draft={tools} />
               ) : (

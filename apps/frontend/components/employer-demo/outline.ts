@@ -383,6 +383,22 @@ export function placeSaid(keys: string[], g: GroupingFull, key: string, heading:
   return `${heading}: ${list.indexOf(key) + 1} of ${list.length} in ${groupLabelOf(group, g.customGroups)}`;
 }
 
+/**
+ * Quiet group labels for the draft JD (R1-27 Option A): the first section of each non-empty group in
+ * the order shown. Preview / Eye stay flat (caller only asks when draft icons are on). No grips.
+ */
+export function draftGroupBreaks(keys: string[], g: GroupingFull): Map<string, { group: GroupKey; label: string }> {
+  const out = new Map<string, { group: GroupKey; label: string }>();
+  let prev: GroupKey | null = null;
+  for (const k of keys) {
+    const group = groupOfKey(g, k);
+    if (group === prev) continue;
+    out.set(k, { group, label: groupLabelOf(group, g.customGroups) });
+    prev = group;
+  }
+  return out;
+}
+
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 /** A version brought forward: its own sections read group by group, in the grouping its order shows. */

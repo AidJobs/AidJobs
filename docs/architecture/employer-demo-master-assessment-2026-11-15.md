@@ -20,7 +20,7 @@
 
 5. ~~Approve vs unsaved buffers; Add-panel blur/Escape~~ — **Fixed 20 Nov 2026** (Step A R1-06; Step B R1-11; user confirmed on preview)
 
-**Next (22 Nov 2026, after R1-18):** **R1-27** (groups invisible in draft; Move up silently joins neighbouring group). User approved investigate → A–E in a new chat. Phase 7 held.
+**Next (22 Nov 2026, after R1-27):** English chrome still open (R1-07 language defer; else Round 2 leftovers the user prioritises). Phase 7 held until the user says English chrome is good enough.
 
 ---
 
@@ -81,7 +81,7 @@
 | R1-24 | OPEN | Reach never settles step; invites English-only; team mail locked to one org domain. |
 | R1-25 | OPEN | No Kiswahili; tab labels English vs native inconsistently; linking one language still shows link mark. |
 | R1-26 | OPEN | UN: roster/pool wrong; eligibility Anyone; approval = author tick; inclusive flags parkable; Amplify full check can cut years / move essentials. |
-| R1-27 | OPEN | Groups invisible in draft; Move up silently joins neighbouring group. |
+| R1-27 | **Fixed** (22 Nov 2026; Option A) | Quiet group labels in draft (and editable LangDoc) while icons on; Preview/Eye stay flat; no draft group grips (R1-10). Move up/down at a boundary still joins (`moveInReading`); note says `Moved … to {group}`; Undo restores. |
 
 ### C. What Round 1 said works
 
@@ -331,6 +331,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 22 Nov 2026 | R1-15 | `aa7576e`…`dafa4f6` | Ask / walk / change auto-open call `setHidden(null)` so Hide cannot leave a fields card shut after a later ask. Tests `employerDemoR115.test.ts` + no-fetch. **Agent confirmed on preview** (Communications Intern: Hide Details → part stays current, card shut; answer date → fields card returns on How to apply). |
 | 22 Nov 2026 | R1-09 | `aa9fe60` | `onLine` sliding window ending at current so Publish does not sit on the line while Review/Languages are only in +N. Tests `employerDemoR109.test.ts` + window test. Eye-in-setup kept. **Agent confirmed on preview** (narrow split: Publish current → line shows Check · Free or Amplify · Review · Publish; early sections in +9). |
 | 22 Nov 2026 | R1-18 | `12b8f4c`…*(confirm)* | Free-first plan chat; Amplify detail behind “What Amplify adds”; Check/Create language hints only on Amplify; progress part `Language versions`. Free still hides langs/market/reach on the line (by design). Tests `employerDemoR118.test.ts` + publishing `toPlan` skips About/Project (R2-P0-3). **Agent confirmed on preview** (Finance Officer: plan panel Free first + “What Amplify adds” collapsed; parts Check → Free → Review → Publish, no Language versions / Market / Reach). |
+| 22 Nov 2026 | R1-27 (Option A) | *(this commit)* | Quiet `ej-dgroup` labels in draft + editable LangDoc (`draftGroupBreaks`); Preview/Eye flat; no draft group grips. Keep `moveInReading` join; `Moved … to {group}` note; Undo. Tests `employerDemoR127.test.ts`. **Confirm on preview** (labels visible; Move up at boundary joins + note; Undo; Preview flat; outline grips unchanged). |
 
 ---
 
@@ -338,7 +339,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 
 1. Read this file and `employer-side-plan.md` Phase 6 / polish status.  
 2. Confirm `demo/employer` tip and that English-first still holds.  
-3. **Default next:** R1-27 (draft groups / silent join). Or the user’s new priority.  
+3. **Default next:** remaining English chrome the user prioritises (R1-07 deferred; Round 2 leftovers). Or the user’s new priority.  
 4. Mark IDs Fixed in the tables and add a Fix log row in the same commit as the code.  
 5. Do not close Phase 7 until the user says English chrome is good enough.  
 6. Never stage leftover `apps/frontend/lib/__tests__/employerDemoPhase6Review.test.ts` or `apps/frontend/AGENTS.md` unless the user asks.

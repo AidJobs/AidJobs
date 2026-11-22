@@ -7,7 +7,7 @@ import { dismissToUpdate, editVersionSection, keepTranslation, refreshTranslatio
 import { AddPanel, StepNote, useRemovedNoteHidden } from './DocPane';
 import FixedBlock from './FixedBlock';
 import Grip, { dropAt, type GripAction } from './Grip';
-import { groupLabelOf, groupOfKey, groupOrderOf, grouped, KEPT } from './outline';
+import { draftGroupBreaks, groupLabelOf, groupOfKey, groupOrderOf, grouped, KEPT } from './outline';
 import { getState } from './store';
 import { jobLang, langOf, stale, stillOwn, totalLines, untranslated, versionsOf } from './translate';
 import type { DemoJob, GroupKey, JobLang, Section, State } from './types';
@@ -277,6 +277,8 @@ export function LangDoc({ job, s, lang, readOnly = false }: { job: DemoJob; s: S
   const step = job.undoStep?.tab === lang ? job.undoStep : undefined;
   const removedAt = step?.removed ? (step.removed.after && keys.includes(step.removed.after) ? step.removed.after : null) : undefined;
   const topNote = step && !step.removed && !step.keys?.some((k) => keys.includes(k));
+  // R1-27 Option A: quiet group labels while editing a version; read-only stays flat.
+  const breaks = tools ? draftGroupBreaks(keys, g) : null;
   const removedNote =
     step?.removed && !hideRemoved ? (
       <div className="ej-change-note ej-removed-note" role="status" lang="en" dir="ltr">
@@ -320,12 +322,20 @@ export function LangDoc({ job, s, lang, readOnly = false }: { job: DemoJob; s: S
         <div />
         {topNote && !job.lastChange && <StepNote job={job} />}
         {removedAt === null && removedNote}
-        {t.sections.map((sec) => (
-          <Fragment key={sec.key}>
-            <VersionSection job={job} lang={lang} sec={sec} tools={tools} readOnly={readOnly} />
-            {removedAt === sec.key && removedNote}
-          </Fragment>
-        ))}
+        {t.sections.map((sec) => {
+          const br = breaks?.get(sec.key);
+          return (
+            <Fragment key={sec.key}>
+              {br && (
+                <div className="ej-dgroup" data-draft-group={br.group} data-drop-group={br.group} lang="en" dir="ltr">
+                  {br.label}
+                </div>
+              )}
+              <VersionSection job={job} lang={lang} sec={sec} tools={tools} readOnly={readOnly} />
+              {removedAt === sec.key && removedNote}
+            </Fragment>
+          );
+        })}
         {!readOnly && (
           <div className="ej-addend" lang="en" dir="ltr">
             <Tip label="Add a section, or bring back a fixed text">
