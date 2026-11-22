@@ -329,7 +329,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 21 Nov 2026 | R1-20 | `6be0b11`…`7c2e638` | Phone setup template strip: Cancel always shown; closes strip and returns to chat without applying. Test in `employer-demo-no-fetch.test.tsx`. **Agent confirmed on preview ~390px** (Nutrition Officer: See all formats → Cancel → Chat; strip gone, setup unchanged). |
 | 21 Nov 2026 | R1-12 | `aea3040`…`eee45e0` | `.ej-sec-head` wraps globally; `.ej-sec-change` full-width row with visible Also-in + `ej-change-actions` Undo. Tests `employerDemoR112.test.ts` + no-fetch. **Agent confirmed on preview** (Communications Intern: edit About us → Save; wrap; change row 100%; Approve/Undo/grip inside panel). |
 | 22 Nov 2026 | R1-15 | `aa7576e`…`dafa4f6` | Ask / walk / change auto-open call `setHidden(null)` so Hide cannot leave a fields card shut after a later ask. Tests `employerDemoR115.test.ts` + no-fetch. **Agent confirmed on preview** (Communications Intern: Hide Details → part stays current, card shut; answer date → fields card returns on How to apply). |
-| 22 Nov 2026 | R1-09 | _(pending push)_ | `onLine` sliding window ending at current so Publish does not sit on the line while Review/Languages are only in +N. Tests `employerDemoR109.test.ts` + window test. Eye-in-setup kept. Confirm on preview (narrow: Publish current → Review on line). |
+| 22 Nov 2026 | R1-09 | `aa9fe60` | `onLine` sliding window ending at current so Publish does not sit on the line while Review/Languages are only in +N. Tests `employerDemoR109.test.ts` + window test. Eye-in-setup kept. **Agent confirmed on preview** (narrow split: Publish current → line shows Check · Free or Amplify · Review · Publish; early sections in +9). |
 
 ---
 
