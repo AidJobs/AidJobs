@@ -391,6 +391,11 @@ def test_the_scheduler_still_crawls_when_the_daily_pass_fails(monkeypatch):
         calls.append("pass")
         raise RuntimeError("database down")
 
+    async def health():
+        # Stubbed so a failed pass does not open a real DB for crawl-health (W-39).
+        calls.append("health")
+        return None
+
     async def crawls():
         calls.append("crawl")
         orch.running = False
@@ -400,11 +405,12 @@ def test_the_scheduler_still_crawls_when_the_daily_pass_fails(monkeypatch):
         return None
 
     orch.daily_pass_once = failing_pass
+    orch.crawl_health_once = health
     orch.run_due_sources_once = crawls
     monkeypatch.setattr("orchestrator.asyncio.sleep", no_sleep)
     orch.running = True
     asyncio.run(orch.scheduler_loop())
-    assert calls == ["pass", "crawl"]
+    assert calls == ["pass", "health", "crawl"]
 
 
 # --- The preview stays read-only ----------------------------------------------------------------
