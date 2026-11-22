@@ -1,7 +1,12 @@
 {
   "url": "https://careers.example.org/jobfeed",
   "reader": "rss-feed",
-  "report": null,
+  "report": {
+    "pages": 1,
+    "expected": 2,
+    "complete": false,
+    "stop": "rss has no catalogue total"
+  },
   "jobs": [
     {
       "title": "Programme Officer",

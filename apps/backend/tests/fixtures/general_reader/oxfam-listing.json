@@ -1,6 +1,11 @@
 {
  "url": "https://jobs.oxfam.org.uk/jobs/home/",
- "report": null,
+ "report": {
+  "pages": 1,
+  "expected": 6,
+  "complete": false,
+  "stop": "no stated total"
+ },
  "jobs": [
   {
    "title": "Finance ManagerSyria - Damascus - Head office26 October 2026",

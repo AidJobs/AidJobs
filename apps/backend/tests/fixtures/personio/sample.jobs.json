@@ -10,7 +10,10 @@
       "description": "<p>Lead regional marketing.</p>\n<p>Five years experience.</p>",
       "employment_type": "permanent",
       "location_raw": "Berlin; Brussels",
-      "locations": ["Berlin", "Brussels"]
+      "locations": [
+        "Berlin",
+        "Brussels"
+      ]
     },
     {
       "title": "Field Officer",
@@ -21,7 +24,15 @@
       "description": "Support field teams.",
       "employment_type": "temporary",
       "location_raw": "Nairobi",
-      "locations": ["Nairobi"]
+      "locations": [
+        "Nairobi"
+      ]
     }
-  ]
+  ],
+  "report": {
+    "pages": 1,
+    "expected": 2,
+    "complete": true,
+    "stop": null
+  }
 }

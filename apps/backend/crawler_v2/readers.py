@@ -5,7 +5,10 @@ reader, then the "Sites" engine reader, then the general rule-based reader. A re
 or reads no rows passes the page to the next; the general reader's own failure fails the crawl.
 
 RSS and API (pull request 3b): one feed reader and one generic JSON reader. Each turns the first
-response into field-contract candidates; completeness only when the listing states a total.
+response into field-contract candidates. Completeness (W-39): named closed catalogues
+(Workable, Greenhouse, Lever, Personio) report when the body is the full board; generic RSS,
+Teamtailor RSS, and JSON without a stated total report incomplete; general HTML reports only
+on positive full-catalogue evidence.
 
 Public ATS feeds (W-38): Workable, Greenhouse, Teamtailor, Lever and Personio, recognised from
 the source's board address via `first_request` (contract §10 amendment), before the generic JSON
@@ -55,6 +58,11 @@ from crawler_v2.feed_fields import (
     jobs_array,
     json_listing_report,
 )
+from crawler_v2.listing_completeness import (
+    closed_catalogue_report,
+    general_html_report,
+    rss_incomplete_report,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -84,12 +92,23 @@ def _json_api_jobs(body: str, careers_url: str):
     return jobs, json_listing_report(jobs, data)
 
 
-def _workable_feed_jobs(body: str, careers_url: str) -> Optional[List[Dict]]:
+def _workable_feed_jobs(body: str, careers_url: str):
     data = json.loads(body)
     if not looks_like_workable(data):
-        return None
+        return None, None
     account = workable_account(careers_url) or "unknown"
-    return jobs_from_workable(data, account)
+    jobs = jobs_from_workable(data, account)
+    raw_items = [
+        item
+        for item in (data.get("jobs") or [])
+        if isinstance(item, dict)
+        and str(item.get("shortcode") or "").strip()
+        and str(item.get("title") or "").strip()
+    ]
+    report = closed_catalogue_report(
+        jobs, data=data, raw_item_count=len(raw_items), allow_dedupe=True
+    )
+    return jobs, report
 
 
 def _greenhouse_list_jobs(body: str, token: str):
@@ -116,19 +135,37 @@ def _teamtailor_feed_jobs(body: str) -> List[Dict]:
     return jobs_from_teamtailor(body)
 
 
-def _lever_feed_jobs(body: str) -> List[Dict]:
+def _lever_feed_jobs(body: str):
+    from crawler_v2.listing_completeness import incomplete
+
     data = json.loads(body)
     if not isinstance(data, list):
-        return []
+        return [], incomplete("not a lever postings list")
     if data and not looks_like_lever(data):
-        return []
-    return jobs_from_lever(data)
+        return [], incomplete("not a lever postings list")
+    jobs = jobs_from_lever(data)
+    raw_items = [item for item in data if isinstance(item, dict)]
+    return jobs, closed_catalogue_report(jobs, raw_item_count=len(raw_items))
 
 
-def _personio_feed_jobs(body: str, account: str, tld: str) -> List[Dict]:
+def _personio_feed_jobs(body: str, account: str, tld: str):
+    from xml.etree import ElementTree
+
+    from crawler_v2.listing_completeness import incomplete
+
     if not looks_like_personio(body):
-        return []
-    return jobs_from_personio(body, account, tld)
+        return [], incomplete("not a personio feed")
+    jobs = jobs_from_personio(body, account, tld)
+    try:
+        root = ElementTree.fromstring(body)
+    except ElementTree.ParseError:
+        return jobs, closed_catalogue_report(jobs, truncated=True)
+
+    def _tag(name: str) -> str:
+        return name.rsplit("}", 1)[-1] if "}" in name else name
+
+    raw = sum(1 for el in root.iter() if _tag(el.tag).lower() == "position")
+    return jobs, closed_catalogue_report(jobs, raw_item_count=raw)
 
 
 # The reader and the general reader's strategy for the current crawl, recorded on its extraction
@@ -202,8 +239,11 @@ class SitesReader(_WalkReader):
 
 
 class GeneralReader(Reader):
-    """The rule-based reader: structured data, then the strategy selector's choice. It reports
-    no completeness (W-39)."""
+    """The rule-based reader: structured data, then the strategy selector's choice.
+
+    Always reports completeness on a finished extract (W-39): complete only with a matching
+    stated total (or on-page rows that match it); a teaser with no total stays incomplete.
+    """
 
     name = "general"
 
@@ -225,7 +265,8 @@ class GeneralReader(Reader):
             self._crawler._extract_jobs_sync, first.body, source["careers_url"]
         )
         LISTING_STRATEGY.set(strategy)
-        return ListingResult(self.name, jobs, strategy=strategy)
+        report = general_html_report(first.body, jobs)
+        return ListingResult.from_report(self.name, jobs, report, strategy=strategy)
 
 
 def html_readers(crawler) -> List[Reader]:
@@ -233,8 +274,11 @@ def html_readers(crawler) -> List[Reader]:
 
 
 class RssFeedReader(Reader):
-    """One RSS or Atom feed body as a listing. Reports no completeness: a truncated feed looks
-    the same as a full one (growth plan, section 4.1; W-39 for stronger rules)."""
+    """One RSS or Atom feed body as a listing.
+
+    Always reports incomplete on a finished parse (W-39): a truncated feed looks the same as a
+    full one, so it must not count as absence evidence.
+    """
 
     name = "rss-feed"
     source_types = frozenset({"rss"})
@@ -248,7 +292,7 @@ class RssFeedReader(Reader):
         base = source.get("careers_url") or ""
         jobs = await asyncio.to_thread(_rss_feed_jobs, first.body, base)
         logger.info("RSS feed reader found %s jobs", len(jobs))
-        return ListingResult(self.name, jobs)
+        return ListingResult.from_report(self.name, jobs, rss_incomplete_report(jobs))
 
 
 class JsonApiReader(Reader):
@@ -308,7 +352,7 @@ class WorkableFeedReader(Reader):
         if first.stop or first.status != 200 or not (first.body or "").strip():
             return ListingResult(self.name)
         try:
-            jobs = await asyncio.to_thread(
+            jobs, report = await asyncio.to_thread(
                 _workable_feed_jobs, first.body, source.get("careers_url") or ""
             )
         except (TypeError, ValueError):
@@ -316,8 +360,8 @@ class WorkableFeedReader(Reader):
         if jobs is None:
             return None
         logger.info("Workable feed reader found %s jobs", len(jobs))
-        # Widget has no catalogue total; multi-location rows inflate raw counts.
-        return ListingResult(self.name, jobs)
+        # Widget has no catalogue total; multi-location rows are merged by shortcode (W-39).
+        return ListingResult.from_report(self.name, jobs, report)
 
 
 class GreenhouseFeedReader(Reader):
@@ -452,7 +496,8 @@ class TeamtailorFeedReader(Reader):
             return ListingResult(self.name)
         jobs = await asyncio.to_thread(_teamtailor_feed_jobs, first.body)
         logger.info("Teamtailor feed reader found %s jobs", len(jobs))
-        return ListingResult(self.name, jobs)
+        # Teamtailor jobs.rss is generic RSS: truncation is invisible (W-39).
+        return ListingResult.from_report(self.name, jobs, rss_incomplete_report(jobs))
 
 
 class LeverFeedReader(Reader):
@@ -489,11 +534,11 @@ class LeverFeedReader(Reader):
         if first.stop or first.status != 200 or not (first.body or "").strip():
             return ListingResult(self.name)
         try:
-            jobs = await asyncio.to_thread(_lever_feed_jobs, first.body)
+            jobs, report = await asyncio.to_thread(_lever_feed_jobs, first.body)
         except (TypeError, ValueError):
             return ListingResult(self.name)
         logger.info("Lever feed reader found %s jobs", len(jobs))
-        return ListingResult(self.name, jobs)
+        return ListingResult.from_report(self.name, jobs, report)
 
 
 class PersonioFeedReader(Reader):
@@ -529,9 +574,11 @@ class PersonioFeedReader(Reader):
         if not parsed:
             return ListingResult(self.name)
         account, tld = parsed
-        jobs = await asyncio.to_thread(_personio_feed_jobs, first.body, account, tld)
+        jobs, report = await asyncio.to_thread(
+            _personio_feed_jobs, first.body, account, tld
+        )
         logger.info("Personio feed reader found %s jobs", len(jobs))
-        return ListingResult(self.name, jobs)
+        return ListingResult.from_report(self.name, jobs, report)
 
 
 def rss_readers(_crawler=None) -> List[Reader]:
