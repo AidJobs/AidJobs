@@ -32,6 +32,7 @@ from contracts.reader import Fetch, ListingResult, Request, Response
 from contracts.refusal import refusal
 from contracts.run_ownership import OwnershipLost, save_failure_outcome
 from crawler_v2.feed_fields import job_from_json_item, jobs_array
+from crawler_v2.listing_fingerprint import listing_ids_fingerprint
 from crawler_v2.readers import (
     LISTING_READER,
     api_readers,
@@ -348,6 +349,7 @@ class SimpleAPICrawler:
                 )
 
             report = dict(listing_report) if isinstance(listing_report, dict) else None
+            listing_hash, listing_id_count = listing_ids_fingerprint(jobs)
             crawl_status, crawl_message = _listing_outcome(len(jobs), report)
             crawl_status, crawl_message = save_failure_outcome(
                 crawl_status, crawl_message, counts
@@ -357,6 +359,8 @@ class SimpleAPICrawler:
                 "status": crawl_status,
                 "message": crawl_message,
                 "listing": report,
+                "listing_ids_hash": listing_hash,
+                "listing_id_count": listing_id_count,
                 "valid": len(admitted),
                 "counts": {
                     "found": len(jobs),

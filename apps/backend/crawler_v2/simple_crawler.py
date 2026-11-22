@@ -58,6 +58,11 @@ from contracts.reader import Response
 from contracts.refusal import refusal
 from contracts.run_ownership import OwnershipLost, confirm_running, save_failure_outcome
 from crawler_v2.job_pages import SavedJob, choose_pages, link_key, saved_job
+from crawler_v2.listing_fingerprint import (
+    early_stop_details,
+    listing_ids_fingerprint,
+    previous_complete_listing_hash,
+)
 from crawler_v2.parse_lock import DATEPARSER_LOCK
 from crawler_v2.readers import LISTING_READER, LISTING_STRATEGY, html_readers, read_listing
 
@@ -2005,6 +2010,40 @@ class SimpleCrawler:
         finally:
             conn.close()
 
+    def _previous_listing_ids_hash(self, source_id: str) -> Optional[str]:
+        """Hash from the latest finished complete crawl, or None when that row has none.
+
+        The latest complete run wins even if its hash is null (empty URL set / pre-migration):
+        skipping null rows would early-stop against an older fingerprint (W-39 D8).
+        Connection failures return None (no early-stop); they must not fail the crawl.
+        """
+        conn = None
+        try:
+            conn = self._get_db_conn()
+            with conn.cursor() as cur:
+                cur.execute("SET LOCAL statement_timeout = '30s'")
+                cur.execute(
+                    """
+                    SELECT listing_ids_hash
+                    FROM crawl_logs
+                    WHERE source_id = %s
+                      AND listing_complete IS TRUE
+                      AND status IS DISTINCT FROM 'running'
+                    ORDER BY ran_at DESC
+                    LIMIT 1
+                    """,
+                    (str(source_id),),
+                )
+                rows = cur.fetchall()
+            conn.rollback()
+            return previous_complete_listing_hash(rows)
+        except Exception as e:
+            logger.debug("Previous listing hash not read: %s", redact_exception(e))
+            return None
+        finally:
+            if conn is not None:
+                conn.close()
+
     def _enrich_job_from_detail_sync(self, job: Dict, html: str) -> Dict:
         """Parse a fetched detail page (worker thread)."""
         job['page_read'] = True
@@ -2556,6 +2595,20 @@ class SimpleCrawler:
 
                 # Listing size before job-page caps hold rows back (canary rows_read, W-35).
                 listing_row_count = len(jobs)
+                listing_hash, listing_id_count = listing_ids_fingerprint(jobs)
+                listing_complete = bool(
+                    listing_report and listing_report.get("complete") is True
+                )
+                previous_hash = None
+                if listing_complete and listing_hash and source_id:
+                    previous_hash = await asyncio.to_thread(
+                        self._previous_listing_ids_hash, source_id
+                    )
+                early_stop = early_stop_details(
+                    listing_complete=listing_complete,
+                    current_hash=listing_hash,
+                    previous_hash=previous_hash,
+                )
                 
                 logger.info(f"Job extraction complete: {len(jobs)} jobs extracted from listing page")
                 
@@ -2570,6 +2623,14 @@ class SimpleCrawler:
                 # Skip enrichment for UNICEF since they're blocking with 403
                 needs_enrichment = any('undp.org' in job.get('apply_url', '').lower() for job in jobs)
                 skip_enrichment = any('unicef.org' in job.get('apply_url', '').lower() for job in jobs)
+                # Early-stop (W-39): when the complete listing's URL set matches the previous
+                # complete run, never open every page (including UNDP's open-all path); use the
+                # normal new/deadline/rotation plan so sightings and counting stay honest.
+                if early_stop and needs_enrichment:
+                    logger.info(
+                        "Early-stop: listing ids unchanged; UNDP open-all deferred to page plan"
+                    )
+                    needs_enrichment = False
                 
                 unconfirmed = []
                 if skip_enrichment:
@@ -2608,10 +2669,17 @@ class SimpleCrawler:
                             jobs[index]['page_not_read'] = True
                         unconfirmed = [jobs[index] for index in sorted(plan.unconfirmed)]
                         jobs = [job for index, job in enumerate(jobs) if index not in plan.unconfirmed]
-                        logger.info(
-                            "Job pages: %s to open, %s read from the listing alone, %s held back",
-                            len(to_open), len(plan.listing_only), len(unconfirmed),
-                        )
+                        if early_stop:
+                            logger.info(
+                                "Early-stop: listing ids unchanged; "
+                                "%s to open (new/deadline/rotation), %s listing alone, %s held back",
+                                len(to_open), len(plan.listing_only), len(unconfirmed),
+                            )
+                        else:
+                            logger.info(
+                                "Job pages: %s to open, %s read from the listing alone, %s held back",
+                                len(to_open), len(plan.listing_only), len(unconfirmed),
+                            )
                     
                     # The fetch policy spaces requests to one host; a refusal or a spent budget
                     # ends the job pages, and the rows not opened keep their listing fields.
@@ -2748,6 +2816,8 @@ class SimpleCrawler:
                         extracted_fields['strategy'] = LISTING_STRATEGY.get()
                     if canary_warnings:
                         extracted_fields['canary'] = list(canary_warnings)
+                    if early_stop:
+                        extracted_fields['early_stop'] = True
                     
                     await asyncio.to_thread(
                         self.extraction_logger.log_extraction,
@@ -2769,11 +2839,15 @@ class SimpleCrawler:
                     crawl_status, crawl_message, counts
                 )
                 crawl_message = canary_append_message(crawl_message, canary_warnings)
+                if early_stop:
+                    crawl_message = f'{crawl_message}; early-stop: listing ids unchanged'
                 return {
                     'status': crawl_status,
                     'message': crawl_message,
                     # Read by the run's finish for its lifecycle record (contract §6).
                     'listing': dict(listing_report) if listing_report else None,
+                    'listing_ids_hash': listing_hash,
+                    'listing_id_count': listing_id_count,
                     'valid': len(admitted),
                     'validation_info': {
                         'total_extracted': len(jobs),

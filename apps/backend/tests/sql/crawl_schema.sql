@@ -81,6 +81,9 @@ CREATE TABLE public.crawl_logs (
     "counted" boolean,
     "expired" integer,
     "returned" integer,
+    -- Added by infra/migrations/w39_listing_ids_hash.sql (W-39).
+    "listing_ids_hash" text,
+    "listing_id_count" integer,
     CONSTRAINT "crawl_logs_pkey" PRIMARY KEY (id),
     CONSTRAINT "crawl_logs_source_id_fkey" FOREIGN KEY (source_id) REFERENCES sources(id) ON DELETE CASCADE
 );

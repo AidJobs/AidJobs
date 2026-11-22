@@ -451,7 +451,9 @@ def test_the_lifecycle_record_is_written_after_the_ownership_check_in_the_same_t
     assert "counted = %s" in record[0] and "status" not in record[0]
     assert record[1][-1] == "run-9"
     # No listing report in this result: not complete, so it does not count, and expires nothing.
-    assert record[1][0] is None and record[1][-2] is False
+    # Params: … counted, listing_ids_hash, listing_id_count, run_id (W-39).
+    assert record[1][0] is None and record[1][-4] is False
+    assert record[1][-3] is None and record[1][-2] is None
     assert expiry == ("UPDATE crawl_logs SET expired = %s, returned = %s WHERE id = %s",
                       (0, 0, "run-9"))
     assert not any(sql.startswith("UPDATE jobs") for sql, _p in statements)
