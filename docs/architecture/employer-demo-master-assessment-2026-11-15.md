@@ -20,7 +20,7 @@
 
 5. ~~Approve vs unsaved buffers; Add-panel blur/Escape~~ — **Fixed 20 Nov 2026** (Step A R1-06; Step B R1-11; user confirmed on preview)
 
-**Next (22 Nov 2026, after R1-18):** remaining English chrome. Phase 7 held.
+**Next (22 Nov 2026, after R1-18):** **R1-27** (groups invisible in draft; Move up silently joins neighbouring group). User approved investigate → A–E in a new chat. Phase 7 held.
 
 ---
 
@@ -338,7 +338,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 
 1. Read this file and `employer-side-plan.md` Phase 6 / polish status.  
 2. Confirm `demo/employer` tip and that English-first still holds.  
-3. **Default next:** remaining English chrome (after R1-18). Or the user’s new priority.  
+3. **Default next:** R1-27 (draft groups / silent join). Or the user’s new priority.  
 4. Mark IDs Fixed in the tables and add a Fix log row in the same commit as the code.  
 5. Do not close Phase 7 until the user says English chrome is good enough.  
 6. Never stage leftover `apps/frontend/lib/__tests__/employerDemoPhase6Review.test.ts` or `apps/frontend/AGENTS.md` unless the user asks.
