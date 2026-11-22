@@ -1317,9 +1317,10 @@ def test_two_html_crawls_at_once_keep_their_own_listing_reports(db):
 
     (unicef_result, icrc_result), extractions = asyncio.run(scenario())
     assert "listing complete: 3 pages" in unicef_result["message"]
-    assert icrc_result["message"] == "Found 1 jobs"
+    assert icrc_result["message"] == "Found 1 jobs; listing not counted: no stated total"
     assert extractions[unicef["id"]]["listing_pages"] == 3
-    assert "listing_pages" not in extractions[icrc["id"]]
+    assert extractions[icrc["id"]].get("listing_complete") is False
+    assert extractions[icrc["id"]].get("listing_pages") == 1
 
 
 # ---------------------------------------------------------------------------
