@@ -20,7 +20,7 @@
 
 5. ~~Approve vs unsaved buffers; Add-panel blur/Escape~~ — **Fixed 20 Nov 2026** (Step A R1-06; Step B R1-11; user confirmed on preview)
 
-**Next (22 Nov 2026, after R1-15):** remaining English chrome (R1-09 / R1-18, …). Phase 7 held.
+**Next (22 Nov 2026, after R1-09):** remaining English chrome (R1-18, …). Phase 7 held.
 
 ---
 
@@ -57,7 +57,7 @@
 
 | ID | Status | Fault |
 | --- | --- | --- |
-| R1-09 | OPEN (partial) | **U-1 placement Fixed 20 Nov 2026.** Still open: Publish early while Languages/Review in +N; icons hidden until writing; phone parts over icons. |
+| R1-09 | **Fixed** (22 Nov 2026) | **U-1 placement Fixed 20 Nov 2026.** +N: sliding window ending at current so Review/Languages stay with Publish. Phone parts-over-icons: R2-P1-10. Eye until writing: kept (nothing to preview in setup). |
 | R1-10 | **Fixed** (21 Nov 2026; click/drag U-4 B; fake Moved `7475fda`; group drops + rehome; agent confirmed on preview) | Grip threshold 12px; fake “Moved” at ends closed; outline group drag shows `data-group-drop` insertion bar; `removeGroup` rehomes sections (catalog → own group; custom → previous/next/`job`); Undo restores; AI path same. Draft has no group grips (by design). |
 | R1-11 | **Fixed** (20 Nov 2026; Step B `732a06f`…`9e4ae13`) | Enter commits; blur/Escape cancel. Add your own under every group. After Enter-add, JD scroll preserved (no jump to top). | User confirmed on preview, 20 Nov 2026 |
 | R1-12 | **Fixed** (21 Nov 2026) | Section headers wrap; change note full-width with Also-in / Undo visible (StepNote-shaped). Touch sizes/opacity: R2-P1-10. |
@@ -250,7 +250,7 @@ Full **icon inventory table** (Eye, History, progress, tabs, X, Approve, pencil,
 
 | ID | Maps | Finding |
 | --- | --- | --- |
-| R2-P1-1 | **(1) U-1** | **Placement Fixed 20 Nov 2026** (user confirmed). Still open: +N ordering (Publish early), phone sheet, Eye hidden until sections |
+| R2-P1-1 | **(1) U-1** | **Placement Fixed 20 Nov 2026** (user confirmed). +N ordering Fixed with R1-09 (22 Nov 2026). Phone sheet: R2-P1-10. Eye until sections: kept by design. |
 | R2-P1-2 | **(2) Fixed with U-2** | Chat `undo` vs `undoStep`; remove dismiss |
 | R2-P1-3 | **(3)** | Save/Cancel semantics; setup card no Save; 40-char draft rule |
 | R2-P1-4 | **(4)/(5) Fixed** (21 Nov 2026) | Grip click Fixed (U-4 B); Add blur/Escape Fixed (R1-11); fake “Moved” at ends Fixed; group drop insertion bar + remove-group rehome Fixed (agent confirmed on preview) |
@@ -328,7 +328,8 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 21 Nov 2026 | R2-P1-10, R1-12/20 partial | `031dcb0`…`148853d` | `--ej-touch: 44px` @ ≤1023; section icons / Chat·Job / Send / parts / pills / icons; tools opacity 1 under 1023; sticky `.ej-edit-actions`; parts row flex+truncate; strip winning Eye/History/Approve inlines. Tests `employerDemoR2P110.test.ts` + phone no-fetch. **Agent confirmed on preview ~390px** (Communications Intern: Chat/Job/Send/Eye/History/pencil/grip/Save all 44px; parts does not overlap Eye; sticky Save bar while editing). |
 | 21 Nov 2026 | R1-20 | `6be0b11`…`7c2e638` | Phone setup template strip: Cancel always shown; closes strip and returns to chat without applying. Test in `employer-demo-no-fetch.test.tsx`. **Agent confirmed on preview ~390px** (Nutrition Officer: See all formats → Cancel → Chat; strip gone, setup unchanged). |
 | 21 Nov 2026 | R1-12 | `aea3040`…`eee45e0` | `.ej-sec-head` wraps globally; `.ej-sec-change` full-width row with visible Also-in + `ej-change-actions` Undo. Tests `employerDemoR112.test.ts` + no-fetch. **Agent confirmed on preview** (Communications Intern: edit About us → Save; wrap; change row 100%; Approve/Undo/grip inside panel). |
-| 22 Nov 2026 | R1-15 | `aa7576e` | Ask / walk / change auto-open call `setHidden(null)` so Hide cannot leave a fields card shut after a later ask. Tests `employerDemoR115.test.ts` + no-fetch. **Agent confirmed on preview** (Communications Intern: Hide Details → part stays current, card shut; open Review from +N → card returns; live bundle has ask-path `setHidden(null)`). |
+| 22 Nov 2026 | R1-15 | `aa7576e`…`dafa4f6` | Ask / walk / change auto-open call `setHidden(null)` so Hide cannot leave a fields card shut after a later ask. Tests `employerDemoR115.test.ts` + no-fetch. **Agent confirmed on preview** (Communications Intern: Hide Details → part stays current, card shut; answer date → fields card returns on How to apply). |
+| 22 Nov 2026 | R1-09 | _(pending push)_ | `onLine` sliding window ending at current so Publish does not sit on the line while Review/Languages are only in +N. Tests `employerDemoR109.test.ts` + window test. Eye-in-setup kept. Confirm on preview (narrow: Publish current → Review on line). |
 
 ---
 
@@ -336,7 +337,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 
 1. Read this file and `employer-side-plan.md` Phase 6 / polish status.  
 2. Confirm `demo/employer` tip and that English-first still holds.  
-3. **Default next:** remaining English chrome (R1-09 / R1-18, …). Or the user’s new priority.  
+3. **Default next:** remaining English chrome (R1-18, …). Or the user’s new priority.  
 4. Mark IDs Fixed in the tables and add a Fix log row in the same commit as the code.  
 5. Do not close Phase 7 until the user says English chrome is good enough.  
 6. Never stage leftover `apps/frontend/lib/__tests__/employerDemoPhase6Review.test.ts` or `apps/frontend/AGENTS.md` unless the user asks.

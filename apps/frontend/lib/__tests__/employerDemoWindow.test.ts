@@ -508,7 +508,23 @@ describe('the window, revised: "+N" keeps every part within reach', () => {
     const { shown, more } = onLine(parts, fit, last);
     expect(shown).toHaveLength(4);
     expect(shown.at(-1)?.key).toBe(last);
+    // R1-09: window ends at current — last four parts, not first three + Publish.
+    expect(shown.map((p) => p.key)).toEqual(parts.slice(-4).map((p) => p.key));
     expect(shown.length + more.length).toBe(parts.length);
+  });
+
+  // R1-09: Publish current must not bury Review (and Amplify mid-steps) in +N behind early sections.
+  it('keeps Review with Publish on the line when the window is tight (R1-09)', () => {
+    const parts = partsOf(job('job-comms'), getState());
+    const publish = parts.find((p) => p.key === 'publish')!;
+    const review = parts.find((p) => p.key === 'review')!;
+    expect(publish).toBeDefined();
+    expect(review).toBeDefined();
+    const { shown, more } = onLine(parts, 4, 'publish');
+    expect(shown.map((p) => p.key)).toContain('review');
+    expect(shown.map((p) => p.key)).toContain('publish');
+    expect(shown.at(-1)?.key).toBe('publish');
+    expect(more.some((p) => p.key === 'outline' || p.section)).toBe(true);
   });
 });
 

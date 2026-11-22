@@ -98,11 +98,15 @@ export function lineFit(widths: number[], room: number, more = 52): number {
   return Math.max(1, n);
 }
 
-/** The parts on the line and those in "+N": the first that fit, with the part in view always on the line. */
+/**
+ * The parts on the line and those in "+N".
+ * R1-09: when the part in view sits past the first `fit` slots, show a window ending at it — so Languages /
+ * Review stay with Publish instead of early sections + Publish while those sit only in +N.
+ */
 export function onLine(parts: Part[], fit: number, current: string): { shown: Part[]; more: Part[] } {
   const n = Math.min(fit, parts.length);
   const at = parts.findIndex((p) => p.key === current);
-  const shown = at >= n && n > 0 ? [...parts.slice(0, n - 1), parts[at]] : parts.slice(0, n);
+  const shown = at >= n && n > 0 ? parts.slice(at - n + 1, at + 1) : parts.slice(0, n);
   return { shown, more: parts.filter((p) => !shown.includes(p)) };
 }
 
