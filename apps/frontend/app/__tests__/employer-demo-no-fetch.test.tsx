@@ -1555,6 +1555,41 @@ describe('employer demo: creating a job in one window (round 7, phase 1)', () =>
     shows('Archived screen, kept for reference');
   });
 
+  // R1-15: Hide shuts the card but keeps the pin; a later ask must clear Hide and show Details again.
+  it('Hide then a later ask reopens the Details fields card', () => {
+    fresh();
+    let id = '';
+    act(() => {
+      id = startJob('Hiring a Shelter Officer in Goma, closing 30 December 2026, fixed-term');
+    });
+    phone = false;
+    render();
+    route(`#job/${id}`);
+    part('Details');
+    expect(container.querySelector('#ej-part-card')).not.toBeNull();
+    expect(currentLabel()).toBe('Details');
+    click('Hide');
+    expect(container.querySelector('#ej-part-card')).toBeNull();
+    expect(currentLabel()).toBe('Details');
+    act(() =>
+      update((st) => ({
+        ...st,
+        jobs: st.jobs.map((j) =>
+          j.id === id
+            ? {
+                ...j,
+                chat: [...j.chat, { id: `ask-later-${Date.now()}`, from: 'ai' as const, text: 'Where is the duty station?', ask: 'place' as const }],
+              }
+            : j,
+        ),
+      })),
+    );
+    expect(job(id).part).toBe('details');
+    expect(container.querySelector('#ej-part-card')).not.toBeNull();
+    expect(container.querySelector('#ej-part-card')?.getAttribute('aria-label')).toMatch(/Details/i);
+    expect(currentLabel()).toBe('Details');
+  });
+
   // R2-P1-9 / R1-13: leaving Preview must clear the preview flag so Eye returns.
   it('leaving Preview via a progress part or Job description restores Eye and drops the Preview tab', () => {
     fresh();

@@ -997,17 +997,22 @@ function JobWindow({ id }: { id: string }) {
   }, [job, s.reviewerAs]);
 
   // The line follows the chat: a section the chat has just changed comes into view, and a fact asked for makes Details current.
+  // R1-15: clear Hide so a later ask / change can show the fields card again (goPart already clears).
   useEffect(() => {
     if (!job || changeKey === seenChange.current) return;
     seenChange.current = changeKey;
     if (!changeKey || !job.lastChange) return;
+    setHidden(null);
     setPart(job.id, `s:${job.lastChange.keys[0]}`);
     scrollToId(`ej-sec-${job.lastChange.keys[0]}`);
   }, [changeKey, job]);
   useEffect(() => {
     if (!job || askId === seenAsk.current) return;
     seenAsk.current = askId;
-    if (askId) setPart(job.id, 'details');
+    if (askId) {
+      setHidden(null);
+      setPart(job.id, 'details');
+    }
   }, [askId, job]);
 
   // A job opened in its state says where it stands and what fits (section 19, phase 4); a draft picks up where it left off.
@@ -1054,6 +1059,8 @@ function JobWindow({ id }: { id: string }) {
     seenStep.current = stepNow;
     // R2-P1-9: walk focus leaves the preview panel — clear the preview flag so Eye returns.
     setPreview(false);
+    // R1-15: walk open must not leave a prior Hide shutting the new part's card.
+    setHidden(null);
     setPart(job.id, p);
     const sec = sectionOf(p);
     scrollToId(sec && p !== 's:apply' ? `ej-sec-${sec}` : 'ej-part-card');

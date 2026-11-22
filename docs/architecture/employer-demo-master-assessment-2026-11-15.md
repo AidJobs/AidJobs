@@ -20,7 +20,7 @@
 
 5. ~~Approve vs unsaved buffers; Add-panel blur/Escape~~ — **Fixed 20 Nov 2026** (Step A R1-06; Step B R1-11; user confirmed on preview)
 
-**Next (21 Nov 2026, after R1-12):** remaining English chrome (R1-09 / R1-15 / R1-18, …). Phase 7 held.
+**Next (22 Nov 2026, after R1-15):** remaining English chrome (R1-09 / R1-18, …). Phase 7 held.
 
 ---
 
@@ -63,7 +63,7 @@
 | R1-12 | **Fixed** (21 Nov 2026) | Section headers wrap; change note full-width with Also-in / Undo visible (StepNote-shaped). Touch sizes/opacity: R2-P1-10. |
 | R1-13 | **Fixed** (R2-P1-9, 21 Nov 2026) | Leaving Preview (progress part, Job description tab, walk, open/close tab) clears `preview` so Eye returns; Preview tab no longer lingers. | Agent confirmed on preview |
 | R1-14 | **Fixed** (R2-P1-8, 21 Nov 2026) | Walk Check card uses `checkPoints` (same as progress); outline gaps block Check; google stays facts-only. |
-| R1-15 | OPEN | Hide card + later ask leaves part highlighted with card shut. |
+| R1-15 | **Fixed** (22 Nov 2026) | Hide still pins the part; ask / walk / change auto-open clear `hidden` so the fields card returns (same as `goPart`). |
 | R1-16 | **Fixed** (U-3 Step A, 20 Nov 2026; grip naming remains U-4) | Save no longer renames; shared `pageIntake` for JD + chat; Accept/Reject/skip clear intake so a dirty box cannot overwrite. |
 | R1-17 | **Fixed** (U-3 Step B, 20 Nov 2026) | Bullets/short paste fixed in Step A. Sub-insert stays by design. Accept no longer auto-approves; Undo restores pack, body, and draft card. |
 | R1-18 | OPEN | Free plan hides Languages; Amplify/market/Reach sit in front of a small NGO post. |
@@ -327,7 +327,8 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 21 Nov 2026 | R2-P1-9, R1-13 | `4a6e4f1`…`1300b7a` | `Window.tsx`: `pickPanelTab` + `setPreview(false)` on progress part, Job description / other panel tabs, walk focus, open/close tab, toJob, version tab. Test in `employer-demo-no-fetch.test.tsx` (leave Preview → Eye back). **Agent confirmed on preview** (Communications Intern: Eye → Preview tab; About us part restores Eye, Preview tab gone; Eye → Job description tab restores Eye). |
 | 21 Nov 2026 | R2-P1-10, R1-12/20 partial | `031dcb0`…`148853d` | `--ej-touch: 44px` @ ≤1023; section icons / Chat·Job / Send / parts / pills / icons; tools opacity 1 under 1023; sticky `.ej-edit-actions`; parts row flex+truncate; strip winning Eye/History/Approve inlines. Tests `employerDemoR2P110.test.ts` + phone no-fetch. **Agent confirmed on preview ~390px** (Communications Intern: Chat/Job/Send/Eye/History/pencil/grip/Save all 44px; parts does not overlap Eye; sticky Save bar while editing). |
 | 21 Nov 2026 | R1-20 | `6be0b11`…`7c2e638` | Phone setup template strip: Cancel always shown; closes strip and returns to chat without applying. Test in `employer-demo-no-fetch.test.tsx`. **Agent confirmed on preview ~390px** (Nutrition Officer: See all formats → Cancel → Chat; strip gone, setup unchanged). |
-| 21 Nov 2026 | R1-12 | `aea3040`…`e19f4d6` | `.ej-sec-head` wraps globally; `.ej-sec-change` full-width row with visible Also-in + `ej-change-actions` Undo. Tests `employerDemoR112.test.ts` + no-fetch. **Agent confirmed on preview** (Communications Intern: edit About us → Save; wrap; change row 100%; Approve/Undo/grip inside panel). |
+| 21 Nov 2026 | R1-12 | `aea3040`…`eee45e0` | `.ej-sec-head` wraps globally; `.ej-sec-change` full-width row with visible Also-in + `ej-change-actions` Undo. Tests `employerDemoR112.test.ts` + no-fetch. **Agent confirmed on preview** (Communications Intern: edit About us → Save; wrap; change row 100%; Approve/Undo/grip inside panel). |
+| 22 Nov 2026 | R1-15 | _(pending push)_ | Ask / walk / change auto-open call `setHidden(null)` so Hide cannot leave a fields card shut after a later ask. Tests `employerDemoR115.test.ts` + no-fetch. Confirm on preview. |
 
 ---
 
@@ -335,7 +336,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 
 1. Read this file and `employer-side-plan.md` Phase 6 / polish status.  
 2. Confirm `demo/employer` tip and that English-first still holds.  
-3. **Default next:** remaining English chrome (R1-09 / R1-15 / R1-18, …). Or the user’s new priority.  
+3. **Default next:** remaining English chrome (R1-09 / R1-18, …). Or the user’s new priority.  
 4. Mark IDs Fixed in the tables and add a Fix log row in the same commit as the code.  
 5. Do not close Phase 7 until the user says English chrome is good enough.  
 6. Never stage leftover `apps/frontend/lib/__tests__/employerDemoPhase6Review.test.ts` or `apps/frontend/AGENTS.md` unless the user asks.
