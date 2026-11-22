@@ -679,7 +679,16 @@ function tidyParked(id: string) {
   const w = j?.walk;
   if (!j || !w?.parked?.length) return;
   const open = new Set(checkPoints(j, s).map((p) => `check:${p.key}`));
-  const still = w.parked.filter((k) => (k.startsWith('approve:') ? !w.approved.includes(k.slice(8)) : k.startsWith('check:') ? open.has(k) : !isSettled(k, j)));
+  // EN-BLOCK #1: version:X stays only while that translation still exists and is unreviewed.
+  const still = w.parked.filter((k) => {
+    if (k.startsWith('approve:')) return !w.approved.includes(k.slice(8));
+    if (k.startsWith('check:')) return open.has(k);
+    if (k.startsWith('version:')) {
+      const t = j.translations?.[k.slice('version:'.length) as JobLang];
+      return Boolean(t && !t.reviewed);
+    }
+    return !isSettled(k, j);
+  });
   if (still.length !== w.parked.length) updateJob(id, (x) => (x.walk ? { ...x, walk: { ...x.walk, parked: still.length ? still : undefined, hold: x.walk.hold && still.includes(x.walk.hold) ? x.walk.hold : undefined } } : x));
 }
 

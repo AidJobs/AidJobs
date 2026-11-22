@@ -200,7 +200,8 @@ function afterCheck(job: DemoJob, s: State): Step {
     const full = fullPoints(job, s)[0];
     if (full && !isSettled('full', job) && !parked('full')) return { kind: 'full', point: full };
     if (!isSettled('langs', job) && !parked('langs')) return { kind: 'langs' };
-    const draft = versionsOf(job).find((k) => !job.translations?.[k]?.reviewed);
+    // EN-BLOCK #1: each unreviewed version can be parked (`version:${lang}`); parked ones wait like langs / Reach.
+    const draft = versionsOf(job).find((k) => !job.translations?.[k]?.reviewed && !parked(`version:${k}`));
     if (draft) return { kind: 'version', lang: draft };
   }
   if (!reviewDone(job, s)) return job.review.state === 'none' ? { kind: 'review' } : { kind: 'waiting' };
@@ -227,7 +228,8 @@ export const ESSENTIAL_WORDS: Record<string, string> = { title: 'the job title',
 
 /**
  * The key a question is parked under (section 19, phase 6, A), or null for one that waits instead: the setup, changed lines waiting for
- * a yes, the reason for a genuine requirement, Free or Amplify, a required review, publishing, and the essentials once they come back.
+ * a yes, the reason for a genuine requirement, Free or Amplify, a required review, publishing, the essentials once they come back, and
+ * (EN-BLOCK #1) an unreviewed language version (`version:${lang}`).
  */
 export function parkKey(step: Step | null): string | null {
   if (!step) return null;
@@ -238,6 +240,8 @@ export function parkKey(step: Step | null): string | null {
       return `approve:${step.section}`;
     case 'check':
       return `check:${step.point.key}`;
+    case 'version':
+      return `version:${step.lang}`;
     case 'details':
     case 'sdgs':
     case 'fixed':
@@ -258,6 +262,8 @@ export function parkedIn(part: string, job: DemoJob): string[] {
   const parked = job.walk?.parked ?? [];
   if (part === 'details') return parked.filter((k) => (ASKS as string[]).includes(k) || k === 'details' || k === 'sdgs');
   if (part === 'check') return parked.filter((k) => k.startsWith('check:'));
+  // EN-BLOCK #1: Language versions part holds langs and each parked version:* key.
+  if (part === 'langs') return parked.filter((k) => k === 'langs' || k.startsWith('version:'));
   if (part.startsWith('s:')) {
     const key = part.slice(2);
     const facts = FACTS_BEFORE[SECTION_BY_KEY[key]?.group ?? 'job'] as string[];
