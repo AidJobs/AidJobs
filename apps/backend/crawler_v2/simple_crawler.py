@@ -2015,9 +2015,11 @@ class SimpleCrawler:
 
         The latest complete run wins even if its hash is null (empty URL set / pre-migration):
         skipping null rows would early-stop against an older fingerprint (W-39 D8).
+        Connection failures return None (no early-stop); they must not fail the crawl.
         """
-        conn = self._get_db_conn()
+        conn = None
         try:
+            conn = self._get_db_conn()
             with conn.cursor() as cur:
                 cur.execute("SET LOCAL statement_timeout = '30s'")
                 cur.execute(
@@ -2039,7 +2041,8 @@ class SimpleCrawler:
             logger.debug("Previous listing hash not read: %s", redact_exception(e))
             return None
         finally:
-            conn.close()
+            if conn is not None:
+                conn.close()
 
     def _enrich_job_from_detail_sync(self, job: Dict, html: str) -> Dict:
         """Parse a fetched detail page (worker thread)."""
