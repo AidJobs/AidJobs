@@ -225,7 +225,7 @@ jobs:
             'schema|aidjobs_app|public usage=t create=f, database create=f temporary=t'; do
             grep -qxF "$line" roles-verify.txt || { echo "03_verify.sql lacks: $line"; exit 1; }
           done
-          test "$(grep -c '^table|' roles-verify.txt)" -eq 38
+          test "$(grep -c '^table|' roles-verify.txt)" -eq 39
           run_sql "$TEST_ADMIN_DATABASE_URL" -c "DROP DATABASE aidjobs_roles_test"
           python -m pytest tests/test_crawl_ownership.py tests/test_source_lifecycle_db.py -q -rs -p no:cacheprovider | tee ownership-tests.log
           if grep -qE "[0-9]+ skipped" ownership-tests.log; then
