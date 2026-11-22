@@ -20,7 +20,7 @@
 
 5. ~~Approve vs unsaved buffers; Add-panel blur/Escape~~ — **Fixed 20 Nov 2026** (Step A R1-06; Step B R1-11; user confirmed on preview)
 
-**Next (22 Nov 2026, after R1-09):** remaining English chrome (R1-18, …). Phase 7 held.
+**Next (22 Nov 2026, after R1-18):** remaining English chrome. Phase 7 held.
 
 ---
 
@@ -66,7 +66,7 @@
 | R1-15 | **Fixed** (22 Nov 2026) | Hide still pins the part; ask / walk / change auto-open clear `hidden` so the fields card returns (same as `goPart`). |
 | R1-16 | **Fixed** (U-3 Step A, 20 Nov 2026; grip naming remains U-4) | Save no longer renames; shared `pageIntake` for JD + chat; Accept/Reject/skip clear intake so a dirty box cannot overwrite. |
 | R1-17 | **Fixed** (U-3 Step B, 20 Nov 2026) | Bullets/short paste fixed in Step A. Sub-insert stays by design. Accept no longer auto-approves; Undo restores pack, body, and draft card. |
-| R1-18 | OPEN | Free plan hides Languages; Amplify/market/Reach sit in front of a small NGO post. |
+| R1-18 | **Fixed** (22 Nov 2026) | Free still hides Language versions on the progress line (by design). Chrome: plan chat Free-first; Amplify detail behind “What Amplify adds”; Check/Create language hints only on Amplify; progress part renamed Language versions. |
 | R1-19 | **Fixed** (R2-P0-5, 21 Nov 2026) | After Approve, section header shows an **Approved** chip while `walk` is active; Edit+Save that changes text clears approval (R1-06) and Approve returns. |
 | R1-20 | **Fixed** (21 Nov 2026) | Parts label vs Eye (R2-P1-10). Setup phone template strip Cancel returns to chat without applying. |
 | R1-28 | **Fixed** (20–21 Nov 2026; `97e7fde`) | Pencil Save on How to apply no longer opens the How to apply fields card (`editSection` leaves `part` alone when that part has fields). Other sections still pin the progress line when the chat notices the edit. | User confirmed on preview, 21 Nov 2026 |
@@ -330,6 +330,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 21 Nov 2026 | R1-12 | `aea3040`…`eee45e0` | `.ej-sec-head` wraps globally; `.ej-sec-change` full-width row with visible Also-in + `ej-change-actions` Undo. Tests `employerDemoR112.test.ts` + no-fetch. **Agent confirmed on preview** (Communications Intern: edit About us → Save; wrap; change row 100%; Approve/Undo/grip inside panel). |
 | 22 Nov 2026 | R1-15 | `aa7576e`…`dafa4f6` | Ask / walk / change auto-open call `setHidden(null)` so Hide cannot leave a fields card shut after a later ask. Tests `employerDemoR115.test.ts` + no-fetch. **Agent confirmed on preview** (Communications Intern: Hide Details → part stays current, card shut; answer date → fields card returns on How to apply). |
 | 22 Nov 2026 | R1-09 | `aa9fe60` | `onLine` sliding window ending at current so Publish does not sit on the line while Review/Languages are only in +N. Tests `employerDemoR109.test.ts` + window test. Eye-in-setup kept. **Agent confirmed on preview** (narrow split: Publish current → line shows Check · Free or Amplify · Review · Publish; early sections in +9). |
+| 22 Nov 2026 | R1-18 | *(this commit)* | Free-first plan chat; Amplify detail behind “What Amplify adds”; Check/Create language hints only on Amplify; progress part `Language versions`. Free still hides langs/market/reach on the line (by design). Tests `employerDemoR118.test.ts` + publishing `toPlan` skips About/Project (R2-P0-3). Preview confirm in follow-up note. |
 
 ---
 
@@ -337,7 +338,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 
 1. Read this file and `employer-side-plan.md` Phase 6 / polish status.  
 2. Confirm `demo/employer` tip and that English-first still holds.  
-3. **Default next:** remaining English chrome (R1-18, …). Or the user’s new priority.  
+3. **Default next:** remaining English chrome (after R1-18). Or the user’s new priority.  
 4. Mark IDs Fixed in the tables and add a Fix log row in the same commit as the code.  
 5. Do not close Phase 7 until the user says English chrome is good enough.  
 6. Never stage leftover `apps/frontend/lib/__tests__/employerDemoPhase6Review.test.ts` or `apps/frontend/AGENTS.md` unless the user asks.

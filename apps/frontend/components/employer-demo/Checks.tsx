@@ -160,7 +160,10 @@ export function checkSummary(job: DemoJob, s: State, amplify: boolean): Array<{ 
   return [
     { key: 'advert', text: toLook ? `${toLook} ${toLook === 1 ? 'check' : 'checks'} to look at` : 'checks all clear' },
     ...(isReviewable(job) ? [{ key: 'review' as const, text: reviewText(job, s) }] : []),
-    { key: 'languages', text: !amplify ? 'language versions with Amplify' : versions.length ? `${versions.length} language ${versions.length === 1 ? 'version' : 'versions'}` : 'no language versions' },
+    // R1-18: no “language versions with Amplify” tease on the Free path.
+    ...(amplify
+      ? [{ key: 'languages' as const, text: versions.length ? `${versions.length} language ${versions.length === 1 ? 'version' : 'versions'}` : 'no language versions' }]
+      : []),
   ];
 }
 
@@ -286,56 +289,59 @@ export default function BeforePublish({
         </div>
       ),
     },
-    {
-      key: 'languages',
-      icon: <Languages size={16} strokeWidth={1.8} />,
-      title: 'Language versions',
-      summary: !amplify ? 'With Amplify' : versions.length ? versions.map((v) => `${v.label}${status(v.key) === 'reviewed' ? ' ✓' : ' (draft)'}`).join(' · ') : 'None yet',
-      tone: !amplify ? 'locked' : versions.some((v) => status(v.key) !== 'reviewed') ? 'tip' : 'ok',
-      body: !amplify ? (
-        <Locked text="Amplify adds versions of the job page in French, Arabic, Spanish, and Portuguese, which you review before they appear." onChooseAmplify={onChooseAmplify} />
-      ) : (
-        <div className="flex flex-col gap-2">
-          <span className="aj-muted">AidJobs drafts each version; you review it before it appears. Each is its own version of the job page, for people reading and searching in that language.</span>
-          {versions.length > 0 && job.status !== 'live' && owner && (
-            <span className="aj-faint">
-              You can also edit each version in its tab of the job&apos;s window, like the job&apos;s own language.{' '}
-              <button type="button" className="aj-text-btn ej-tap" style={{ height: 'auto', padding: 0 }} onClick={() => openWindowAt(job.id, 'langs')}>
-                Open the window
-              </button>
-            </span>
-          )}
-          <ul className="ej-divide flex flex-col" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-            {versionChoices(job).map((l) => {
-              const t = job.translations?.[l.key];
-              return (
-                <li key={l.key} className="flex flex-wrap items-center gap-2 py-2">
-                  <span className="min-w-[96px]" style={{ fontWeight: 600 }} lang={l.key}>
-                    {l.native}
-                  </span>
-                  <span className="aj-faint min-w-0 flex-1">{t ? status(l.key) : l.label}</span>
-                  {owner && !t && (
-                    <button type="button" className="aj-pill" style={{ height: 30 }} onClick={() => addTranslation(job.id, l.key)}>
-                      Add {l.label}
+    // R1-18: Language versions row only on Amplify — Free path does not tease locked language versions.
+    ...(amplify
+      ? [
+          {
+            key: 'languages' as const,
+            icon: <Languages size={16} strokeWidth={1.8} />,
+            title: 'Language versions',
+            summary: versions.length ? versions.map((v) => `${v.label}${status(v.key) === 'reviewed' ? ' ✓' : ' (draft)'}`).join(' · ') : 'None yet',
+            tone: (versions.some((v) => status(v.key) !== 'reviewed') ? 'tip' : 'ok') as 'ok' | 'tip' | 'locked',
+            body: (
+              <div className="flex flex-col gap-2">
+                <span className="aj-muted">AidJobs drafts each version; you review it before it appears. Each is its own version of the job page, for people reading and searching in that language.</span>
+                {versions.length > 0 && job.status !== 'live' && owner && (
+                  <span className="aj-faint">
+                    You can also edit each version in its tab of the job&apos;s window, like the job&apos;s own language.{' '}
+                    <button type="button" className="aj-text-btn ej-tap" style={{ height: 'auto', padding: 0 }} onClick={() => openWindowAt(job.id, 'langs')}>
+                      Open the window
                     </button>
-                  )}
-                  {owner && t && (
-                    <>
-                      <button type="button" className="aj-pill" style={{ height: 30 }} onClick={() => setReview(l.key)}>
-                        {t.reviewed && !stale(job, t) ? 'Open' : 'Review'}
-                      </button>
-                      <button type="button" className="aj-text-btn" style={{ height: 30 }} onClick={() => removeTranslation(job.id, l.key)}>
-                        Remove
-                      </button>
-                    </>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ),
-    },
+                  </span>
+                )}
+                <ul className="ej-divide flex flex-col" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                  {versionChoices(job).map((l) => {
+                    const t = job.translations?.[l.key];
+                    return (
+                      <li key={l.key} className="flex flex-wrap items-center gap-2 py-2">
+                        <span className="min-w-[96px]" style={{ fontWeight: 600 }} lang={l.key}>
+                          {l.native}
+                        </span>
+                        <span className="aj-faint min-w-0 flex-1">{t ? status(l.key) : l.label}</span>
+                        {owner && !t && (
+                          <button type="button" className="aj-pill" style={{ height: 30 }} onClick={() => addTranslation(job.id, l.key)}>
+                            Add {l.label}
+                          </button>
+                        )}
+                        {owner && t && (
+                          <>
+                            <button type="button" className="aj-pill" style={{ height: 30 }} onClick={() => setReview(l.key)}>
+                              {t.reviewed && !stale(job, t) ? 'Open' : 'Review'}
+                            </button>
+                            <button type="button" className="aj-text-btn" style={{ height: 30 }} onClick={() => removeTranslation(job.id, l.key)}>
+                              Remove
+                            </button>
+                          </>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ),
+          },
+        ]
+      : []),
     {
       key: 'notice',
       icon: <Printer size={16} strokeWidth={1.8} />,

@@ -77,6 +77,8 @@ const first = (name: string) => name.split(' ')[0];
  */
 export function PlanChoice({ job, s }: { job: DemoJob; s: State }) {
   const [plansOpen, setPlansOpen] = useState(false);
+  // R1-18: Amplify detail starts collapsed so Free stays primary; open when Amplify is already chosen.
+  const [amplifyDetailOpen, setAmplifyDetailOpen] = useState(job.choice === 'amplify');
   const owner = !s.reviewerAs;
   const standard = allowance(s, 'standard');
   const freeOk = canGoFree(s, job.id);
@@ -90,6 +92,7 @@ export function PlanChoice({ job, s }: { job: DemoJob; s: State }) {
     const no = chooseBlock(getState(), job, p);
     if (no) return notify(`${no}.`);
     setChoice(job.id, p);
+    if (p === 'amplify') setAmplifyDetailOpen(true);
   };
   return (
     <div className="flex flex-col gap-2" role="radiogroup" onKeyDown={radioKeys} aria-label="Free or Amplify">
@@ -109,7 +112,10 @@ export function PlanChoice({ job, s }: { job: DemoJob; s: State }) {
         {job.paidFor && <span className="aj-muted" style={{ fontWeight: 600 }}>Already paid: it was scheduled, then taken back to a draft. Publishing it again costs nothing.</span>}
         {!job.paidFor && freeAmp && <FreeAmplifyTerms />}
         {!job.paidFor && !freeAmp && canAmplifyFree(s, job.id) && <span className="aj-muted">Paid for this job; your free Amplify stays available for later.</span>}
-        <AmplifyIncludes />
+        <button type="button" className="aj-text-btn self-start" aria-expanded={amplifyDetailOpen} onClick={() => setAmplifyDetailOpen(!amplifyDetailOpen)}>
+          What Amplify adds
+        </button>
+        {amplifyDetailOpen && <AmplifyIncludes />}
         {job.paidFor ? null : onHand && !freeAmp ? (
           <span className="aj-muted" style={{ fontWeight: 600 }}>
             Uses 1 of your {onHandCount} package {onHandCount === 1 ? 'job' : 'jobs'}

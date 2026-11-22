@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import {
+  advanceFromAbout,
+  advanceFromProject,
   applyTemplate,
+  approveSection,
   chooseBlock,
   chooseStyle,
   forgetProfile,
@@ -33,6 +36,9 @@ const last = (id: string) => job(id).chat.at(-1);
 function toPlan(text = "We're hiring a Logistics Officer in Goma, fixed-term, closing 30 December 2026"): string {
   const id = startJob(text, undefined, [], true);
   applyTemplate(id, job(id).format);
+  // R2-P0-3: About us / project sit between template and style; skip so toPlan still lands on plan.
+  if (job(id).setup === 'about') advanceFromAbout(id);
+  if (job(id).setup === 'project') advanceFromProject(id);
   chooseStyle(id, ['Warm']);
   setPace(id, 'all');
   update((s) => ({ ...s, org: { ...s.org, keepOffered: ['fixed', 'apply'] }, jobs: s.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, approved: [...j.tags], settled: [...ASKS, ...LEFT] } } : j)) }));
@@ -53,16 +59,19 @@ beforeEach(() => {
 });
 
 describe('step 8: free or Amplify (section 19)', () => {
-  it('after the check, the chat offers both, with the free listings and what Amplify includes', () => {
+  it('after the check, the chat offers both, Free first with Amplify shortened (R1-18)', () => {
     const id = toPlan();
     expect(step(id)).toEqual({ kind: 'plan' });
     expect(last(id)?.text).toContain('**Free**: your one free standard listing, once for your organisation');
     expect(last(id)?.text).toContain('**Amplify** (free once for your organisation; after this, US$28.40 a job or part of a package)');
-    expect(last(id)?.text).toContain('1 language version besides its own (more at US$5 each)');
+    expect(last(id)?.text).toContain('What Amplify adds');
+    expect(last(id)?.text).toContain('Free is the usual start');
+    expect(last(id)?.text).not.toContain('1 language version besides its own (more at US$5 each)');
     expect(last(id)?.quick).toEqual(['Publish free', 'Amplify']);
     update((s) => ({ ...s, free: { amplify: 'job-x' } }));
     const paid = toPlan("We're hiring a Driver in Goma, fixed-term, closing 30 December 2026");
     expect(last(paid)?.text).toContain('**Amplify** (US$28.40)');
+    expect(last(paid)?.text).toContain('What Amplify adds');
   });
 
   it('Amplify only for a verified organisation; Free only while the free standard listing is unused', () => {
@@ -265,8 +274,11 @@ describe('review before Reach and the flyer: each review state (section 19, phas
     as('amina', 'approved');
     goOn(id);
     expect(open(id)).toBe(true);
-    editSection(id, job(id).tags.find((k) => !['about', 'apply'].includes(k))!, 'A line changed after approval.');
+    const section = job(id).tags.find((k) => !['about', 'apply'].includes(k))!;
+    editSection(id, section, 'A line changed after approval.');
     expect(open(id)).toBe(false);
+    // Edit clears that section’s walk approval; re-approve, then the reopened review waits.
+    approveSection(id, section);
     goOn(id);
     expect(step(id)).toEqual({ kind: 'waiting' });
   });
@@ -299,6 +311,8 @@ describe('found on the real-AI walk (12 November 2026)', () => {
   it('at the basic check, "leave that one too" leaves the point, and a short reply the rules cannot read is asked again, not added to the text', () => {
     const id = startJob("We're hiring a Logistics Officer in Goma, fixed-term", undefined, [], true);
     applyTemplate(id, job(id).format);
+    if (job(id).setup === 'about') advanceFromAbout(id);
+    if (job(id).setup === 'project') advanceFromProject(id);
     chooseStyle(id, ['Warm']);
     setPace(id, 'all');
     update((s) => ({ ...s, org: { ...s.org, keepOffered: ['fixed', 'apply'] }, jobs: s.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, approved: [...j.tags], settled: [...ASKS, ...LEFT] } } : j)) }));
@@ -408,6 +422,8 @@ describe('step 10: kept for next time (section 19)', () => {
   it('in a job in another language, a fixed text shows the organisation’s wording for that language, else its own text marked to translate', () => {
     const id = startJob('Nous recherchons un chargé de logistique à Goma, CDD de 12 mois', undefined, [], true);
     applyTemplate(id, job(id).format);
+    if (job(id).setup === 'about') advanceFromAbout(id);
+    if (job(id).setup === 'project') advanceFromProject(id);
     chooseStyle(id, ['Warm']);
     setPace(id, 'all');
     update((s) => ({ ...s, org: { ...s.org, keepOffered: ['fixed', 'apply'] }, jobs: s.jobs.map((j) => (j.id === id ? { ...j, walk: { ...j.walk!, approved: [...j.tags], settled: [...ASKS, 'details', 'sdgs'] } } : j)) }));

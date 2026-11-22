@@ -48,7 +48,7 @@ export function partsOf(job: DemoJob, s: State): Part[] {
       ? [
           { key: 'market', label: 'Market check', done: settled('market') || marketPoints(job, s).length === 0 },
           { key: 'full', label: 'Full check', done: settled('full') || fullPoints(job, s).length === 0 },
-          { key: 'langs', label: 'Languages', done: settled('langs') && versionsOf(job).every((k) => job.translations?.[k]?.reviewed) },
+          { key: 'langs', label: 'Language versions', done: settled('langs') && versionsOf(job).every((k) => job.translations?.[k]?.reviewed) },
         ]
       : []),
     { key: 'review', label: 'Review', done: published || (required ? approvedFor(s, job) : reviewDone(job, s)) },
@@ -100,7 +100,7 @@ export function lineFit(widths: number[], room: number, more = 52): number {
 
 /**
  * The parts on the line and those in "+N".
- * R1-09: when the part in view sits past the first `fit` slots, show a window ending at it — so Languages /
+ * R1-09: when the part in view sits past the first `fit` slots, show a window ending at it — so Language versions /
  * Review stay with Publish instead of early sections + Publish while those sit only in +N.
  */
 export function onLine(parts: Part[], fit: number, current: string): { shown: Part[]; more: Part[] } {

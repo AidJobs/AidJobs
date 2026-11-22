@@ -9,6 +9,7 @@ import { changesSince, changeSummary, tellOffer } from './changes';
 import CreateEntry, { OPEN_CHAT_KEY } from './CreateEntry';
 import { ArchivedBanner } from './Archive';
 import { openPoints } from './Checks';
+import { amplifying } from './flow';
 import { canGoFree } from './plans';
 import { ChatPanel, DocumentView, TitleEditor } from './DocPane';
 import FactBar from './FactBar';
@@ -154,6 +155,8 @@ export default function Create({ id }: { id?: string }) {
   const last = job.chat[job.chat.length - 1];
   const waiting = !reviewing && last?.from === 'ai' && last.ask ? 1 : 0;
   const checks = job.sections.length ? openPoints(job, s, Boolean(job.paidFor) || !canGoFree(s, job.id)) : [];
+  // R1-18: language-version copy only on the Amplify path — Free keeps the job’s own language only.
+  const amplifyLangHint = amplifying(job) || job.choice === 'amplify' || job.plan === 'amplify';
   const menu = !reviewing && job.status !== 'live' && job.status !== 'closed';
   const setPanel = (p: Panel) => {
     setPanelState(p);
@@ -295,7 +298,9 @@ export default function Create({ id }: { id?: string }) {
             </span>
             {checks.length > 0 && <span>Still to look at: {checks.length > 3 ? `${checks.slice(0, 2).join('; ')}; and ${checks.length - 2} more` : checks.join('; ')}.</span>}
             <span className="aj-muted">
-              Check your job against similar ones, add language versions, {approvalRequired(s, job) && !approvedFor(s, job) ? 'send it for review (approval is required before publishing)' : 'send it for review if you want'}, and choose how to publish.
+              {amplifyLangHint
+                ? `Check your job against similar ones, add language versions, ${approvalRequired(s, job) && !approvedFor(s, job) ? 'send it for review (approval is required before publishing)' : 'send it for review if you want'}, and choose how to publish.`
+                : `Check your job, ${approvalRequired(s, job) && !approvedFor(s, job) ? 'send it for review (approval is required before publishing)' : 'send it for review if you want'}, and choose how to publish.`}
             </span>
             <button type="button" className="aj-ink-btn self-start" onClick={() => openWindowAt(job.id, 'publish')}>
               Next: check and publish <ArrowRight size={14} strokeWidth={2} />

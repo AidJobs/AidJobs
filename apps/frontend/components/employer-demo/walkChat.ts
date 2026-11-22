@@ -262,9 +262,17 @@ function laterPrompt(s: State, job: DemoJob, step: Step, key: string, aiOn = fal
         ? `**Free**: your one free standard listing, once for your organisation; listed ${LISTED_DAYS.free} days, standard placement, in ${own} only, used only when it goes live.`
         : `Your free standard listing is used (once per organisation), so it goes out with **Amplify** or a package job.`;
       const cost = freeAmp ? `free once for your organisation; after this, ${usd(ONE_JOB)} a job or part of a package` : onHand ? `uses 1 of your ${onHand} package ${onHand === 1 ? 'job' : 'jobs'}` : usd(price.amount);
-      const ampText = s.org.verified ? `**Amplify** (${cost}): ${amplifyLine(s, freeAmp)}.` : 'Amplify is for verified organisations: verify yours in Organisation settings to choose it.';
+      // R1-18: when Free is available, lead with it; Amplify is shortened and secondary (detail lives under “What Amplify adds”).
+      const ampText = !s.org.verified
+        ? 'Amplify is for verified organisations: verify yours in Organisation settings to choose it.'
+        : free
+          ? `**Amplify** (${cost}): optional — featured listing, checks, language versions, flyer, and Reach. Details in the panel under “What Amplify adds”.`
+          : `**Amplify** (${cost}): ${amplifyLine(s, freeAmp)}.`;
+      const which = free
+        ? 'Which one? Free is the usual start; Amplify sits second in the panel.'
+        : 'Which one? Amplify and the packages are in the panel.';
       const quick = [...(free ? [PUBLISH_FREE] : []), ...(s.org.verified ? [onHand && !freeAmp ? USE_PACKAGE : AMPLIFY] : [])];
-      return [stepMsg(`The job description is ready. Next, how it goes out.\n${freeText}\n${ampText}\nWhich one? Both are side by side in the panel, with the packages.`, key, quick)];
+      return [stepMsg(`The job description is ready. Next, how it goes out.\n${freeText}\n${ampText}\n${which}`, key, quick)];
     }
     case 'market':
     case 'full': {

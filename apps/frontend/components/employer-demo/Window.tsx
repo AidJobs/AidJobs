@@ -20,6 +20,7 @@ import { ReviewForm, ReviewPanel } from './Review';
 import type { ChatMsg } from './types';
 import { aiOn, askAi, carryMessage, GO_ON, probeAi, useAi, whenAnswered, writeVersion } from './ai';
 import { amplifying, checkPoints, FIXED_SECTIONS, flyerStale, nextStep, outlineEditOpen, partOfStep, reachOpen, stepKey, walkAutoOpen } from './flow';
+import { canGoFree } from './plans';
 import { readJobFile } from './readFile';
 import { ABOUT_QUICK, CHOOSE_SDGS, INVITE, OTHER_WORDING, PROJECT_QUICK, SHOW_FLYER, SKIP_APPROVAL, stateOffer } from './walkChat';
 import { STATE_DIALOGS, type OpenTarget } from './aiActions';
@@ -431,7 +432,7 @@ function PartFields({ part, job, s, onClose, onFact, open, act }: { part: string
     plan: ['Free or Amplify', 'How it goes out; the free terms and the packages'],
     market: ['Market check', 'How your job compares with similar open jobs'],
     full: ['Full check', 'Requirements and pay, compared with similar jobs'],
-    langs: ['Languages', 'Versions of the job page in other languages'],
+    langs: ['Language versions', 'Versions of the job page in other languages'],
     flyer: ['Flyer', 'A one-page notice with a QR code'],
     reach: ['Reach', 'Invite people by email when it goes live'],
     review: ['Review', 'Comments, suggestions, and approval'],
@@ -464,7 +465,10 @@ function PartFields({ part, job, s, onClose, onFact, open, act }: { part: string
         ) : (
           <p className="m-0">Nothing to look at in the basic check.</p>
         )}
-        <p className="aj-muted m-0">With Amplify, the market check and the full advert check follow as parts of their own.</p>
+        {/* R1-18: Amplify teaser only once Amplify is the path — not while Free is still the natural start. */}
+        {(amplifying(job) || job.choice === 'amplify' || !canGoFree(s, job.id)) && (
+          <p className="aj-muted m-0">With Amplify, the market check and the full advert check follow as parts of their own.</p>
+        )}
       </div>
     );
   else if (part === 'plan') body = isPublished(job) ? <LiveCard job={job} s={s} open={open} /> : <PlanChoice job={job} s={s} />;
