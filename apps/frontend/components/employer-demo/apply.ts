@@ -4,7 +4,7 @@ import type { ApplySettings, Facts, Org, OrgType } from './types';
 export const DOCUMENTS = ['CV', 'Cover letter', 'Motivation letter', 'Supporting statement', 'Statement of purpose', 'Academic certificates', 'Technical proposal', 'Financial proposal or daily rate', 'Work samples'];
 
 /** The application method most organisations of each type use, from the research (plan, section 14). */
-export function defaultApply(orgType: OrgType, careersUrl: string): ApplySettings {
+export function defaultApply(orgType: OrgType, careersUrl: string, domain = ''): ApplySettings {
   const base: ApplySettings = {
     method: 'system',
     address: careersUrl,
@@ -23,11 +23,27 @@ export function defaultApply(orgType: OrgType, careersUrl: string): ApplySetting
     replyWeeks: '',
     anonymised: false,
   };
-  if (orgType === 'ngo') return { ...base, method: 'email', address: '', documents: ['CV', 'Cover letter', 'Academic certificates'], subjectLine: true, onePdf: true, maxMb: '5' };
+  // FW-1: NGO email apply starts with jobs@domain when the org has a domain, so the fact matches applyLines.
+  if (orgType === 'ngo') return { ...base, method: 'email', address: domain ? `jobs@${domain}` : '', documents: ['CV', 'Cover letter', 'Academic certificates'], subjectLine: true, onePdf: true, maxMb: '5' };
   if (orgType === 'charity') return { ...base, method: 'formOnly', documents: ['Supporting statement'], statementWords: '1500', shortlistedOnly: false, replyWeeks: '2' };
   if (orgType === 'contractor') return { ...base, documents: ['CV', 'Cover letter'], cvPages: '5', references: '3' };
   if (orgType === 'un') return { ...base, documents: ['CV'] };
   return { ...base, rolling: true };
+}
+
+/**
+ * FW-1: the email the How to apply body and the essential fact share — typed address, or jobs@org.domain when email apply has none.
+ */
+export function emailAddress(a: ApplySettings, org: Pick<Org, 'domain'>): string {
+  if (a.method !== 'email') return a.address.trim();
+  return a.address.trim() || (org.domain ? `jobs@${org.domain}` : '');
+}
+
+/** Persist the jobs@domain fallback into apply.address when email apply would print it (FW-1). */
+export function withEmailAddress(a: ApplySettings, org: Pick<Org, 'domain'>): ApplySettings {
+  if (a.method !== 'email' || a.address.trim()) return a;
+  const address = emailAddress(a, org);
+  return address ? { ...a, address } : a;
 }
 
 export function applyLines(a: ApplySettings, f: Facts, org: Org): string[] {
@@ -35,7 +51,7 @@ export function applyLines(a: ApplySettings, f: Facts, org: Org): string[] {
   const docs = a.documents.length ? a.documents.join(', ').replace(/, ([^,]*)$/, ' and $1') : 'your application';
   const lines: string[] = [];
   if (a.method === 'email') {
-    lines.push(`Send ${docs.toLowerCase().replace(/^cv/, 'your CV')} to ${a.address || `jobs@${org.domain}`}${by}.`);
+    lines.push(`Send ${docs.toLowerCase().replace(/^cv/, 'your CV')} to ${emailAddress(a, org) || `jobs@${org.domain}`}${by}.`);
     const rules = [a.subjectLine && `use the job title, "${f.title || 'job title'}", as the subject`, a.onePdf && 'combine everything into one PDF', a.maxMb && `keep attachments under ${a.maxMb} MB`].filter(Boolean);
     if (rules.length) lines.push(`Please ${rules.join(', ')}.`);
   } else if (a.method === 'formOnly') {

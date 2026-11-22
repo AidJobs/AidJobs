@@ -161,7 +161,7 @@ export function allFormats(preset: DemoPreset = 'riverstone'): Format[] {
 function job(today: number, id: string, roleKey: string, formatKey: string, facts: Partial<Facts>, extra: Partial<DemoJob>, add: string[] = []): DemoJob {
   const f: Facts = { ...emptyFacts(), languages: ['English'], ...facts };
   const format = allFormats().find((x) => x.key === formatKey) ?? HOUSE_FORMAT;
-  const apply = defaultApply(SAMPLE_ORG.orgType, SAMPLE_ORG.careersUrl);
+  const apply = defaultApply(SAMPLE_ORG.orgType, SAMPLE_ORG.careersUrl, SAMPLE_ORG.domain);
   const tags = orderSections([...format.order.map((o) => o.key), ...add], format);
   const sections = buildSections(tags, { facts: f, roleKey, org: SAMPLE_ORG, tone: format.tone, format, commitments: format.commitments, applyLines: applyLines(apply, f, SAMPLE_ORG) });
   return {

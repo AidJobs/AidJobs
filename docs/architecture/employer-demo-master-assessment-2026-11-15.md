@@ -20,7 +20,7 @@
 
 5. ~~Approve vs unsaved buffers; Add-panel blur/Escape~~ — **Fixed 20 Nov 2026** (Step A R1-06; Step B R1-11; user confirmed on preview)
 
-**Next (22 Nov 2026, after EN-BLOCK #1):** Version park **Fixed** (Option A). Free-walk leftovers FW-1/FW-2 stay open; next Amplify EN-BLOCKs (#2–3 pay/slot, Reach settle, …) or FW when prioritised. R1-07 deferred. Phase 7 held until the user says English chrome is good enough.
+**Next (22 Nov 2026, after FW-1):** FW-1 **Fixed** (Option A). Next: FW-2 (Project after No) or Amplify EN-BLOCK #2+ when prioritised. R1-07 deferred. Phase 7 held until the user says English chrome is good enough.
 
 ---
 
@@ -335,14 +335,21 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 22 Nov 2026 | Free walk (English) | preview `?v=freewalk1` | Tumaini CHO: Local NGO concise → No project → sections OK → Check → Free → Review optional. **Blocked publish** with empty `apply.address` while How-to-apply body already had `jobs@tumaini.example.org`; CTA still “Publish free”; toast “It could not be published…” (essentials missing not in button `reason`). After filling Email address + Save: **Publish free Now → Live** (standard held, listed until closing, Copy link / Share / Amplify CTA). Schedule-date CTA wording OK; Preview Job page / In Google / When shared OK; R1-18 no Language versions on Free; Fixed-text starter toggle OK. Progress Details/Fixed stayed “to do” without walk settle (not a publish gate). Earlier: Project brief `[to confirm]` after No project (still open). |
 | 22 Nov 2026 | EN-BLOCK #1 investigate | code only | `parkKey` has no `version` case → null; `afterCheck` always returns unreviewed `version` with no `parked(…)` guard; `parkedIn('langs')` only exact `langs`. Skip / not now / ask-again cannot park; walk stuck before review / Reach / flyer / publish. **Option A plan ready** (not built). |
 | 22 Nov 2026 | EN-BLOCK #1 (Option A) | `c244b97` | `parkKey`/`afterCheck`/`parkedIn`/`tidyParked` for `version:${lang}`. Tests `employerDemoEnBlock1.test.ts`. **Agent confirmed on preview** (`?v=enblock1`: French version step → skip → parked `version:fr` → Next question → Review Send/No; open Language versions unparks → version step returns). |
+| 22 Nov 2026 | FW-1 (Option A) | *(push tip)* | `emailAddress`/`withEmailAddress`; essentials+org; CTA+toast; NGO default + write/publish persist. Tests `employerDemoFw1.test.ts`. **Agent confirm on preview**. |
 
 ### Free walk leftovers (English; 22 Nov 2026)
 
 | ID | Status | Fault |
 | --- | --- | --- |
-| FW-1 | OPEN | Pencil / AI How to apply can leave `apply.address` empty while the body names an email; `publishBlock` returns `Missing: an email address to apply to` but Publish CTA ignores essentials in `reason`, and fail toast is vague. |
+| FW-1 | **Fixed** (22 Nov 2026; Option A) | ~~empty apply.address vs body email; vague toast~~ `emailAddress` / `withEmailAddress`; essentials+CTA+toast; NGO default + write/publish persist. |
 | FW-2 | OPEN | Choosing **No project** in setup can still leave a Project brief section `[to confirm]` that blocks Check until removed. |
 | FW-3 | Note | Walk Details / Fixed text stay “to do” until chat settles them even when the Job pane already has facts and commitments; Free publish does not require those settles. |
+
+### FW-1 — apply email + publish toast — **Fixed** (22 Nov 2026; Option A)
+
+**Was:** `applyLines` printed `jobs@domain` while `apply.address` stayed empty; Publish CTA ignored essentials; fail toast was vague.
+
+**Fix:** `emailAddress` / `withEmailAddress`; essentials(job, org); NGO `defaultApply(…, domain)`; persist on write/live-draft/publish/setMethod; CTA + toast use essentials / `publishBlock`. Tests `employerDemoFw1.test.ts`. Confirm on preview.
 
 ### EN-BLOCK #1 — version park — **Fixed** (22 Nov 2026; Option A)
 
@@ -358,7 +365,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 
 1. Read this file and `employer-side-plan.md` Phase 6 / polish status.  
 2. Confirm `demo/employer` tip and that English-first still holds.  
-3. **Default next:** Free-walk leftovers FW-1/FW-2, or Amplify EN-BLOCK #2–3 / Reach settle when the user prioritises. R1-07 stays deferred.  
+3. **Default next:** FW-2 (Project after No), or Amplify EN-BLOCK #2–3 / Reach settle when the user prioritises. R1-07 stays deferred.  
 4. Mark IDs Fixed in the tables and add a Fix log row in the same commit as the code.  
 5. Do not close Phase 7 until the user says English chrome is good enough.  
 6. Never stage leftover `apps/frontend/lib/__tests__/employerDemoPhase6Review.test.ts` or `apps/frontend/AGENTS.md` unless the user asks.

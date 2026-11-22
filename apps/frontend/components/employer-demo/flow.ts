@@ -5,7 +5,8 @@ import { basicAdvertCheck, fullAdvertCheck, marketCheck, type Point } from './ma
 import { inferSdgs } from './setup';
 import { langOf, versionsOf } from './translate';
 import { fixedLabel, fixedMarked } from './fixed';
-import type { AskKind, DemoJob, Format, GroupKey, JobLang, State, Walk } from './types';
+import { emailAddress } from './apply';
+import type { AskKind, DemoJob, Format, GroupKey, JobLang, Org, State, Walk } from './types';
 
 /**
  * A new employer's writing, in order (employer-side plan, section 19, steps 3 to 7): each fact just before the first section that uses
@@ -190,7 +191,7 @@ function afterCheck(job: DemoJob, s: State): Step {
   const parked = (k: string) => Boolean(job.walk?.parked?.includes(k));
   if (!isSettled('plan', job)) {
     // Only the essentials come back (section 19, phase 6, A), here, before Free or Amplify; they wait to be answered.
-    const e = essentials(job)[0];
+    const e = essentials(job, s.org)[0];
     return e ? { kind: 'ask', fact: e, essential: true } : { kind: 'plan' };
   }
   const amplify = job.choice === 'amplify';
@@ -212,15 +213,18 @@ function afterCheck(job: DemoJob, s: State): Step {
   return { kind: 'publish' };
 }
 
-/** What a job cannot go out without (section 19, phase 6, A): the title, the duty station, the closing date, the contract, and a way to apply that works. */
-export function essentials(job: DemoJob): AskKind[] {
+/**
+ * What a job cannot go out without (section 19, phase 6, A): the title, the duty station, the closing date, the contract, and a way to
+ * apply that works. FW-1: with `org`, email apply accepts the jobs@domain fallback that applyLines prints.
+ */
+export function essentials(job: DemoJob, org?: Pick<Org, 'domain'>): AskKind[] {
   const f = job.facts;
   const out: AskKind[] = [];
   if (!f.title) out.push('title');
   if (!f.location && f.arrangement !== 'remote') out.push('place');
   if (!f.deadline) out.push('deadline');
   if (!f.contract && f.engagement === 'job') out.push('contract');
-  if (job.apply.method === 'email' && !job.apply.address.trim()) out.push('method');
+  if (job.apply.method === 'email' && !(org ? emailAddress(job.apply, org) : job.apply.address.trim())) out.push('method');
   return out;
 }
 

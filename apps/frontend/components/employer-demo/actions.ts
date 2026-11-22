@@ -1,6 +1,6 @@
 'use client';
 
-import { applyLines, defaultApply } from './apply';
+import { applyLines, defaultApply, withEmailAddress } from './apply';
 import { approvalRequired, approvedFor, isApproved, pausedByChanges } from './approval';
 import {
   addDays,
@@ -728,18 +728,21 @@ function writeByRules(id: string, keys: string[]) {
     ...s,
     jobs: s.jobs.map((x) => {
       if (x.id !== id) return x;
-      const ctx = ctxFor(s, x);
+      // FW-1: persist jobs@domain before building apply lines so the Email field matches the body.
+      const apply = keys.includes('apply') ? withEmailAddress(x.apply, s.org) : x.apply;
+      const base = apply === x.apply ? x : { ...x, apply };
+      const ctx = ctxFor(s, base);
       const add = keys
-        .filter((k) => x.tags.includes(k) && !isWritten(x, k))
+        .filter((k) => base.tags.includes(k) && !isWritten(base, k))
         .map((k) => {
-          const sec = withTemplateSubs(s, x, built(k, ctx, x));
-          return x.renamed?.[k] ? { ...sec, title: x.renamed[k] } : sec;
+          const sec = withTemplateSubs(s, base, built(k, ctx, base));
+          return base.renamed?.[k] ? { ...sec, title: base.renamed[k] } : sec;
         });
-      if (!add.length) return x;
-      const sections = inOutlineOrder([...x.sections.filter((sec) => !add.some((a) => a.key === sec.key)), ...add], x.tags);
+      if (!add.length) return apply === x.apply ? x : base;
+      const sections = inOutlineOrder([...base.sections.filter((sec) => !add.some((a) => a.key === sec.key)), ...add], base.tags);
       const written = add.filter((a) => !FIXED_SECTIONS.includes(a.key));
-      if (!written.length) return { ...x, sections };
-      return { ...x, sections, versions: [...x.versions, { n: x.versions.length + 1, at: Date.now(), note: written.length > 1 ? 'First draft' : `Wrote ${written[0].title}`, sections }] };
+      if (!written.length) return { ...base, sections };
+      return { ...base, sections, versions: [...base.versions, { n: base.versions.length + 1, at: Date.now(), note: written.length > 1 ? 'First draft' : `Wrote ${written[0].title}`, sections }] };
     }),
   }));
 }
@@ -757,8 +760,11 @@ export function writeNow(id: string) {
 /** The live draft: once the role is known, the job description is written straight away and fills in as facts arrive. */
 function withLiveDraft(s: State, j: DemoJob): DemoJob {
   if (j.walk || j.setup || j.sections.length || !j.facts.title || j.tags.length < 3) return j;
-  const sections = buildSections(j.tags, ctxFor(s, j)).map((sec) => withTemplateSubs(s, j, sec));
-  return { ...j, sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: 'First draft', sections }] };
+  // FW-1: fill jobs@domain before apply lines so the Email field matches the body.
+  const apply = withEmailAddress(j.apply, s.org);
+  const base = apply === j.apply ? j : { ...j, apply };
+  const sections = buildSections(base.tags, ctxFor(s, base)).map((sec) => withTemplateSubs(s, base, sec));
+  return { ...base, sections, versions: [...base.versions, { n: base.versions.length + 1, at: Date.now(), note: 'First draft', sections }] };
 }
 
 function memoryHint(s: State, title: string): string | null {
@@ -783,7 +789,7 @@ function newJob(s: State, id: string, facts: Facts, roleKey: string, formatKey: 
     format: format.key,
     tone: format.tone,
     commitments: fixedFor(s, format),
-    apply: s.org.keptApply ? { ...s.org.keptApply } : defaultApply(s.org.orgType, s.org.careersUrl),
+    apply: s.org.keptApply ? { ...s.org.keptApply } : defaultApply(s.org.orgType, s.org.careersUrl, s.org.domain),
     genuine: {},
     sections: [],
     versions: [],
@@ -1609,14 +1615,14 @@ export function answerFact(id: string, patch: Partial<Facts>, said: string, kind
   ensureAsk(id);
 }
 
-/** How people apply, chosen in the chat; an email address is kept only when the user gave one. */
+/** How people apply, chosen in the chat; an email address is kept when the user gave one, else jobs@domain for email (FW-1). */
 export function setMethod(id: string, method: ApplySettings['method'], said: string, address?: string) {
   if (!ownerOnly()) return;
   update((s) => ({
     ...s,
     jobs: s.jobs.map((j) => {
       if (j.id !== id) return j;
-      const apply = { ...j.apply, method, ...(address ? { address } : {}) };
+      const apply = withEmailAddress({ ...j.apply, method, ...(address ? { address } : {}) }, s.org);
       const next = rebuilt(s, touched({ ...j, apply }));
       const walk = next.walk ? { ...next.walk, settled: Array.from(new Set([...next.walk.settled, 'method'])) } : next.walk;
       return { ...next, walk, chat: [...j.chat, msg('user', said)] };
@@ -3596,7 +3602,7 @@ export function publishBlock(s: State, id: string, o: PublishOptions): string | 
   if (!j || s.reviewerAs) return 'Only your organisation can publish';
   if (j.status === 'live' || j.status === 'scheduled' || j.status === 'closed') return 'Already published';
   // What a job cannot go out without (section 19, phase 6, A), by every route: the card, the Publish part, and scheduling.
-  const missing = essentials(j);
+  const missing = essentials(j, s.org);
   if (missing.length) return `Missing: ${missing.map((k) => ESSENTIAL_WORDS[k]).join(', ')}`;
   // Empty / unfinished outline sections must not go live (R2-P0-1), Free or Amplify.
   const sections = sectionPublishBlock(j);
@@ -3630,6 +3636,8 @@ function reachAtGoLive(j: DemoJob, sendsOn: string | null): Partial<DemoJob> {
 
 /** Publishes, then queues the prepared Reach emails. Publishing never waits for, or depends on, the emails. */
 export function publish(id: string, o: PublishOptions): boolean {
+  // FW-1: persist the jobs@domain fallback before the gate so the live job's Email field matches How to apply.
+  updateJob(id, (j) => ({ ...j, apply: withEmailAddress(j.apply, getState().org) }));
   if (publishBlock(getState(), id, o)) return false;
   let sending = false;
   let told: string | undefined;
@@ -3882,7 +3890,7 @@ export function publishNow(id: string): boolean {
   const j = s.jobs.find((x) => x.id === id);
   if (!j || s.reviewerAs || j.status !== 'scheduled') return false;
   // Essentials by every route that makes a job go out (section 19, phase 6, A), including Publish now.
-  const missing = essentials(j);
+  const missing = essentials(j, s.org);
   if (missing.length) {
     update((st) => ({ ...st, notice: { text: `Missing: ${missing.map((k) => ESSENTIAL_WORDS[k]).join(', ')}` } }));
     return false;

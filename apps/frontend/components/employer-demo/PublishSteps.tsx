@@ -18,6 +18,7 @@ import {
   goOn,
   leaveAmplifyPoint,
   publish,
+  publishBlock,
   remindPayer,
   remindReviewers,
   removeTranslation,
@@ -29,7 +30,7 @@ import {
 } from './actions';
 import { approvalRequired, approvedFor } from './approval';
 import { addDays, longDate, shortDate } from './engine';
-import { fullPoints, marketPoints, reviewDone, sectionPublishBlock } from './flow';
+import { essentials, ESSENTIAL_WORDS, fullPoints, marketPoints, reviewDone, sectionPublishBlock } from './flow';
 import { deliveryText, planCount } from './invites';
 import { isPublished } from './lifecycle';
 import { jobUrl } from './links';
@@ -383,19 +384,23 @@ export function PublishCard({ job, s, open, payment = false, compact = false }: 
   const request = job.payRequest;
   const dateBlock = upgrade ? null : scheduleBlock(s, job, schedule);
   const sectionBlock = upgrade ? null : sectionPublishBlock(job);
+  // FW-1: essentials in the CTA (same wording as publishBlock), so the button is not "Publish free" when an email is missing.
+  const missing = essentials(job, s.org);
   const reason = s.reviewerAs
     ? 'Reviewers cannot publish'
-    : blocked
-      ? 'Waiting for approval'
-      : dateBlock
-        ? dateBlock
-        : sectionBlock
-          ? sectionBlock
-          : chosen === 'free' && !free
-            ? 'Your free standard listing is used'
-            : chosen === 'amplify' && !s.org.verified
-              ? 'Verify your organisation to amplify'
-              : null;
+    : missing.length
+      ? `Missing: ${missing.map((k) => ESSENTIAL_WORDS[k]).join(', ')}`
+      : blocked
+        ? 'Waiting for approval'
+        : dateBlock
+          ? dateBlock
+          : sectionBlock
+            ? sectionBlock
+            : chosen === 'free' && !free
+              ? 'Your free standard listing is used'
+              : chosen === 'amplify' && !s.org.verified
+                ? 'Verify your organisation to amplify'
+                : null;
   const when = schedule ? ` for ${longDate(schedule)}` : '';
   const invites = chosen === 'amplify' ? planCount(job, job.reachPlan) : 0;
   const inviting = invites ? ` · invite ${invites} ${invites === 1 ? 'person' : 'people'} ${upgrade && job.status === 'live' ? 'now' : 'when live'}` : '';
@@ -409,8 +414,13 @@ export function PublishCard({ job, s, open, payment = false, compact = false }: 
       : `${key === 'one' ? `Amplify: ${job.facts.title}` : key === 'extra' ? `Extra job on “Always hiring”: ${job.facts.title}` : key === 'always' ? '“Always hiring” subscription, first month (3 jobs)' : `${packageOf(key).jobs} jobs, one used for ${job.facts.title}`}${langs ? `, with ${langs} more language ${langs === 1 ? 'version' : 'versions'}` : ''}`;
   const checkoutAmount = (key: PackageKey | 'extra' | 'langs') => usd((key === 'langs' ? 0 : key === 'extra' ? single.amount : packageOf(key).price) + langCost);
 
+  const amplifyPaid = (): Paid => (prepaid ? 'direct' : freeAmp ? 'free' : onHand ? 'onHand' : 'direct');
   const finish = (ok: boolean) => {
-    if (!ok) return notify('It could not be published. Check the choices and try again.');
+    if (!ok) {
+      // FW-1: name the real publishBlock reason instead of a vague toast.
+      const why = publishBlock(getState(), job.id, chosen === 'free' ? { plan: 'free', schedule } : { plan: 'amplify', schedule, paid: amplifyPaid(), langs });
+      return notify(why ?? 'It could not be published. Check the choices and try again.');
+    }
     setFailed(null);
     goOn(job.id);
   };

@@ -20,6 +20,7 @@ import {
   overruleChanges,
   pausedByChanges,
   publish,
+  publishBlock,
   remindPayer,
   scheduleBlock,
   type Paid,
@@ -48,7 +49,7 @@ import { PUBLIC_SAMPLES } from './sample';
 import BeforePublish, { checkSummary, checksToLook, type RowKey } from './Checks';
 import { ArchivedBanner } from './Archive';
 import { socialLabel, socialOf } from './context';
-import { sectionPublishBlock } from './flow';
+import { essentials, ESSENTIAL_WORDS, sectionPublishBlock } from './flow';
 import { deliveryText, planCount } from './invites';
 import { ReachRow } from './Reach';
 import { AmplifyIncludes, Checkout, FreeTerms } from './Pricing';
@@ -954,19 +955,23 @@ function PublishPage({ id }: { id?: string }) {
   const request = job.payRequest;
   const dateBlock = upgrade ? null : scheduleBlock(s, job, schedule);
   const sectionBlock = upgrade ? null : sectionPublishBlock(job);
+  // FW-1: essentials on the CTA (same as PublishSteps / publishBlock).
+  const missing = essentials(job, s.org);
   const reason = s.reviewerAs
     ? 'Reviewers cannot publish'
-    : blocked
-      ? 'Waiting for approval'
-      : dateBlock
-        ? dateBlock
-        : sectionBlock
-          ? sectionBlock
-          : chosen === 'free' && !freeOk
-            ? 'Your free standard listing is used'
-            : chosen === 'amplify' && !s.org.verified
-              ? 'Verify your organisation to amplify'
-              : null;
+    : missing.length
+      ? `Missing: ${missing.map((k) => ESSENTIAL_WORDS[k]).join(', ')}`
+      : blocked
+        ? 'Waiting for approval'
+        : dateBlock
+          ? dateBlock
+          : sectionBlock
+            ? sectionBlock
+            : chosen === 'free' && !freeOk
+              ? 'Your free standard listing is used'
+              : chosen === 'amplify' && !s.org.verified
+                ? 'Verify your organisation to amplify'
+                : null;
   const when = schedule ? ` for ${longDate(schedule)}` : '';
   const invites = chosen === 'amplify' ? planCount(job, job.reachPlan) : 0;
   const inviting = invites ? ` · invite ${invites} ${invites === 1 ? 'person' : 'people'} ${upgrade && job.status === 'live' ? 'now' : 'when live'}` : '';
@@ -986,11 +991,15 @@ function PublishPage({ id }: { id?: string }) {
   const checkoutItem = payKey === 'one' ? `Amplify: ${job.facts.title}` : payKey === 'extra' ? `Extra job on “Always hiring”: ${job.facts.title}` : payKey === 'always' ? '“Always hiring” subscription, first month (3 jobs)' : `${packageOf(payKey).jobs} jobs, one used for ${job.facts.title}`;
   const checkoutAmount = payKey === 'extra' ? usd(single.amount) : usd(packageOf(payKey).price);
 
-  const finish = (ok: boolean) => {
+  const finish = (ok: boolean, paidHow?: Paid) => {
     if (ok) {
       setFailed(null);
       setDone(true);
-    } else notify('It could not be published. Check the choices and try again.');
+      return;
+    }
+    // FW-1: toast the real publishBlock reason.
+    const why = publishBlock(getState(), job.id, chosen === 'free' ? { plan: 'free', schedule } : { plan: 'amplify', schedule, paid: paidHow ?? (prepaid ? 'direct' : onHand ? 'onHand' : 'direct') });
+    notify(why ?? 'It could not be published. Check the choices and try again.');
   };
   const publishFree = (date: string | null) => {
     if (!getState().org.freeTermsAccepted) setTerms({ schedule: date });
@@ -1001,8 +1010,8 @@ function PublishPage({ id }: { id?: string }) {
     if (!upgrade && now && changesAfterApproval(now) && now.review.overruled === undefined) return setOverrule(true);
     setFailed(null);
     if (chosen === 'free') publishFree(schedule);
-    else if (prepaid) finish(publish(job.id, { plan: 'amplify', schedule, paid: 'direct' }));
-    else if (onHand) finish(upgrade ? amplifyLive(job.id, 'onHand') : publish(job.id, { plan: 'amplify', schedule, paid: 'onHand' }));
+    else if (prepaid) finish(publish(job.id, { plan: 'amplify', schedule, paid: 'direct' }), 'direct');
+    else if (onHand) finish(upgrade ? amplifyLive(job.id, 'onHand') : publish(job.id, { plan: 'amplify', schedule, paid: 'onHand' }), 'onHand');
     else setCheckout(payKey);
   };
   const paid = (key: PackageKey | 'extra') => {
