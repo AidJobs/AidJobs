@@ -24,6 +24,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.jobs TO aidjobs_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.sources TO aidjobs_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.crawl_logs TO aidjobs_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.crawl_locks TO aidjobs_app;
+GRANT SELECT, INSERT, UPDATE ON TABLE public.crawl_health_mail TO aidjobs_app;
 GRANT SELECT, INSERT, UPDATE ON TABLE public.domain_policies TO aidjobs_app;
 GRANT SELECT ON TABLE public.robots_cache TO aidjobs_app;
 GRANT SELECT, INSERT, UPDATE ON TABLE public.link_validations TO aidjobs_app;
@@ -53,6 +54,7 @@ GRANT SELECT ON TABLE
   public.clusters,
   public.contracts,
   public.countries,
+  public.crawl_health_mail,
   public.crawl_locks,
   public.crawl_logs,
   public.crisis_types,

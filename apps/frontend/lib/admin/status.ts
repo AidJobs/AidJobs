@@ -110,6 +110,8 @@ export function recentActivity(body: unknown, limit = 5): RecentActivity {
 
 export type SourceRow = { id: string; org_name: string | null; careers_url: string | null; status?: string };
 
+export type FillRate = { filled: number; total: number; rate: number | null };
+
 export type SourceQuality = {
   source_id: string;
   source_name: string | null;
@@ -122,6 +124,8 @@ export type SourceQuality = {
   short_titles?: number;
   duplicate_urls: Array<{ url: string; count: number; titles: string[] }>;
   quality_score: number;
+  /** Capture-field fill rates on admitted (not deleted) rows; quality only, never a gate. */
+  fill_rates?: Record<string, FillRate>;
 };
 
 export type ReportResult = { ok: true; report: SourceQuality } | { ok: false; error: string };

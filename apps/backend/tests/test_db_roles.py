@@ -29,12 +29,12 @@ CODE += [BACKEND / "main.py", BACKEND / "orchestrator.py"]
 
 # Production's public tables, read only on 5 November 2026 (security plan, stage 6).
 PRODUCTION_TABLES = frozenset("""
-    benefits clusters contracts countries crawl_locks crawl_logs crisis_types domain_policies
-    donors enrichment_feedback enrichment_ground_truth enrichment_history enrichment_reviews
-    extraction_logs failed_inserts find_earn_submissions findearn_submissions functional
-    job_deletion_audit jobs jobs_side levels link_validations missions org_types payments
-    policy_flags raw_pages response_phases rewards robots_cache shortlists sources synonyms tags
-    takedowns users work_modalities
+    benefits clusters contracts countries crawl_health_mail crawl_locks crawl_logs crisis_types
+    domain_policies donors enrichment_feedback enrichment_ground_truth enrichment_history
+    enrichment_reviews extraction_logs failed_inserts find_earn_submissions findearn_submissions
+    functional job_deletion_audit jobs jobs_side levels link_validations missions org_types
+    payments policy_flags raw_pages response_phases rewards robots_cache shortlists sources
+    synonyms tags takedowns users work_modalities
 """.split())
 # Created in production before the schema was kept in infra/ (verified there, 5 November 2026).
 TABLES_OUTSIDE_MIGRATIONS = frozenset({"jobs_side", "findearn_submissions"})
