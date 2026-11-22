@@ -102,6 +102,17 @@ def test_activity_floors_do_not_raise_a_health_shorten(monkeypatch):
         },
     )
     assert timedelta(hours=5) <= (next_run - before) <= timedelta(hours=7)
+    # Without a health shorten, the 10-change band still floors at 0.5 (not 0.25).
+    next_half = orch.compute_next_run(
+        3,
+        "ngo",
+        inserted=10,
+        updated=0,
+        consecutive_failures=0,
+        consecutive_nochange=0,
+        health=None,
+    )
+    assert timedelta(hours=11) <= (next_half - before) <= timedelta(hours=13)
 
 
 def test_failure_backoff_is_not_shortened_by_health(monkeypatch):
