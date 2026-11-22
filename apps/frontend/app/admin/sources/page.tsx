@@ -1019,7 +1019,13 @@ export default function AdminSourcesPage() {
                             onClick={() => handleToggleStatus(source)}
                             disabled={togglingSourceId === source.id}
                             className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#F5F5F7] hover:bg-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group"
-                            title={source.status === 'active' ? 'Pause' : 'Resume'}
+                            title={
+                              source.status === 'active'
+                                ? 'Pause'
+                                : (source.consecutive_failures ?? 0) > 0
+                                  ? `Resume (keeps ${source.consecutive_failures} consecutive failure${(source.consecutive_failures ?? 0) === 1 ? '' : 's'})`
+                                  : 'Resume'
+                            }
                           >
                             {togglingSourceId === source.id ? (
                               <div className="w-4 h-4 border-2 border-[#0071E3] border-t-transparent rounded-full animate-spin" />
@@ -1029,7 +1035,11 @@ export default function AdminSourcesPage() {
                               <Play className="w-4 h-4 text-[#30D158]" />
                             )}
                             <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
-                              {source.status === 'active' ? 'Pause' : 'Resume'}
+                              {source.status === 'active'
+                                ? 'Pause'
+                                : (source.consecutive_failures ?? 0) > 0
+                                  ? `Resume (keeps ${source.consecutive_failures} failure${(source.consecutive_failures ?? 0) === 1 ? '' : 's'})`
+                                  : 'Resume'}
                             </span>
                           </button>
                           )}

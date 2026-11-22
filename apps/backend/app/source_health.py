@@ -265,19 +265,19 @@ class SourceHealthScorer:
         activity_score: float,
         org_type: Optional[str]
     ) -> float:
-        """Recommend crawl frequency in days"""
-        from orchestrator import DEFAULT_FREQ_DAYS
-        
-        # Start with org type default
-        base_freq = DEFAULT_FREQ_DAYS.get(org_type, 3) if org_type else 3
-        
-        # Adjust based on health and activity
+        """Recommend crawl frequency in days from the decision-13 base (W-39).
+
+        The orchestrator may use this only to shorten the base, before no-change and
+        failure backoff. A slower recommendation here no longer replaces a shorter
+        computed interval (the old |diff|>2 stretch).
+        """
+        from orchestrator import default_freq_days
+
+        base_freq = default_freq_days(org_type)
+
         if health_score >= 80 and activity_score >= 70:
-            # High health + high activity = crawl more frequently
-            return max(0.5, base_freq - 1)
-        elif health_score < 50 or activity_score < 30:
-            # Low health or low activity = crawl less frequently
+            return max(0.25, base_freq - 0.25) if base_freq <= 0.5 else max(0.5, base_freq - 1)
+        if health_score < 50 or activity_score < 30:
             return min(14, base_freq + 2)
-        else:
-            return base_freq
+        return base_freq
 

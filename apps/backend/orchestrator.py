@@ -22,14 +22,39 @@ from crawler_v2.api_crawler import SimpleAPICrawler
 
 logger = logging.getLogger(__name__)
 
-# Defaults by org type
+# Decision 13 targets (W-39): twice a day for UN and large NGOs, daily for the rest.
+# Keys are lower-case; look up with default_freq_days(). Unknown → 1 day.
 DEFAULT_FREQ_DAYS = {
-    'un': 1,
-    'ingo': 2,
-    'ngo': 3,
+    'un': 0.5,
+    'ingo': 0.5,
+    'ngo': 1,
     'academic': 7,
     'private': 5,
 }
+# Stored crawl_frequency_days=3 is the pre-W-39 default; treat as "use org-type default"
+# so live sources with a legacy 3 actually get decision 13 once org_type is set (D2).
+_LEGACY_FREQ_DAYS = 3
+
+
+def default_freq_days(org_type: Optional[str]) -> float:
+    """Decision-13 base interval for an org type; unknown and blank → 1 day."""
+    key = (org_type or "").strip().lower()
+    if key in DEFAULT_FREQ_DAYS:
+        return float(DEFAULT_FREQ_DAYS[key])
+    return 1.0
+
+
+def resolve_base_freq_days(crawl_frequency_days, org_type: Optional[str]) -> float:
+    """Base interval for scheduling (D2).
+
+    Explicit admin frequency wins, except null, non-positive, or the legacy column
+    default 3, which all mean "use the org-type default" (0.5 cannot be stored as int).
+    """
+    if crawl_frequency_days is None or crawl_frequency_days <= 0:
+        return default_freq_days(org_type)
+    if crawl_frequency_days == _LEGACY_FREQ_DAYS:
+        return default_freq_days(org_type)
+    return float(crawl_frequency_days)
 
 GLOBAL_MAX_CONCURRENCY = 3
 SCHEDULER_INTERVAL_SECONDS = 300  # 5 minutes
@@ -238,7 +263,7 @@ class CrawlerOrchestrator:
 
     def compute_next_run(
         self,
-        base_freq_days: int,
+        base_freq_days,
         org_type: Optional[str],
         inserted: int,
         updated: int,
@@ -247,87 +272,78 @@ class CrawlerOrchestrator:
         source_id: Optional[str] = None,
         health: Optional[Dict] = None,
     ) -> datetime:
+        """Next run from the decision-13 base, then adaptive rules (W-39 D2/D3).
+
+        Order: resolve base → health may only shorten that base → activity may
+        shorten → no-change and failure backoff may only lengthen → soft low-health
+        lengthen → jitter. REFUSAL_WAIT is applied by the caller after this returns
+        and is never shortened.
         """
-        Compute next run time with enhanced adaptive scheduling.
-        
-        Rules:
-        - If many changes (inserted + updated >= 10): decrease frequency
-        - If no changes for 3+ runs: increase frequency
-        - On failures: exponential backoff
-        - Consider source health score for frequency adjustment
-        - Add jitter ±15%
-        """
-        # Start with base frequency (or default from org type)
-        if base_freq_days is None or base_freq_days <= 0:
-            base_freq_days = DEFAULT_FREQ_DAYS.get(org_type, 3)
-        
-        freq_days = base_freq_days
-        
-        # Adjust based on activity (more sophisticated)
-        changes = inserted + updated
-        
-        if changes >= 20:
-            # Very high activity -> crawl much more frequently
-            freq_days = max(0.25, freq_days - 2)
-            logger.debug(f"[orchestrator] Very high activity ({changes} changes) -> freq={freq_days} days")
-        elif changes >= 10:
-            # High activity -> crawl more frequently
-            freq_days = max(0.5, freq_days - 1)
-            logger.debug(f"[orchestrator] High activity ({changes} changes) -> freq={freq_days} days")
-        elif changes >= 5:
-            # Moderate activity -> slight increase
-            freq_days = max(0.5, freq_days - 0.5)
-            logger.debug(f"[orchestrator] Moderate activity ({changes} changes) -> freq={freq_days} days")
-        elif changes == 0:
-            # No changes
-            if consecutive_nochange >= 5:
-                # Many consecutive no-changes -> crawl much less frequently
-                freq_days = min(21, freq_days + 3)
-                logger.debug(f"[orchestrator] {consecutive_nochange} consecutive no-changes -> freq={freq_days} days")
-            elif consecutive_nochange >= 3:
-                # Some consecutive no-changes -> crawl less frequently
-                freq_days = min(14, freq_days + 1)
-                logger.debug(f"[orchestrator] {consecutive_nochange} consecutive no-changes -> freq={freq_days} days")
-        
-        # Apply failure backoff (enhanced exponential backoff)
-        if consecutive_failures > 0:
-            # Exponential backoff: 6h * 2^failures, capped at 7 days
-            backoff_hours = 6 * (2 ** min(consecutive_failures, 4))  # Cap at 4 for calculation
-            backoff_days = min(7, backoff_hours / 24.0)
-            freq_days = max(freq_days, backoff_days)
-            logger.debug(f"[orchestrator] {consecutive_failures} failures -> backoff={backoff_days} days")
-        
-        # Consider source health score if available
+        freq_days = resolve_base_freq_days(base_freq_days, org_type)
+
         if health is None and source_id:
             health = self.health_score(source_id)
         if health:
             try:
-                
-                # Adjust frequency based on health
-                if health['score'] >= 80:
-                    # High health -> can crawl more frequently if activity is high
-                    if health['components']['activity'] >= 70:
-                        freq_days = max(0.5, freq_days - 0.5)
-                elif health['score'] < 50:
-                    # Low health -> crawl less frequently to avoid wasting resources
-                    freq_days = min(14, freq_days + 1)
-                
-                # Use recommended frequency if it's significantly different
-                recommended = health['recommended_frequency_days']
-                if abs(recommended - freq_days) > 2:
+                recommended = float(health["recommended_frequency_days"])
+                # D3: recommended may only shorten the decision-13 base, before NC/backoff.
+                if recommended < freq_days:
                     freq_days = recommended
-                    logger.debug(f"[orchestrator] Using health-based recommended frequency: {freq_days} days")
+                    logger.debug(
+                        "[orchestrator] Health recommended frequency shortens base to %s days",
+                        freq_days,
+                    )
             except Exception as e:
-                logger.debug(f"[orchestrator] Could not calculate health score: {e}")
-        
-        # Add jitter ±15% to spread out crawls
+                logger.debug(f"[orchestrator] Could not apply health recommendation: {e}")
+
+        changes = inserted + updated
+        if changes >= 20:
+            freq_days = max(0.25, freq_days - 2)
+            logger.debug(f"[orchestrator] Very high activity ({changes} changes) -> freq={freq_days} days")
+        elif changes >= 10:
+            freq_days = max(0.5, freq_days - 1)
+            logger.debug(f"[orchestrator] High activity ({changes} changes) -> freq={freq_days} days")
+        elif changes >= 5:
+            freq_days = max(0.5, freq_days - 0.5)
+            logger.debug(f"[orchestrator] Moderate activity ({changes} changes) -> freq={freq_days} days")
+        elif changes == 0:
+            if consecutive_nochange >= 5:
+                freq_days = min(21, freq_days + 3)
+                logger.debug(
+                    "[orchestrator] %s consecutive no-changes -> freq=%s days",
+                    consecutive_nochange,
+                    freq_days,
+                )
+            elif consecutive_nochange >= 3:
+                freq_days = min(14, freq_days + 1)
+                logger.debug(
+                    "[orchestrator] %s consecutive no-changes -> freq=%s days",
+                    consecutive_nochange,
+                    freq_days,
+                )
+
+        if consecutive_failures > 0:
+            backoff_hours = 6 * (2 ** min(consecutive_failures, 4))
+            backoff_days = min(7, backoff_hours / 24.0)
+            freq_days = max(freq_days, backoff_days)
+            logger.debug(
+                "[orchestrator] %s failures -> backoff=%s days",
+                consecutive_failures,
+                backoff_days,
+            )
+
+        # Soft lengthen for low health (display reliability still counts only ok). Not the old
+        # |diff|>2 replace that stretched UNICEF to ~5 days.
+        if health:
+            try:
+                if health["score"] < 50:
+                    freq_days = min(14, freq_days + 1)
+            except Exception as e:
+                logger.debug(f"[orchestrator] Could not apply low-health lengthen: {e}")
+
         jitter_factor = random.uniform(0.85, 1.15)
         freq_days *= jitter_factor
-        
-        # Calculate next run
-        next_run = datetime.utcnow() + timedelta(days=freq_days)
-        
-        return next_run
+        return datetime.utcnow() + timedelta(days=freq_days)
     
     async def get_due_sources(self, limit: int = MAX_SOURCES_PER_RUN) -> List[Dict]:
         """Due sources, prioritised; read off the event loop."""
@@ -733,6 +749,20 @@ class CrawlerOrchestrator:
         stop = record["listing_stop"]
         if stop is not None:
             stop = redact_text(stop)[:300]
+        # Fingerprint only when the listing was complete (W-39); never backfill older runs.
+        listing_hash = None
+        listing_id_count = None
+        if record["listing_complete"] is True:
+            raw_hash = result.get("listing_ids_hash")
+            raw_count = result.get("listing_id_count")
+            if (
+                isinstance(raw_hash, str)
+                and raw_hash
+                and isinstance(raw_count, int)
+                and raw_count > 0
+            ):
+                listing_hash = raw_hash[:64]
+                listing_id_count = raw_count
         cur.execute(
             """
             UPDATE crawl_logs SET
@@ -744,7 +774,9 @@ class CrawlerOrchestrator:
                 failed_saves = %s,
                 unrecorded = %s,
                 matched_active = %s,
-                counted = %s
+                counted = %s,
+                listing_ids_hash = %s,
+                listing_id_count = %s
             WHERE id = %s
             """,
             (
@@ -757,6 +789,8 @@ class CrawlerOrchestrator:
                 record["unrecorded"],
                 record["matched_active"],
                 record["counted"],
+                listing_hash,
+                listing_id_count,
                 run_id,
             ),
         )
