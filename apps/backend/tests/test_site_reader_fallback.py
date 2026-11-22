@@ -209,7 +209,13 @@ def test_a_page_without_job_cards_goes_to_the_general_reader_wherever_it_is(monk
         crawler, sentinel = _crawler(monkeypatch)
         jobs, report = asyncio.run(crawler._listing_jobs(without_cards, url))
         assert jobs == sentinel
-        assert report is None
+        # General reader always reports (W-39); no stated total → incomplete.
+        assert report == {
+            "pages": 1,
+            "expected": len(sentinel),
+            "complete": False,
+            "stop": "no stated total",
+        }
         assert crawler.general_calls == 1
 
 
@@ -383,7 +389,7 @@ def test_saved_icrc_listing_goes_straight_to_the_general_reader(monkeypatch):
     _no_network(crawler, monkeypatch)
     before = crawler.extract_jobs_from_html(html, _ICRC_LISTING)
     after, report = asyncio.run(crawler._listing_jobs(html, _ICRC_LISTING))
-    assert report is None
+    assert report is not None and report["complete"] is False
     assert after == before
     first = admit_batch([dict(job) for job in before], "html")
     second = admit_batch([dict(job) for job in after], "html")
@@ -808,9 +814,32 @@ def test_the_page_cap_and_a_repeated_page_are_partial(monkeypatch):
 def test_sources_without_a_paged_listing_keep_the_plain_message(monkeypatch):
     crawler, _sentinel = _crawler(monkeypatch)
     _jobs, report = asyncio.run(crawler._listing_jobs("<html></html>", _ICRC_LISTING))
-    assert report is None
+    assert report == {
+        "pages": 1,
+        "expected": len(_sentinel) if _sentinel else None,
+        "complete": False,
+        "stop": "no stated total",
+    }
     assert _listing_outcome(14, None) == ("ok", "Found 14 jobs")
     assert _listing_outcome(0, None) == ("warn", "No jobs found")
+    # Unknown-completeness stops stay ok; shortfalls stay warn (W-39).
+    unknown = {
+        "pages": 1,
+        "expected": 6,
+        "complete": False,
+        "stop": "no stated total",
+    }
+    assert _listing_outcome(6, unknown) == (
+        "ok",
+        "Found 6 jobs; listing not counted: no stated total",
+    )
+    shortfall = {
+        "pages": 1,
+        "expected": 12,
+        "complete": False,
+        "stop": "showing 1 to 12 of 12, read 32 rows, 12 on-page",
+    }
+    assert _listing_outcome(32, shortfall)[0] == "warn"
 
 
 def test_unknown_expected_total_is_reported_as_unknown():

@@ -188,6 +188,48 @@ def test_json_without_total_reports_incomplete_not_null():
     assert report["stop"] == "no stated total"
 
 
+def test_json_stated_total_with_paging_stays_incomplete():
+    data = {
+        "total": 1,
+        "hasMore": True,
+        "jobs": [{"title": "A", "url": "https://example.org/a"}],
+    }
+    jobs, report = _json_api_jobs_safe(data)
+    assert len(jobs) >= 1
+    assert report["complete"] is False
+    assert report["stop"] == "paging not followed"
+
+
+def test_closed_catalogue_dropped_row_without_dedupe_is_incomplete():
+    from crawler_v2.listing_completeness import closed_catalogue_report
+
+    jobs = [{"title": "A", "apply_url": "https://example.org/a"}]
+    assert closed_catalogue_report(jobs, raw_item_count=2)["complete"] is False
+    assert closed_catalogue_report(
+        jobs, raw_item_count=2, allow_dedupe=True
+    )["complete"] is True
+
+
+def test_lever_non_list_body_is_incomplete():
+    from crawler_v2.readers import _lever_feed_jobs
+
+    jobs, report = _lever_feed_jobs('{"not": "a list"}')
+    assert jobs == []
+    assert report["complete"] is False
+    assert report["stop"] == "not a lever postings list"
+
+
+def _json_api_jobs_safe(data: dict):
+    from crawler_v2.feed_fields import job_from_json_item, jobs_array, json_listing_report
+
+    jobs = []
+    for item in jobs_array(data):
+        job = job_from_json_item(item, "https://example.org/")
+        if job:
+            jobs.append(job)
+    return jobs, json_listing_report(jobs, data)
+
+
 def test_workable_paging_signal_makes_catalogue_incomplete():
     data = json.loads(_body("workable"))
     data["hasMore"] = True
