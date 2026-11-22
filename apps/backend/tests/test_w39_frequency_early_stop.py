@@ -9,6 +9,7 @@ from crawler_v2.listing_fingerprint import (
     early_stop_details,
     listing_ids_fingerprint,
     listing_url_keys,
+    previous_complete_listing_hash,
 )
 from orchestrator import (
     DEFAULT_FREQ_DAYS,
@@ -80,6 +81,27 @@ def test_health_recommended_only_shortens_base_before_backoff(monkeypatch):
         },
     )
     assert timedelta(hours=10) <= (next_short - before) <= timedelta(hours=14)
+
+
+def test_activity_floors_do_not_raise_a_health_shorten(monkeypatch):
+    orch = CrawlerOrchestrator("postgresql://unused")
+    monkeypatch.setattr("orchestrator.random.uniform", lambda a, b: 1.0)
+    before = datetime.utcnow()
+    # Health shortened UN base 0.5 → 0.25; 10 changes must not floor back up to 0.5.
+    next_run = orch.compute_next_run(
+        3,
+        "un",
+        inserted=10,
+        updated=0,
+        consecutive_failures=0,
+        consecutive_nochange=0,
+        health={
+            "score": 90,
+            "components": {"activity": 90},
+            "recommended_frequency_days": 0.25,
+        },
+    )
+    assert timedelta(hours=5) <= (next_run - before) <= timedelta(hours=7)
 
 
 def test_failure_backoff_is_not_shortened_by_health(monkeypatch):
@@ -172,6 +194,32 @@ def test_early_stop_gate(complete, current, previous, expect):
     )
 
 
+def test_newer_complete_null_hash_blocks_older_fingerprint():
+    # Run A hashed H; run B complete with null; run C must not early-stop on H.
+    assert previous_complete_listing_hash([("H",)]) == "H"
+    assert previous_complete_listing_hash([(None,), ("H",)]) is None
+    assert previous_complete_listing_hash([("",), ("H",)]) is None
+    assert previous_complete_listing_hash([]) is None
+    assert (
+        early_stop_details(
+            listing_complete=True,
+            current_hash="H",
+            previous_hash=previous_complete_listing_hash([(None,), ("H",)]),
+        )
+        is False
+    )
+
+
+def test_undp_open_all_is_disabled_when_early_stop():
+    source = (
+        __import__("pathlib").Path(__file__).resolve().parents[1]
+        / "crawler_v2"
+        / "simple_crawler.py"
+    ).read_text(encoding="utf-8")
+    assert "if early_stop and needs_enrichment:" in source
+    assert "needs_enrichment = False" in source
+
+
 def test_lifecycle_stores_hash_only_when_complete():
     class Cursor:
         def __init__(self):
@@ -220,6 +268,8 @@ def test_recommend_frequency_uses_decision_13_base():
     from app.source_health import SourceHealthScorer
 
     scorer = SourceHealthScorer("postgresql://unused")
-    assert scorer._recommend_frequency(90, 80, "un") <= 0.5
+    assert scorer._recommend_frequency(90, 80, "un") == 0.25
     assert scorer._recommend_frequency(90, 80, "ngo") == 0.5  # base 1 − 1
     assert scorer._recommend_frequency(40, 20, "un") >= 2.0
+    # Published recommendation keeps two decimals (0.25, not 0.2).
+    assert round(scorer._recommend_frequency(90, 80, "un"), 2) == 0.25

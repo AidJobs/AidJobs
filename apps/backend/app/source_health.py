@@ -107,7 +107,8 @@ class SourceHealthScorer:
                         'engagement': round(engagement, 2)
                     },
                     'priority': priority,
-                    'recommended_frequency_days': round(recommended_freq, 1)
+                    # Two decimals so a 0.25d UN/INGO recommendation is not published as 0.2.
+                    'recommended_frequency_days': round(recommended_freq, 2)
                 }
         finally:
             conn.close()

@@ -44,3 +44,19 @@ def early_stop_details(
     if not current_hash or not previous_hash:
         return False
     return current_hash == previous_hash
+
+
+def previous_complete_listing_hash(rows: Iterable[tuple]) -> Optional[str]:
+    """Hash from the latest finished complete crawl row, or None if that row has none.
+
+    `rows` are (listing_ids_hash,) ordered by ran_at descending. A newer complete row with a
+    null hash must not fall through to an older hash (W-39 D8).
+    """
+    for row in rows:
+        if not row:
+            return None
+        value = row[0]
+        if value is None or value == "":
+            return None
+        return str(value)
+    return None

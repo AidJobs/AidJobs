@@ -58,7 +58,11 @@ from contracts.reader import Response
 from contracts.refusal import refusal
 from contracts.run_ownership import OwnershipLost, confirm_running, save_failure_outcome
 from crawler_v2.job_pages import SavedJob, choose_pages, link_key, saved_job
-from crawler_v2.listing_fingerprint import early_stop_details, listing_ids_fingerprint
+from crawler_v2.listing_fingerprint import (
+    early_stop_details,
+    listing_ids_fingerprint,
+    previous_complete_listing_hash,
+)
 from crawler_v2.parse_lock import DATEPARSER_LOCK
 from crawler_v2.readers import LISTING_READER, LISTING_STRATEGY, html_readers, read_listing
 
@@ -2007,7 +2011,11 @@ class SimpleCrawler:
             conn.close()
 
     def _previous_listing_ids_hash(self, source_id: str) -> Optional[str]:
-        """Hash from the latest finished complete crawl of this source, or None. Read-only."""
+        """Hash from the latest finished complete crawl, or None when that row has none.
+
+        The latest complete run wins even if its hash is null (empty URL set / pre-migration):
+        skipping null rows would early-stop against an older fingerprint (W-39 D8).
+        """
         conn = self._get_db_conn()
         try:
             with conn.cursor() as cur:
@@ -2018,18 +2026,15 @@ class SimpleCrawler:
                     FROM crawl_logs
                     WHERE source_id = %s
                       AND listing_complete IS TRUE
-                      AND listing_ids_hash IS NOT NULL
                       AND status IS DISTINCT FROM 'running'
                     ORDER BY ran_at DESC
                     LIMIT 1
                     """,
                     (str(source_id),),
                 )
-                row = cur.fetchone()
+                rows = cur.fetchall()
             conn.rollback()
-            if not row or not row[0]:
-                return None
-            return str(row[0])
+            return previous_complete_listing_hash(rows)
         except Exception as e:
             logger.debug("Previous listing hash not read: %s", redact_exception(e))
             return None

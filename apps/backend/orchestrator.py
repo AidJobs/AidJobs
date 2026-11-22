@@ -297,15 +297,29 @@ class CrawlerOrchestrator:
                 logger.debug(f"[orchestrator] Could not apply health recommendation: {e}")
 
         changes = inserted + updated
+        # Activity may only shorten further (or leave unchanged). Floors must not raise an
+        # interval that health already shortened below 0.5 (W-39 review).
         if changes >= 20:
-            freq_days = max(0.25, freq_days - 2)
-            logger.debug(f"[orchestrator] Very high activity ({changes} changes) -> freq={freq_days} days")
+            freq_days = min(freq_days, max(0.25, freq_days - 2))
+            logger.debug(
+                "[orchestrator] Very high activity (%s changes) -> freq=%s days",
+                changes,
+                freq_days,
+            )
         elif changes >= 10:
-            freq_days = max(0.5, freq_days - 1)
-            logger.debug(f"[orchestrator] High activity ({changes} changes) -> freq={freq_days} days")
+            freq_days = min(freq_days, max(0.25, freq_days - 1))
+            logger.debug(
+                "[orchestrator] High activity (%s changes) -> freq=%s days",
+                changes,
+                freq_days,
+            )
         elif changes >= 5:
-            freq_days = max(0.5, freq_days - 0.5)
-            logger.debug(f"[orchestrator] Moderate activity ({changes} changes) -> freq={freq_days} days")
+            freq_days = min(freq_days, max(0.25, freq_days - 0.5))
+            logger.debug(
+                "[orchestrator] Moderate activity (%s changes) -> freq=%s days",
+                changes,
+                freq_days,
+            )
         elif changes == 0:
             if consecutive_nochange >= 5:
                 freq_days = min(21, freq_days + 3)
