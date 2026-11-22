@@ -335,7 +335,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 22 Nov 2026 | Free walk (English) | preview `?v=freewalk1` | Tumaini CHO: Local NGO concise → No project → sections OK → Check → Free → Review optional. **Blocked publish** with empty `apply.address` while How-to-apply body already had `jobs@tumaini.example.org`; CTA still “Publish free”; toast “It could not be published…” (essentials missing not in button `reason`). After filling Email address + Save: **Publish free Now → Live** (standard held, listed until closing, Copy link / Share / Amplify CTA). Schedule-date CTA wording OK; Preview Job page / In Google / When shared OK; R1-18 no Language versions on Free; Fixed-text starter toggle OK. Progress Details/Fixed stayed “to do” without walk settle (not a publish gate). Earlier: Project brief `[to confirm]` after No project (still open). |
 | 22 Nov 2026 | EN-BLOCK #1 investigate | code only | `parkKey` has no `version` case → null; `afterCheck` always returns unreviewed `version` with no `parked(…)` guard; `parkedIn('langs')` only exact `langs`. Skip / not now / ask-again cannot park; walk stuck before review / Reach / flyer / publish. **Option A plan ready** (not built). |
 | 22 Nov 2026 | EN-BLOCK #1 (Option A) | `c244b97` | `parkKey`/`afterCheck`/`parkedIn`/`tidyParked` for `version:${lang}`. Tests `employerDemoEnBlock1.test.ts`. **Agent confirmed on preview** (`?v=enblock1`: French version step → skip → parked `version:fr` → Next question → Review Send/No; open Language versions unparks → version step returns). |
-| 22 Nov 2026 | FW-1 (Option A) | *(push tip)* | `emailAddress`/`withEmailAddress`; essentials+org; CTA+toast; NGO default + write/publish persist. Tests `employerDemoFw1.test.ts`. **Agent confirm on preview**. |
+| 22 Nov 2026 | FW-1 (Option A) | `fb74df0` | `emailAddress`/`withEmailAddress`; essentials+org; CTA+toast; NGO default + write/publish persist. Tests `employerDemoFw1.test.ts`. **Agent confirmed on preview** (`?v=fw1` Tumaini CHO: By email → `jobs@tumaini.example.org` in Email address without manual fill; Publish CTA named Project brief while unfinished, then **Publish free · your free standard listing** → Now → Live with Copy link / Amplify). |
 
 ### Free walk leftovers (English; 22 Nov 2026)
 
@@ -349,7 +349,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 
 **Was:** `applyLines` printed `jobs@domain` while `apply.address` stayed empty; Publish CTA ignored essentials; fail toast was vague.
 
-**Fix:** `emailAddress` / `withEmailAddress`; essentials(job, org); NGO `defaultApply(…, domain)`; persist on write/live-draft/publish/setMethod; CTA + toast use essentials / `publishBlock`. Tests `employerDemoFw1.test.ts`. Confirm on preview.
+**Fix:** `emailAddress` / `withEmailAddress`; essentials(job, org); NGO `defaultApply(…, domain)`; persist on write/live-draft/publish/setMethod; CTA + toast use essentials / `publishBlock`. Tests `employerDemoFw1.test.ts`. **Confirmed on preview.**
 
 ### EN-BLOCK #1 — version park — **Fixed** (22 Nov 2026; Option A)
 
