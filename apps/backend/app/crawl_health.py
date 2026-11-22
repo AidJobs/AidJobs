@@ -182,8 +182,22 @@ def finish_claim(cur, day: date, *, delivery: str, http_status: Optional[int]) -
     )
 
 
+class _NoRedirect(request.HTTPRedirectHandler):
+    """Refuse redirects so a Bearer token is never replayed to another host."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_RESEND_OPENER = request.build_opener(_NoRedirect())
+
+
 def send_resend(*, api_key: str, to_addr: str, from_addr: str, subject: str, text: str) -> int:
-    """POST to Resend. Returns the HTTP status code. Never logs the key or response body."""
+    """POST to Resend. Returns the HTTP status code. Never logs the key or response body.
+
+    Redirects are refused (3xx becomes HTTPError). Authorization is unredirected as a
+    second defence so a future opener change cannot copy the Bearer token.
+    """
     payload = json.dumps(
         {"from": from_addr, "to": [to_addr], "subject": subject, "text": text}
     ).encode("utf-8")
@@ -192,29 +206,36 @@ def send_resend(*, api_key: str, to_addr: str, from_addr: str, subject: str, tex
         data=payload,
         method="POST",
         headers={
-            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
             "Accept": "application/json",
         },
     )
+    # Unredirected: even if redirects were allowed, the key would not follow.
+    req.add_unredirected_header("Authorization", f"Bearer {api_key}")
     try:
-        with request.urlopen(req, timeout=30) as resp:
+        with _RESEND_OPENER.open(req, timeout=30) as resp:
             # Drain without keeping the body for logs.
             resp.read()
-            return int(resp.status)
+            status = int(resp.status)
     except error.HTTPError as exc:
         try:
             exc.read()
         except Exception:
             pass
-        return int(exc.code)
+        status = int(exc.code)
+    # Treat any redirect status as failure even if a custom opener returned it.
+    if 300 <= status < 400:
+        return status
+    return status
 
 
 def run_crawl_health_once(conn) -> Optional[Dict[str, Any]]:
     """One attempt per UTC day. Returns a summary, or None when today's attempt already exists.
 
-    Never raises for mail failures: the claim is finished as failed/log_only and the
-    scheduler continues. Database errors still propagate so the caller can log them.
+    The day claim is committed as `pending` before any HTTP call, so a restart after a
+    successful send cannot double-mail. Never raises for mail failures: the claim is
+    finished as failed/log_only and the scheduler continues. Database errors still
+    propagate so the caller can log them.
     """
     day = utc_today()
     from psycopg2.extras import RealDictCursor  # local import keeps module import light
@@ -226,78 +247,82 @@ def run_crawl_health_once(conn) -> Optional[Dict[str, Any]]:
         rows = load_source_health_rows(cur)
         buckets = classify_sources(rows)
         body = compose_message(buckets, day=day)
-        api_key = _env("RESEND_API_KEY")
-        to_addr = _env("AIDJOBS_HEALTH_TO")
-        from_addr = _env("AIDJOBS_HEALTH_FROM") or DEFAULT_FROM
-        subject = f"AidJobs crawl health — {day.isoformat()} UTC"
-
-        if not api_key or not to_addr:
-            finish_claim(cur, day, delivery="log_only", http_status=None)
-            conn.commit()
-            logger.info(
-                "[crawl_health] %s UTC: composed only (missing RESEND_API_KEY or "
-                "AIDJOBS_HEALTH_TO); delivery=log_only\n%s",
-                day.isoformat(),
-                body,
-            )
-            return {
-                "day": day.isoformat(),
-                "delivery": "log_only",
-                "http_status": None,
-                "buckets": buckets,
-            }
-
-        try:
-            status = send_resend(
-                api_key=api_key,
-                to_addr=to_addr,
-                from_addr=from_addr,
-                subject=subject,
-                text=body,
-            )
-        except Exception as exc:
-            finish_claim(cur, day, delivery="failed", http_status=None)
-            conn.commit()
-            logger.error(
-                "[crawl_health] %s UTC: send failed (%s); delivery=failed",
-                day.isoformat(),
-                redact_exception(exc),
-            )
-            return {
-                "day": day.isoformat(),
-                "delivery": "failed",
-                "http_status": None,
-                "buckets": buckets,
-            }
-
-        if 200 <= status < 300:
-            finish_claim(cur, day, delivery="sent", http_status=status)
-            conn.commit()
-            logger.info(
-                "[crawl_health] %s UTC: sent; http_status=%s",
-                day.isoformat(),
-                status,
-            )
-            return {
-                "day": day.isoformat(),
-                "delivery": "sent",
-                "http_status": status,
-                "buckets": buckets,
-            }
-
-        finish_claim(cur, day, delivery="failed", http_status=status)
+        # Commit the claim before any provider call (survives kill/restart).
         conn.commit()
+
+    api_key = _env("RESEND_API_KEY")
+    to_addr = _env("AIDJOBS_HEALTH_TO")
+    from_addr = _env("AIDJOBS_HEALTH_FROM") or DEFAULT_FROM
+    subject = f"AidJobs crawl health — {day.isoformat()} UTC"
+
+    def _finish(delivery: str, http_status: Optional[int]) -> None:
+        with conn.cursor() as cur:
+            finish_claim(cur, day, delivery=delivery, http_status=http_status)
+        conn.commit()
+
+    if not api_key or not to_addr:
+        _finish("log_only", None)
+        logger.info(
+            "[crawl_health] %s UTC: composed only (missing RESEND_API_KEY or "
+            "AIDJOBS_HEALTH_TO); delivery=log_only\n%s",
+            day.isoformat(),
+            body,
+        )
+        return {
+            "day": day.isoformat(),
+            "delivery": "log_only",
+            "http_status": None,
+            "buckets": buckets,
+        }
+
+    try:
+        status = send_resend(
+            api_key=api_key,
+            to_addr=to_addr,
+            from_addr=from_addr,
+            subject=subject,
+            text=body,
+        )
+    except Exception as exc:
+        _finish("failed", None)
         logger.error(
-            "[crawl_health] %s UTC: provider refused; http_status=%s; delivery=failed",
+            "[crawl_health] %s UTC: send failed (%s); delivery=failed",
+            day.isoformat(),
+            redact_exception(exc),
+        )
+        return {
+            "day": day.isoformat(),
+            "delivery": "failed",
+            "http_status": None,
+            "buckets": buckets,
+        }
+
+    if 200 <= status < 300:
+        _finish("sent", status)
+        logger.info(
+            "[crawl_health] %s UTC: sent; http_status=%s",
             day.isoformat(),
             status,
         )
         return {
             "day": day.isoformat(),
-            "delivery": "failed",
+            "delivery": "sent",
             "http_status": status,
             "buckets": buckets,
         }
+
+    _finish("failed", status)
+    logger.error(
+        "[crawl_health] %s UTC: provider refused; http_status=%s; delivery=failed",
+        day.isoformat(),
+        status,
+    )
+    return {
+        "day": day.isoformat(),
+        "delivery": "failed",
+        "http_status": status,
+        "buckets": buckets,
+    }
 
 
 __all__ = [
