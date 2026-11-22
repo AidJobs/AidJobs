@@ -1,5 +1,5 @@
--- One empty table for each of production's 38 public tables (read on 5 November 2026), with
--- Row-Level Security on as there. CI applies infra/roles/02_grants.sql to them in a scratch
+-- One empty table for each of production's public tables (39 including crawl_health_mail, W-39),
+-- with Row-Level Security on as there. CI applies infra/roles/02_grants.sql to them in a scratch
 -- database; tests/test_db_roles.py keeps this list equal to its PRODUCTION_TABLES.
 
 CREATE TABLE public.benefits ();
@@ -10,6 +10,8 @@ CREATE TABLE public.contracts ();
 ALTER TABLE public.contracts ENABLE ROW LEVEL SECURITY;
 CREATE TABLE public.countries ();
 ALTER TABLE public.countries ENABLE ROW LEVEL SECURITY;
+CREATE TABLE public.crawl_health_mail ();
+ALTER TABLE public.crawl_health_mail ENABLE ROW LEVEL SECURITY;
 CREATE TABLE public.crawl_locks ();
 ALTER TABLE public.crawl_locks ENABLE ROW LEVEL SECURITY;
 CREATE TABLE public.crawl_logs ();

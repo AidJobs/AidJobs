@@ -15,6 +15,21 @@ from psycopg2.extras import RealDictCursor  # type: ignore
 
 logger = logging.getLogger(__name__)
 
+# Capture fields for fill-rate quality (growth plan §4.1 item 5 / W-39 D9).
+# Measured on admitted (saved) rows only; never gates counting or expiry.
+CAPTURE_FILL_FIELDS = (
+    ("description", "description"),
+    ("posted_on", "posted_on"),
+    ("locations", "locations"),
+    ("contract_type", "contract_type"),
+    ("salary_range_text", "salary_range_text"),
+    ("advert_language", "advert_language"),
+    ("deadline", "deadline"),
+    ("location_raw", "location_raw"),
+    ("country", "country"),
+    ("city", "city"),
+)
+
 # Path words that name a list of jobs rather than one job (UX-04).
 LISTING_WORDS = frozenset({
     "jobs", "job", "careers", "career", "vacancies", "vacancy", "opportunities", "listing",
@@ -223,14 +238,24 @@ class DataQualityValidator:
                         'error': 'Source not found'
                     }
                 
-                # Get job statistics
+                # Get job statistics (admitted / saved rows: not deleted)
                 cur.execute("""
                     SELECT 
                         COUNT(*) as total_jobs,
                         COUNT(DISTINCT apply_url) as unique_urls,
                         COUNT(CASE WHEN apply_url IS NULL THEN 1 END) as null_urls,
                         COUNT(CASE WHEN title IS NULL OR title = '' THEN 1 END) as missing_titles,
-                        COUNT(CASE WHEN LENGTH(title) < 5 THEN 1 END) as short_titles
+                        COUNT(CASE WHEN LENGTH(title) < 5 THEN 1 END) as short_titles,
+                        COUNT(CASE WHEN description IS NOT NULL AND BTRIM(description) <> '' THEN 1 END) AS filled_description,
+                        COUNT(CASE WHEN posted_on IS NOT NULL THEN 1 END) AS filled_posted_on,
+                        COUNT(CASE WHEN locations IS NOT NULL AND cardinality(locations) > 0 THEN 1 END) AS filled_locations,
+                        COUNT(CASE WHEN contract_type IS NOT NULL AND BTRIM(contract_type) <> '' THEN 1 END) AS filled_contract_type,
+                        COUNT(CASE WHEN salary_range_text IS NOT NULL AND BTRIM(salary_range_text) <> '' THEN 1 END) AS filled_salary_range_text,
+                        COUNT(CASE WHEN advert_language IS NOT NULL AND BTRIM(advert_language) <> '' THEN 1 END) AS filled_advert_language,
+                        COUNT(CASE WHEN deadline IS NOT NULL THEN 1 END) AS filled_deadline,
+                        COUNT(CASE WHEN location_raw IS NOT NULL AND BTRIM(location_raw) <> '' THEN 1 END) AS filled_location_raw,
+                        COUNT(CASE WHEN country IS NOT NULL AND BTRIM(country) <> '' THEN 1 END) AS filled_country,
+                        COUNT(CASE WHEN city IS NOT NULL AND BTRIM(city) <> '' THEN 1 END) AS filled_city
                     FROM jobs
                     WHERE source_id::text = %s
                     AND deleted_at IS NULL
@@ -261,7 +286,11 @@ class DataQualityValidator:
                         'missing_titles': 0,
                         'short_titles': 0,
                         'duplicate_urls': [],
-                        'quality_score': 0.0
+                        'quality_score': 0.0,
+                        'fill_rates': {
+                            name: {'filled': 0, 'total': 0, 'rate': None}
+                            for name, _ in CAPTURE_FILL_FIELDS
+                        },
                     }
                 
                 # Ensure all required keys exist with defaults
@@ -304,6 +333,16 @@ class DataQualityValidator:
                             # Skip invalid duplicate entries
                             continue
                 
+                total = stats_dict['total_jobs']
+                fill_rates = {}
+                for name, _column in CAPTURE_FILL_FIELDS:
+                    filled = int(stats.get(f'filled_{name}', 0) or 0)
+                    fill_rates[name] = {
+                        'filled': filled,
+                        'total': total,
+                        'rate': round((filled / total) * 100.0, 1) if total else None,
+                    }
+
                 return {
                     'source_id': str(source_id),
                     'source_name': source.get('org_name'),
@@ -315,7 +354,8 @@ class DataQualityValidator:
                     'missing_titles': stats_dict['missing_titles'],
                     'short_titles': stats_dict['short_titles'],
                     'duplicate_urls': duplicate_urls_list,
-                    'quality_score': self._calculate_quality_score(stats_dict, duplicates or [])
+                    'quality_score': self._calculate_quality_score(stats_dict, duplicates or []),
+                    'fill_rates': fill_rates,
                 }
         finally:
             conn.close()

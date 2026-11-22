@@ -1132,6 +1132,19 @@ class CrawlerOrchestrator:
     async def daily_pass_once(self) -> Optional[Dict]:
         return await asyncio.to_thread(self._daily_pass_once)
 
+    def _crawl_health_once(self) -> Optional[Dict]:
+        """Daily crawl-health message (W-39 D1). One UTC-day claim in the database."""
+        from app.crawl_health import run_crawl_health_once
+
+        conn = self._get_db_conn()
+        try:
+            return run_crawl_health_once(conn)
+        finally:
+            conn.close()
+
+    async def crawl_health_once(self) -> Optional[Dict]:
+        return await asyncio.to_thread(self._crawl_health_once)
+
     async def run_due_sources_once(self, wait: bool = True) -> Dict:
         """Queue every due source not already queued in this process.
 
@@ -1271,6 +1284,11 @@ class CrawlerOrchestrator:
                 await self.daily_pass_once()
             except Exception as e:
                 logger.error(f"[orchestrator] Daily pass error: {redact_exception(e)}")
+            try:
+                await self.crawl_health_once()
+            except Exception as e:
+                # Mail must never stop crawls (W-39 D1).
+                logger.error(f"[orchestrator] Crawl-health error: {redact_exception(e)}")
             try:
                 await self.run_due_sources_once()
                 consecutive_errors = 0

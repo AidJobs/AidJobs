@@ -556,6 +556,28 @@ export default function DataQualityPage() {
                   </div>
                 </div>
 
+                {sourceDetails.fill_rates && Object.keys(sourceDetails.fill_rates).length > 0 && (
+                  <div>
+                    <h3 className="font-semibold text-[#1D1D1F] mb-1">Field fill rates</h3>
+                    <p className="text-sm text-[#86868B] mb-3">
+                      Share of admitted jobs (not deleted) with each capture field filled. Quality only — never gates counting or expiry.
+                    </p>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                      {Object.entries(sourceDetails.fill_rates).map(([field, info]) => (
+                        <div key={field} className="p-3 rounded-lg border border-[#D2D2D7]">
+                          <div className="text-xs text-[#86868B] mb-1 font-mono">{field}</div>
+                          <div className="text-lg font-semibold text-[#1D1D1F]">
+                            {info.rate == null ? '—' : `${info.rate}%`}
+                          </div>
+                          <div className="text-xs text-[#86868B]">
+                            {info.filled} / {info.total}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {(sourceDetails.duplicate_urls?.length ?? 0) > 0 && (
                   <div>
                     <h3 className="font-semibold text-[#1D1D1F] mb-3">Duplicate URLs</h3>
