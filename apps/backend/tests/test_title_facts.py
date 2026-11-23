@@ -154,10 +154,46 @@ def test_description_fills_only_precision_gaps():
     assert f["sectors"] == []
 
 
+def test_description_ignores_visa_annex_days_and_remote_area():
+    description = (
+        "The incumbent needs a G-4 visa. See Annex D-1. Apply within 14 days. "
+        "Hardship posting in a remote area. We also run an internship programme. "
+        "This role is a Fixed Term appointment at P-3 for 12 months."
+    )
+    f = facts_of("Specialist", description)
+    assert f["grade"] == "P-3"
+    assert f["contract"] == "Fixed term"
+    assert f["duration"] == "12 months"
+    assert f["remote"] is False
+    assert f["level"] == "Mid-career"
+
+
+def test_international_in_parens_is_not_nationals():
+    f = facts_of("Specialist", "Fixed Term Appointment at P-4 (International).")
+    assert f["grade"] == "P-4"
+    assert f["openTo"] == "International"
+    assert facts_of("Officer (International)")["openTo"] != "Nationals"
+    assert facts_of("Consultant (national)")["openTo"] == "Nationals"
+
+
+def test_open_to_international_travel_is_not_eligibility():
+    f = facts_of("Officer, NO-B", "The role is open to international travel.")
+    assert f["openTo"] == "Nationals"
+
+
+def test_title_contract_and_open_to_win_over_description():
+    f = facts_of(
+        "Consultant, P-4",
+        "This is a Fixed Term role open to nationals only.",
+    )
+    assert f["contract"] == "Consultancy"
+    assert f["openTo"] == "International"
+
+
 def test_description_prefix_cap_stops_late_grade():
     # Grade only appears after the 500-character cap.
     padding = "x" * DESCRIPTION_PREFIX_LIMIT
-    f = facts_of("Specialist", padding + " P-3 Fixed Term")
+    f = facts_of("Specialist", padding + " appointment at P-3 Fixed Term")
     assert f["grade"] is None
     assert f["contract"] is None
 
@@ -167,6 +203,18 @@ def test_stored_contract_type_maps_when_known():
     assert f["contract"] == "Fixed term"
     f2 = facts_of("Officer", contract_type="Consultant")
     assert f2["contract"] == "Consultancy"
+    assert map_contract_type("Intern Consultant") == "Internship"
+    assert map_contract_type("Consulting Intern") == "Internship"
+
+
+def test_international_stored_contract_is_not_internship():
+    assert map_contract_type("International Consultant") == "Consultancy"
+    assert map_contract_type("International Fellowship") == "Fellowship"
+    assert map_contract_type("International Fixed Term") == "Fixed term"
+    assert map_contract_type("Internal candidate") is None
+    f = facts_of("Education Officer, P-4", contract_type="International Consultant")
+    assert f["contract"] == "Consultancy"
+    assert f["level"] == "Senior"
 
 
 def test_unmapped_contract_type_leaves_title_result():
@@ -192,6 +240,9 @@ def test_advert_language_maps_codes_and_names():
     # Unmapped stored language leaves the title heuristic (French title).
     f = facts_of("Chargé(e) de suivi et évaluation, NO-B", advert_language="de")
     assert f["language"] == "French"
+    # Mapped English overrides a French title.
+    f2 = facts_of("Chargé(e) de suivi et évaluation, NO-B", advert_language="en")
+    assert f2["language"] == "English"
 
 
 def test_sdg_colours_match_typescript_table():

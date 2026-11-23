@@ -255,6 +255,24 @@ _REMOTE_RE = re.compile(
     r"\bremote(ly)?\b|home[- ]based|work from home|télétravail|remoto",
     re.I,
 )
+# Description remote: avoid "remote area" / hardship prose.
+_REMOTE_DESC_RE = re.compile(
+    r"home[- ]based|work from home|télétravail|remoto|\bremotely\b|"
+    r"\bremote\b(?!\s+area)",
+    re.I,
+)
+_GRADE_DESC_RE = re.compile(
+    r"(?:grade|appointment|level|post(?:ing)?)\s+(?:of\s+|at\s+)?"
+    r"(P|NO|G|GS|D)[- ]?([1-7]|[A-E])\b|"
+    r"\bat\s+(P|NO|G|GS|D)[- ]?([1-7]|[A-E])\b",
+    re.I,
+)
+_DURATION_MONTH_RE = re.compile(
+    r"(?:for|duration(?:\s+of)?|period(?:\s+of)?)\s+"
+    r"(\d+(?:[.,]\d+)?)\s*(months?|mois|meses)\b|"
+    r"(\d+(?:[.,]\d+)?)\s*(months?|mois|meses)\b",
+    re.I,
+)
 _MEL_LEARNING_RE = re.compile(
     r"(monitoring|evaluation|accountability|reporting)[^,#()]{0,25}\blearning\b|"
     r"\blearning and reporting\b",
@@ -262,9 +280,10 @@ _MEL_LEARNING_RE = re.compile(
 )
 
 # Stored employer text → demo contract union. Unmapped values leave the title result.
+# Intern uses a word boundary so "International …" is not Internship (must-fix review).
 _CONTRACT_TYPE_MAP: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"intern", re.I), "Internship"),
-    (re.compile(r"fellow", re.I), "Fellowship"),
+    (re.compile(r"\bintern(?:ship)?s?\b", re.I), "Internship"),
+    (re.compile(r"\bfellow(?:ship)?s?\b", re.I), "Fellowship"),
     (re.compile(r"consult", re.I), "Consultancy"),
     (
         re.compile(
@@ -420,11 +439,19 @@ def _duration_of(text: str) -> Optional[str]:
 
 
 def _open_to_of(text: str, grade: Optional[str]) -> Optional[str]:
-    if re.search(r"international candidates only|open (for|to) international", text, re.I):
+    # Require candidates/applicants/only — not "open to international travel".
+    if re.search(
+        r"international candidates only|"
+        r"open (for|to) international only\b|"
+        r"open (for|to) international(?:\s+candidates|\s+applicants)(?:\s+only)?\b",
+        text,
+        re.I,
+    ):
         return "International"
+    # `(?<![A-Za-z])national\)` keeps "(national)" and blocks "(International)".
     if re.search(
         r"nationals? only|open to nationals|ressortissants|"
-        r"\bnational consultant|\(national\)|national\)",
+        r"\bnational consultant|\(national\)|(?<![A-Za-z])national\)",
         text,
         re.I,
     ):
@@ -480,6 +507,70 @@ def map_advert_language(stored: Optional[str]) -> Optional[str]:
     return _LANG_CODE_MAP.get(key)
 
 
+def _grade_of_description(text: str) -> Optional[str]:
+    """Grade from description only with a local cue (not a visa or annex code)."""
+    match = _GRADE_DESC_RE.search(text)
+    if not match:
+        return None
+    kind_raw = match.group(1) or match.group(3)
+    step = match.group(2) or match.group(4)
+    kind = "G" if kind_raw.upper() == "GS" else kind_raw.upper()
+    if kind == "NO":
+        return f"NO-{step.upper() if step.isalpha() else step}"
+    return f"{kind}-{step.upper() if step.isalpha() else step}"
+
+
+def _contract_of_description(text: str) -> Optional[str]:
+    """Prefer staff/consult contracts over a mention of an internship programme."""
+    if re.search(r"\bFT\b|fixed[- ]term|\bFTA\b|continuing|permanent", text, re.I):
+        return "Fixed term"
+    if re.search(r"\bTA\b|temporary|temporaire|\b364 days\b", text, re.I):
+        return "Temporary"
+    if re.search(
+        r"consult(ant|ancy|ante|ance|oría|oria|or)\b|\bconsultor",
+        text,
+        re.I,
+    ):
+        return "Consultancy"
+    if re.search(r"\bfellow(ship)?\b", text, re.I):
+        return "Fellowship"
+    if re.search(
+        r"\binternship\b(?!\s+programme|\s+program)|\bstagiaire\b|"
+        r"\bpasant[ií]a\b|\bestagi[aá]rio",
+        text,
+        re.I,
+    ):
+        return "Internship"
+    return None
+
+
+def _duration_of_description(text: str) -> Optional[str]:
+    """Prefer an explicit month/period length over an apply-within-N-days notice."""
+    match = _DURATION_MONTH_RE.search(text)
+    if match:
+        number = (match.group(1) or match.group(3) or "").replace(",", ".")
+        unit_raw = (match.group(2) or match.group(4) or "").lower()
+        en = "month"
+        if unit_raw.startswith("mes"):
+            en = "month"
+        plural = "" if number == "1" else "s"
+        return f"{number} {en}{plural}"
+    # Weeks/days only with an explicit for/duration/period cue.
+    match = re.search(
+        r"(?:for|duration(?:\s+of)?|period(?:\s+of)?)\s+"
+        r"(\d+(?:[.,]\d+)?)\s*(weeks?|semaines|days?|jours)\b",
+        text,
+        re.I,
+    )
+    if not match:
+        return None
+    number = match.group(1).replace(",", ".")
+    unit = match.group(2).lower()
+    en = "week" if unit.startswith("w") or unit.startswith("sem") else "day"
+    plural = "" if number == "1" else "s"
+    return f"{number} {en}{plural}"
+
+
 def _fill_precision_gaps(
     title_facts: dict[str, Any], description_prefix: str
 ) -> None:
@@ -487,12 +578,12 @@ def _fill_precision_gaps(
     if not description_prefix:
         return
     if title_facts["grade"] is None:
-        title_facts["grade"] = _grade_of(description_prefix)
+        title_facts["grade"] = _grade_of_description(description_prefix)
     if title_facts["contract"] is None:
-        title_facts["contract"] = _contract_of(description_prefix)
+        title_facts["contract"] = _contract_of_description(description_prefix)
     if title_facts["duration"] is None:
-        title_facts["duration"] = _duration_of(description_prefix)
-    if not title_facts["remote"] and _remote_of(description_prefix):
+        title_facts["duration"] = _duration_of_description(description_prefix)
+    if not title_facts["remote"] and _REMOTE_DESC_RE.search(description_prefix):
         title_facts["remote"] = True
     if title_facts["openTo"] is None:
         # Grade-derived open-to uses the (possibly just filled) grade; explicit
