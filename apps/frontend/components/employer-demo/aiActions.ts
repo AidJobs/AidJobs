@@ -68,7 +68,7 @@ import { approvalRequired } from './approval';
 import { checkSuggestion, offerSuggestion, showPageDraft } from './context';
 import { pageFor } from './pageMemory';
 import { canAmplifyFree } from './plans';
-import { profileFor } from './profiles';
+import { profileFor, profileIdsInContext } from './profiles';
 import { COMMITMENTS, CONTRACTS, daysUntil, extractFacts, headingFor, LANGUAGES, SECTION_BY_KEY, emptyFacts } from './engine';
 import { amplifying, ASKS, asksOf, checkPoints, DECLINABLE, FIXED_SECTIONS, fullPoints, isSettled, isWritten, keepToOffer, LATER, LEFT, marketPoints, nextStep, reachOpen, stepKey } from './flow';
 import { planFor } from './invites';
@@ -189,6 +189,10 @@ const METHODS = ['system', 'email', 'form', 'formOnly'] as const;
 
 /** The user asked to move or reorder something, so the AI may move a section across groups: a verb of moving, not a word like "first". */
 export const MOVE_ASKED = /\b(?:move|moving|put|place|swap|switch|reorder|re-order|rearrange)\b|\b(?:come|go|goes|be|sit)s? (?:first|last|before|after|above|below|earlier|later|at the (?:top|bottom|end|start))\b/i;
+
+/** The user asked to open, start from, rename, or delete a job profile (Phase 7 section F). */
+export const PROFILE_ASKED =
+  /\b(?:job profiles?|profiles? (?:page|list)|open (?:the )?(?:job )?profiles?|show (?:me )?(?:the )?(?:job )?profiles?|start (?:a (?:new )?job )?from (?:this |that |a |the )?profile|use (?:this |that |a |the )?profile(?: for a new job)?|rename (?:this |that |the |a )?profile|delete (?:this |that |the |a )?profile|remove (?:this |that |the |a )?profile)\b/i;
 
 /** The user approved every section at once: "approve the rest", "all of them are good", not "all good" about one section. */
 export const ALL_ASKED = /\bapprove (?:them )?all\b|\bapprove (?:the rest|everything|every section|both|all (?:of them|the sections|sections))\b|\b(?:all (?:of them|the sections|sections)|the rest|everything|every section|both) (?:is |are |looks? )?(?:good|fine|ok|okay|approved)\b/i;
@@ -589,20 +593,22 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         break;
       }
       case 'open_profiles': {
-        // Phase 7: open the list or one known profile; refused for reviewers and unknown ids.
+        // Phase 7: open the list or one profile from context.profiles; only when the user asked.
         if (s.reviewerAs) refused.push('job profiles: only your organisation manages them');
+        else if (!said || !PROFILE_ASKED.test(said)) refused.push('opening job profiles: only when you ask');
         else {
           const pid = typeof a.profile === 'string' ? a.profile : '';
-          if (pid && !(s.profiles ?? []).some((p) => p.id === pid)) refused.push('a job profile the demo does not have');
+          const allowed = profileIdsInContext(s.profiles);
+          if (pid && !allowed.has(pid)) refused.push('a job profile that is not in the list');
           else go('profiles', pid || undefined);
         }
         break;
       }
       case 'start_job_from_profile': {
         const pid = typeof a.profile === 'string' ? a.profile : '';
-        const known = (s.profiles ?? []).some((p) => p.id === pid);
         if (s.reviewerAs) refused.push('starting from a profile: only your organisation can');
-        else if (!pid || !known) refused.push('a job profile the demo does not have');
+        else if (!said || !PROFILE_ASKED.test(said)) refused.push('starting from a profile: only when you ask');
+        else if (!pid || !profileIdsInContext(s.profiles).has(pid)) refused.push('a job profile that is not in the list');
         else if (!startJobFromProfile(pid)) refused.push('starting from that profile: its JD format is gone');
         break;
       }
@@ -610,14 +616,16 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         const pid = typeof a.profile === 'string' ? a.profile : '';
         const name = typeof a.name === 'string' ? a.name : '';
         if (s.reviewerAs) refused.push('renaming a profile: only your organisation can');
-        else if (!pid || !(s.profiles ?? []).some((p) => p.id === pid)) refused.push('a job profile the demo does not have');
+        else if (!said || !PROFILE_ASKED.test(said)) refused.push('renaming a profile: only when you ask');
+        else if (!pid || !profileIdsInContext(s.profiles).has(pid)) refused.push('a job profile that is not in the list');
         else if (!renameProfile(pid, name)) refused.push('renaming that profile');
         break;
       }
       case 'delete_profile': {
         const pid = typeof a.profile === 'string' ? a.profile : '';
         if (s.reviewerAs) refused.push('deleting a profile: only your organisation can');
-        else if (!pid || !(s.profiles ?? []).some((p) => p.id === pid)) refused.push('a job profile the demo does not have');
+        else if (!said || !PROFILE_ASKED.test(said)) refused.push('deleting a profile: only when you ask');
+        else if (!pid || !profileIdsInContext(s.profiles).has(pid)) refused.push('a job profile that is not in the list');
         else if (!deleteProfile(pid)) refused.push('deleting that profile');
         break;
       }

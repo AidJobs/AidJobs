@@ -5,7 +5,7 @@ import { downloadBlock, formatOf, groupingOf, missingFacts } from './actions';
 import { approvalRequired, approvedFor } from './approval';
 import { planCount, planFor } from './invites';
 import { isPublished, STATE_LABEL, stateActionsOf, type StateAction } from './lifecycle';
-import { profileFor, profileName } from './profiles';
+import { profileFor, profileName, profilesForContext } from './profiles';
 import { allowance, canAmplifyFree, canGoFree, LANGS_INCLUDED, LANGUAGE_PRICE, langsToPay, LISTED_DAYS, PACKAGES, paidJobsLeft, singlePrice, usd, usesFreeAmplify, viaFor } from './plans';
 import { ALL_LANGS, jobLang, langOf, stale, versionsOf } from './translate';
 import { applyAiTurn, type Applied, type OpenTarget } from './aiActions';
@@ -288,11 +288,8 @@ export function contextFor(s: State, j: DemoJob, focus: string | undefined, firs
     ...(carry ? { carry: carryFor(j, s, carry) } : {}),
     publishing: publishingFor(s, j, version && j.translations?.[version] ? version : undefined),
     returning: returningFor(s, j),
-    // Phase 7: short list for open / start / rename / delete; no fact bodies.
-    profiles: (() => {
-      const all = s.profiles ?? [];
-      return { total: all.length, list: all.slice(0, 20).map((p) => ({ id: p.id, name: profileName(p) })) };
-    })(),
+    // Phase 7: short list for open / start / rename / delete; no fact bodies; total only when >20.
+    profiles: profilesForContext(s.profiles),
     recommendation: {
       key: rec.key,
       label: recFormat.label,

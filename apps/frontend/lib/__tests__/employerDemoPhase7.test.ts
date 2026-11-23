@@ -1,6 +1,7 @@
 /**
  * Phase 7 (23 November 2026): Job profiles — grouping on save/start, rename, delete Undo,
  * startJobFromProfile, light fact edit, reviewer gate.
+ * Review fixes (23 November 2026): customGroups, AI gates, context.profiles.total, pay/apply edits.
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import {
@@ -13,9 +14,12 @@ import {
   startJobFromProfile,
   updateProfile,
 } from '../../components/employer-demo/actions';
-import { profileFor, profileName, profileOf } from '../../components/employer-demo/profiles';
+import { applyAiTurn, PROFILE_ASKED, type OpenTarget } from '../../components/employer-demo/aiActions';
+import { contextFor } from '../../components/employer-demo/ai';
+import { profileFor, profileIdsInContext, profileName, profileOf, profilesForContext } from '../../components/employer-demo/profiles';
 import { getState, resetDemo, update } from '../../components/employer-demo/store';
 import type { DemoJob, JobProfile } from '../../components/employer-demo/types';
+import { SYSTEM } from '../../lib/employerDemoAi/model';
 
 const job = (id: string) => getState().jobs.find((j) => j.id === id)!;
 
@@ -149,5 +153,83 @@ describe('Phase 7: profile data', () => {
     startFromProfile(id, bare.id);
     expect(job(id).groupOrder).toBeUndefined();
     expect(job(id).tags.length).toBeGreaterThan(0);
+  });
+
+  it('profileOf keeps customGroups; start restores them', () => {
+    const src = job('job-fin');
+    const withCustom: DemoJob = {
+      ...src,
+      customGroups: [{ id: 'g-annex', label: 'Annex' }],
+      groupOrder: ['employer', 'job', 'g-annex', 'applying'],
+      groupOf: { requirements: 'g-annex' },
+    };
+    const p = { ...profileOf(withCustom, Date.now()), id: 'pf-custom' };
+    expect(p.customGroups?.[0]?.id).toBe('g-annex');
+    update((s) => ({
+      ...s,
+      profiles: [p, ...(s.profiles ?? []).filter((x) => !(x.title === p.title && x.location === p.location))],
+    }));
+    const id = startJobFromProfile('pf-custom');
+    expect(id).toBeTruthy();
+    expect(job(id!).customGroups?.some((g) => g.id === 'g-annex')).toBe(true);
+    expect(job(id!).groupOf?.requirements).toBe('g-annex');
+  });
+
+  it('updateProfile pay mode and apply documents; at and source job unchanged', () => {
+    const p = seedFinProfile();
+    const at = p.at;
+    const kept = getState().org.keptApply;
+    expect(
+      updateProfile(p.id, {
+        facts: { salaryMode: 'range', salaryMin: '1000', salaryMax: '2000', currency: 'USD', period: 'month', eligibility: 'righttowork' },
+        apply: { ...p.apply, documents: ['CV', 'Cover letter', 'Work samples'], method: 'email', address: 'jobs@riverstone.example.org' },
+      }),
+    ).toBe(true);
+    const next = getState().profiles!.find((x) => x.id === p.id)!;
+    expect(next.at).toBe(at);
+    expect(next.facts.salaryMode).toBe('range');
+    expect(next.facts.eligibility).toBe('righttowork');
+    expect(next.apply.documents).toContain('Work samples');
+    expect(job(p.from).apply.documents).not.toContain('Work samples');
+    expect(getState().org.keptApply).toEqual(kept);
+  });
+
+  it('profilesForContext omits total at ≤20 and lists at most 20', () => {
+    const many: JobProfile[] = Array.from({ length: 22 }, (_, i) => ({
+      ...profileOf(job('job-fin'), i),
+      id: `pf-n-${i}`,
+      title: `Role ${i}`,
+      location: `City ${i}`,
+    }));
+    const under = profilesForContext(many.slice(0, 5));
+    expect(under.total).toBeUndefined();
+    expect(under.list).toHaveLength(5);
+    const over = profilesForContext(many);
+    expect(over.total).toBe(22);
+    expect(over.list).toHaveLength(20);
+    expect(profileIdsInContext(many).has('pf-n-21')).toBe(false);
+    expect(profileIdsInContext(many).has('pf-n-0')).toBe(true);
+  });
+
+  it('AI profile actions need PROFILE_ASKED and an id in the context list', () => {
+    expect(PROFILE_ASKED.test('open the job profiles')).toBe(true);
+    expect(PROFILE_ASKED.test('go on')).toBe(false);
+    const p = seedFinProfile();
+    const open: OpenTarget[] = [];
+    const record = (t: OpenTarget) => open.push(t);
+    const id = 'job-fin';
+    const unasked = applyAiTurn(id, '', { reply: 'Done.', actions: [{ type: 'delete_profile', profile: p.id }] }, record);
+    expect(unasked.refused.some((r) => /only when you ask/.test(r))).toBe(true);
+    expect(getState().profiles!.some((x) => x.id === p.id)).toBe(true);
+    const outside = applyAiTurn(id, 'delete the profile', { reply: 'Done.', actions: [{ type: 'delete_profile', profile: 'pf-not-listed' }] }, record);
+    expect(outside.refused.some((r) => /not in the list/.test(r))).toBe(true);
+    const renamed = applyAiTurn(id, 'rename the profile', { reply: 'Done.', actions: [{ type: 'rename_profile', profile: p.id, name: 'AI Name' }] }, record);
+    expect(renamed.refused).toEqual([]);
+    expect(profileName(getState().profiles!.find((x) => x.id === p.id)!)).toBe('AI Name');
+    expect(SYSTEM).toMatch(/open_profiles/);
+    expect(SYSTEM).toMatch(/context\.profiles/);
+    const ctx = contextFor(getState(), job(id), undefined, false) as { profiles: { list: unknown[]; total?: number } };
+    expect(ctx.profiles.total).toBeUndefined();
+    expect(Array.isArray(ctx.profiles.list)).toBe(true);
   });
 });

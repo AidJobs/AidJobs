@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
 import { deleteProfile, formatOf, renameProfile, startJobFromProfile, updateProfile } from './actions';
+import { DOCUMENTS } from './apply';
 import { COMMITMENTS, CONTRACTS, emptyFacts, headingFor, salaryText } from './engine';
 import { isLocked } from './fixed';
 import { openJob } from './Home';
@@ -12,8 +13,21 @@ import MenuButton, { type MenuAction } from './MenuButton';
 import { profileName, profileSavedWhen, profileTags } from './profiles';
 import { go, goBack, useDemo, useRoute } from './store';
 import { langOf } from './translate';
-import type { ApplySettings, Facts, JobLang, JobProfile, State } from './types';
+import type { ApplySettings, Engagement, Facts, JobLang, JobProfile, SalaryMode, State } from './types';
 import { Field, HeaderSlot, inputStyle, Section } from './ui';
+
+/** One-shot focus target after leaving a profile panel (Phase 7 review fix). */
+let profilesFocusTarget: string | 'heading' | null = null;
+
+const SALARY_MODES: Array<{ key: SalaryMode; label: string }> = [
+  { key: 'range', label: 'Range' },
+  { key: 'exact', label: 'Exact' },
+  { key: 'scale', label: 'As per our scale' },
+  { key: 'grade', label: 'Grade only' },
+  { key: 'competitive', label: 'Competitive' },
+  { key: 'daily', label: 'Daily rate' },
+  { key: 'hidden', label: 'Not shown' },
+];
 
 /** Phase 7: Job profiles list and open-profile panel. */
 export default function JobProfiles() {
@@ -62,8 +76,21 @@ function List({ s, gone, children }: { s: State; gone?: string; children?: React
     : profiles;
 
   useEffect(() => {
-    if (gone) headingRef.current?.focus();
-  }, [gone]);
+    if (gone) {
+      headingRef.current?.focus();
+      profilesFocusTarget = null;
+      return;
+    }
+    const want = profilesFocusTarget;
+    if (!want) return;
+    profilesFocusTarget = null;
+    if (want === 'heading') {
+      headingRef.current?.focus();
+      return;
+    }
+    const row = document.querySelector<HTMLElement>(`[data-profile-id="${CSS.escape(want)}"]`);
+    (row ?? headingRef.current)?.focus();
+  }, [gone, profiles]);
 
   const search = <SearchToggle query={query} setQuery={setQuery} openField={searching} setOpenField={setSearching} refocusRef={refocusRef} />;
   return (
@@ -72,6 +99,7 @@ function List({ s, gone, children }: { s: State; gone?: string; children?: React
         Job profiles
       </h1>
       <HeaderSlot>{(!phone || !searching) && search}</HeaderSlot>
+      {phone && searching && <div className="-mt-1">{search}</div>}
       {children}
       {!profiles.length && (
         <p className="aj-muted" style={{ margin: 0 }}>
@@ -103,7 +131,7 @@ function Row({ s, profile: p }: { s: State; profile: JobProfile }) {
     {
       label: 'Rename',
       run: () => {
-        const next = window.prompt('Name for this profile', p.name ?? profileName(p));
+        const next = window.prompt('Name for this profile', p.name ?? '');
         if (next === null) return;
         renameProfile(p.id, next);
       },
@@ -113,19 +141,28 @@ function Row({ s, profile: p }: { s: State; profile: JobProfile }) {
       danger: true,
       run: () => {
         deleteProfile(p.id);
-        rowRef.current?.blur();
+        profilesFocusTarget = 'heading';
+        // Remount focus via List effect after state update.
+        queueMicrotask(() => {
+          const want = profilesFocusTarget;
+          if (want !== 'heading') return;
+          profilesFocusTarget = null;
+          document.querySelector<HTMLElement>('h1.aj-display')?.focus();
+        });
       },
     },
   ];
+  const aria = formatGone ? `${profileName(p)}, format no longer available` : profileName(p);
   return (
     <li className="flex flex-wrap items-center gap-2 py-3">
       <button
         ref={rowRef}
         type="button"
+        data-profile-id={p.id}
         className="flex min-w-0 flex-1 flex-col gap-0.5 text-left"
         style={{ border: 'none', background: 'transparent', color: 'inherit', font: 'inherit', cursor: 'pointer', padding: 0 }}
         onClick={() => go('profiles', p.id)}
-        aria-label={profileName(p)}
+        aria-label={aria}
       >
         <span style={{ fontWeight: 650 }}>{profileName(p)}</span>
         <span className="aj-faint">
@@ -142,11 +179,15 @@ function Row({ s, profile: p }: { s: State; profile: JobProfile }) {
 
 function Detail({ s, profile: p }: { s: State; profile: JobProfile }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const skipBlurSave = useRef(false);
   const formatGone = !s.formats.some((f) => f.key === p.format);
   const format = formatOf(s, p.format);
   const tags = profileTags(p);
   const source = s.jobs.find((j) => j.id === p.from);
   const [nameDraft, setNameDraft] = useState(p.name ?? '');
+  const engagement = (p.facts.engagement ?? 'job') as Engagement;
+  const salaryMode = (p.facts.salaryMode ?? 'hidden') as SalaryMode;
+  const showPayAmounts = salaryMode === 'range' || salaryMode === 'exact' || salaryMode === 'daily';
 
   useEffect(() => {
     setNameDraft(p.name ?? '');
@@ -157,14 +198,20 @@ function Detail({ s, profile: p }: { s: State; profile: JobProfile }) {
   }, [p.id]);
 
   const saveName = () => {
+    if (skipBlurSave.current) {
+      skipBlurSave.current = false;
+      return;
+    }
     if ((p.name ?? '') === nameDraft.trim() || (!p.name && !nameDraft.trim())) return;
     renameProfile(p.id, nameDraft);
   };
 
   const back = () => {
+    profilesFocusTarget = p.id;
     goBack('profiles');
-    // Focus return to the row is handled after navigation when the list remounts; list heading is the fallback.
   };
+
+  const patchFacts = (facts: Partial<Facts>) => updateProfile(p.id, { facts });
 
   return (
     <div ref={panelRef} tabIndex={-1} className="mx-auto flex w-full max-w-[720px] flex-col gap-5 px-4 pb-10 pt-4 outline-none lg:px-8 lg:pt-6">
@@ -189,7 +236,10 @@ function Detail({ s, profile: p }: { s: State; profile: JobProfile }) {
               label: 'Delete',
               danger: true,
               run: () => {
-                if (deleteProfile(p.id)) go('profiles');
+                if (deleteProfile(p.id)) {
+                  profilesFocusTarget = 'heading';
+                  go('profiles');
+                }
               },
             },
           ]}
@@ -215,6 +265,8 @@ function Detail({ s, profile: p }: { s: State; profile: JobProfile }) {
                 (e.target as HTMLInputElement).blur();
               }
               if (e.key === 'Escape') {
+                e.preventDefault();
+                skipBlurSave.current = true;
                 setNameDraft(p.name ?? '');
                 (e.target as HTMLInputElement).blur();
               }
@@ -247,30 +299,41 @@ function Detail({ s, profile: p }: { s: State; profile: JobProfile }) {
       <Section title="Facts">
         <div className="flex flex-col gap-3">
           <FactSelect
+            label="Kind of job"
+            value={engagement}
+            options={['job', 'consultancy', 'internship', 'volunteer']}
+            labels={{ job: 'Job', consultancy: 'Consultancy', internship: 'Internship', volunteer: 'Volunteer' }}
+            onChange={(v) => patchFacts({ engagement: v as Engagement })}
+          />
+          <FactSelect
             label="Contract"
             value={p.facts.contract ?? ''}
-            options={CONTRACTS[p.facts.engagement ?? 'job'] ?? CONTRACTS.job}
-            onChange={(contract) => updateProfile(p.id, { facts: { contract } })}
+            options={CONTRACTS[engagement] ?? CONTRACTS.job}
+            onChange={(contract) => patchFacts({ contract })}
           />
-          <FactInput label="Grade" value={p.facts.grade ?? ''} onChange={(grade) => updateProfile(p.id, { facts: { grade } })} />
+          {engagement === 'job' && (
+            <label className="flex items-center gap-2" style={{ fontSize: 14 }}>
+              <input type="checkbox" checked={Boolean(p.facts.subjectToFunding)} onChange={(e) => patchFacts({ subjectToFunding: e.target.checked })} />
+              Subject to funding
+            </label>
+          )}
+          <FactInput label="Grade" value={p.facts.grade ?? ''} onChange={(grade) => patchFacts({ grade })} />
           <FactSelect
             label="Who can apply"
             value={p.facts.eligibility ?? 'anyone'}
-            options={['anyone', 'nationals', 'internal']}
-            labels={{ anyone: 'Anyone', nationals: 'Nationals only', internal: 'Internal only' }}
-            onChange={(eligibility) => updateProfile(p.id, { facts: { eligibility: eligibility as Facts['eligibility'] } })}
+            options={['anyone', 'nationals', 'internal', 'righttowork']}
+            labels={{ anyone: 'Anyone', nationals: 'Nationals only', internal: 'Internal only', righttowork: 'Must have the right to work' }}
+            onChange={(eligibility) => patchFacts({ eligibility: eligibility as Facts['eligibility'] })}
           />
           <FactInput
             label="Languages"
             value={(p.facts.languages ?? []).join(', ')}
             onChange={(raw) =>
-              updateProfile(p.id, {
-                facts: {
-                  languages: raw
-                    .split(/[,;]/)
-                    .map((x) => x.trim())
-                    .filter(Boolean),
-                },
+              patchFacts({
+                languages: raw
+                  .split(/[,;]/)
+                  .map((x) => x.trim())
+                  .filter(Boolean),
               })
             }
           />
@@ -279,38 +342,74 @@ function Detail({ s, profile: p }: { s: State; profile: JobProfile }) {
             value={p.facts.safeguarding ?? ''}
             options={['', 'low', 'medium', 'high']}
             labels={{ '': 'None', low: 'Low', medium: 'Medium', high: 'High' }}
-            onChange={(safeguarding) => updateProfile(p.id, { facts: { safeguarding: safeguarding as Facts['safeguarding'] } })}
+            onChange={(safeguarding) => patchFacts({ safeguarding: safeguarding as Facts['safeguarding'] })}
           />
-          <FactInput label="Duration" value={p.facts.duration ?? ''} onChange={(duration) => updateProfile(p.id, { facts: { duration } })} />
+          <FactInput label="Duration" value={p.facts.duration ?? ''} onChange={(duration) => patchFacts({ duration })} />
           <FactSelect
             label="Arrangement"
             value={p.facts.arrangement ?? 'onsite'}
             options={['onsite', 'hybrid', 'remote']}
             labels={{ onsite: 'On site', hybrid: 'Hybrid', remote: 'Remote' }}
-            onChange={(arrangement) => updateProfile(p.id, { facts: { arrangement: arrangement as Facts['arrangement'] } })}
+            onChange={(arrangement) => patchFacts({ arrangement: arrangement as Facts['arrangement'] })}
           />
           <FactSelect
             label="Hours"
             value={p.facts.hours ?? 'full'}
             options={['full', 'part']}
             labels={{ full: 'Full time', part: 'Part time' }}
-            onChange={(hours) => updateProfile(p.id, { facts: { hours: hours as Facts['hours'] } })}
+            onChange={(hours) => patchFacts({ hours: hours as Facts['hours'] })}
           />
           <FactSelect
             label="Recruitment"
             value={p.facts.recruitment ?? 'vacancy'}
             options={['vacancy', 'roster', 'proposal']}
             labels={{ vacancy: 'Vacancy', roster: 'Roster', proposal: 'Proposal' }}
-            onChange={(recruitment) => updateProfile(p.id, { facts: { recruitment: recruitment as Facts['recruitment'] } })}
+            onChange={(recruitment) => patchFacts({ recruitment: recruitment as Facts['recruitment'] })}
           />
+          {(p.facts.recruitment ?? 'vacancy') === 'roster' && (
+            <FactInput label="Availability" value={p.facts.availability ?? ''} onChange={(availability) => patchFacts({ availability })} />
+          )}
+          {(p.facts.recruitment ?? 'vacancy') === 'proposal' && (
+            <>
+              <FactInput label="Client or donor" value={p.facts.client ?? ''} onChange={(client) => patchFacts({ client })} />
+              <label className="flex items-center gap-2" style={{ fontSize: 14 }}>
+                <input type="checkbox" checked={Boolean(p.facts.keyPersonnel)} onChange={(e) => patchFacts({ keyPersonnel: e.target.checked })} />
+                Key personnel
+              </label>
+            </>
+          )}
+          <FactInput label="Direct reports" value={p.facts.directReports ?? ''} onChange={(directReports) => patchFacts({ directReports })} />
+          <FactInput label="Donor or project" value={p.facts.donor ?? ''} onChange={(donor) => patchFacts({ donor })} />
           <p className="aj-faint m-0" style={{ fontSize: 12 }}>
             Pay as saved: {salaryText({ ...emptyFacts(), ...p.facts, title: p.title, location: p.location }) || 'Hidden'}
           </p>
-          <div className="grid gap-2 sm:grid-cols-3">
-            <FactInput label="Pay min" value={p.facts.salaryMin ?? ''} onChange={(salaryMin) => updateProfile(p.id, { facts: { salaryMin } })} />
-            <FactInput label="Pay max" value={p.facts.salaryMax ?? ''} onChange={(salaryMax) => updateProfile(p.id, { facts: { salaryMax } })} />
-            <FactInput label="Currency" value={p.facts.currency ?? ''} onChange={(currency) => updateProfile(p.id, { facts: { currency } })} />
-          </div>
+          <FactSelect
+            label="How to show pay"
+            value={salaryMode}
+            options={SALARY_MODES.map((m) => m.key)}
+            labels={Object.fromEntries(SALARY_MODES.map((m) => [m.key, m.label]))}
+            onChange={(v) => patchFacts({ salaryMode: v as SalaryMode })}
+          />
+          {showPayAmounts && (
+            <div className="grid gap-2 sm:grid-cols-3">
+              <FactInput label="Currency" value={p.facts.currency ?? ''} onChange={(currency) => patchFacts({ currency: currency.toUpperCase() })} />
+              <FactInput
+                label={salaryMode === 'range' ? 'From' : 'Amount'}
+                value={p.facts.salaryMin ?? ''}
+                onChange={(salaryMin) => patchFacts({ salaryMin })}
+              />
+              {salaryMode === 'range' && <FactInput label="To" value={p.facts.salaryMax ?? ''} onChange={(salaryMax) => patchFacts({ salaryMax })} />}
+              {salaryMode !== 'daily' && (
+                <FactSelect
+                  label="Per"
+                  value={p.facts.period ?? 'month'}
+                  options={['hour', 'month', 'year']}
+                  labels={{ hour: 'an hour', month: 'a month', year: 'a year' }}
+                  onChange={(period) => patchFacts({ period: period as Facts['period'] })}
+                />
+              )}
+            </div>
+          )}
         </div>
       </Section>
 
@@ -385,7 +484,7 @@ function FactSelect({
       <select style={inputStyle} value={value} onChange={(e) => onChange(e.target.value)}>
         {!options.includes(value) && value ? <option value={value}>{value}</option> : null}
         {options.map((o) => (
-          <option key={o} value={o}>
+          <option key={o || 'empty'} value={o}>
             {labels?.[o] ?? o}
           </option>
         ))}
@@ -395,6 +494,8 @@ function FactSelect({
 }
 
 function ApplyEdit({ apply, onChange }: { apply: ApplySettings; onChange: (a: ApplySettings) => void }) {
+  const toggleDoc = (d: string) =>
+    onChange({ ...apply, documents: apply.documents.includes(d) ? apply.documents.filter((x) => x !== d) : [...apply.documents, d] });
   return (
     <div className="flex flex-col gap-3">
       <FactSelect
@@ -408,6 +509,46 @@ function ApplyEdit({ apply, onChange }: { apply: ApplySettings; onChange: (a: Ap
       {(apply.method === 'system' || apply.method === 'form' || apply.method === 'formOnly') && (
         <FactInput label="Link" value={apply.address} onChange={(address) => onChange({ ...apply, address })} />
       )}
+      <Field label="Documents">
+        <div className="flex flex-wrap gap-1.5">
+          {DOCUMENTS.map((d) => (
+            <button key={d} type="button" className="ej-tag" data-on={apply.documents.includes(d)} onClick={() => toggleDoc(d)} aria-pressed={apply.documents.includes(d)}>
+              {d}
+            </button>
+          ))}
+        </div>
+      </Field>
+      <div className="grid grid-cols-3 gap-2">
+        <FactInput label="CV pages" value={apply.cvPages} onChange={(cvPages) => onChange({ ...apply, cvPages })} />
+        <FactInput label="Statement words" value={apply.statementWords} onChange={(statementWords) => onChange({ ...apply, statementWords })} />
+        <FactInput label="References" value={apply.references} onChange={(references) => onChange({ ...apply, references })} />
+      </div>
+      {apply.method === 'email' && (
+        <div className="flex flex-col gap-1.5">
+          <label className="flex items-center gap-2" style={{ fontSize: 14 }}>
+            <input type="checkbox" checked={apply.subjectLine} onChange={(e) => onChange({ ...apply, subjectLine: e.target.checked })} /> Job title as the email subject
+          </label>
+          <label className="flex items-center gap-2" style={{ fontSize: 14 }}>
+            <input type="checkbox" checked={apply.onePdf} onChange={(e) => onChange({ ...apply, onePdf: e.target.checked })} /> Everything in one PDF
+          </label>
+          <FactInput label="Attachment limit (MB)" value={apply.maxMb} onChange={(maxMb) => onChange({ ...apply, maxMb })} />
+        </div>
+      )}
+      <FactInput label="Application language" value={apply.language} onChange={(language) => onChange({ ...apply, language })} />
+      <label className="flex items-center gap-2" style={{ fontSize: 14 }}>
+        <input type="checkbox" checked={apply.rolling} onChange={(e) => onChange({ ...apply, rolling: e.target.checked })} /> Rolling applications
+      </label>
+      <label className="flex items-center gap-2" style={{ fontSize: 14 }}>
+        <input type="checkbox" checked={apply.earlyClose} onChange={(e) => onChange({ ...apply, earlyClose: e.target.checked })} /> May close early
+      </label>
+      <label className="flex items-center gap-2" style={{ fontSize: 14 }}>
+        <input type="checkbox" checked={apply.shortlistedOnly} onChange={(e) => onChange({ ...apply, shortlistedOnly: e.target.checked })} /> Contact shortlisted only
+      </label>
+      <label className="flex items-center gap-2" style={{ fontSize: 14 }}>
+        <input type="checkbox" checked={apply.anonymised} onChange={(e) => onChange({ ...apply, anonymised: e.target.checked })} /> Anonymised screening
+      </label>
+      <FactInput label="Interview dates" value={apply.interviewDates} onChange={(interviewDates) => onChange({ ...apply, interviewDates })} />
+      <FactInput label="Reply within (weeks)" value={apply.replyWeeks} onChange={(replyWeeks) => onChange({ ...apply, replyWeeks })} />
     </div>
   );
 }

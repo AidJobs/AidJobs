@@ -17,6 +17,7 @@ export function profileOf(j: DemoJob, at = Date.now()): JobProfile {
     tags: [...j.tags],
     ...(j.groupOrder?.length ? { groupOrder: [...j.groupOrder] } : {}),
     ...(j.groupOf && Object.keys(j.groupOf).length ? { groupOf: { ...j.groupOf } } : {}),
+    ...(j.customGroups?.length ? { customGroups: j.customGroups.map((g) => ({ ...g })) } : {}),
     facts,
     style: j.style,
     apply: j.apply,
@@ -59,6 +60,20 @@ export function profileName(p: JobProfile): string {
 /** Section keys that will actually start from this profile (catalog only). */
 export function profileTags(p: JobProfile): string[] {
   return p.tags.filter((k) => SECTION_BY_KEY[k]);
+}
+
+/**
+ * Phase 7 AI context: newest-first list of at most 20 `{id, name}`; `total` only when there are more than 20.
+ */
+export function profilesForContext(profiles: JobProfile[] | undefined): { list: Array<{ id: string; name: string }>; total?: number } {
+  const all = profiles ?? [];
+  const list = all.slice(0, 20).map((p) => ({ id: p.id, name: profileName(p) }));
+  return all.length > 20 ? { list, total: all.length } : { list };
+}
+
+/** Ids the AI may open / start / rename / delete (same ≤20 list as `context.profiles`). */
+export function profileIdsInContext(profiles: JobProfile[] | undefined): Set<string> {
+  return new Set(profilesForContext(profiles).list.map((p) => p.id));
 }
 
 /** "today", "yesterday", or "N days ago" from the demo clock (Phase 7 list). */

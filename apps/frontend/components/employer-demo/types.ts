@@ -110,6 +110,8 @@ export type JobProfile = {
   /** Own grouping from the published job (Phase 7); absent on older profiles. */
   groupOrder?: string[];
   groupOf?: Record<string, string>;
+  /** Added groups from the published job (Phase 7 review fix); absent on older profiles. */
+  customGroups?: CustomGroup[];
   facts: Partial<Facts>;
   style?: string[];
   apply: ApplySettings;

@@ -958,9 +958,17 @@ export function startFromProfile(id: string, profileId: string, said?: string) {
       const style = p.style ?? proposedStyle(s);
       const settled = Array.from(new Set([...j.walk.settled, 'title', 'place', 'contract', 'grade', 'eligibility', 'languages', 'safeguarding', 'salary', 'method', 'fixed']));
       const tags = p.tags.filter((k) => SECTION_BY_KEY[k]);
-      const hasGrouping = Boolean(p.groupOrder?.length || (p.groupOf && Object.keys(p.groupOf).length));
+      const hasGrouping = Boolean(p.groupOrder?.length || (p.groupOf && Object.keys(p.groupOf).length) || p.customGroups?.length);
+      const customs = p.customGroups?.length ? p.customGroups.map((g) => ({ ...g })) : undefined;
       const groupedJob = hasGrouping
-        ? regrouped({ ...j, customGroups: undefined }, cleanGrouping({ groupOrder: p.groupOrder, groupOf: p.groupOf }, tags), tags)
+        ? {
+            ...regrouped(
+              { ...j, customGroups: customs },
+              cleanGrouping({ groupOrder: p.groupOrder, groupOf: p.groupOf, customGroups: customs }, tags),
+              tags,
+            ),
+            customGroups: customs,
+          }
         : { ...j, tags: outlineOrder(tags), groupOrder: undefined, groupOf: undefined, customGroups: undefined };
       const base: DemoJob = {
         ...groupedJob,
