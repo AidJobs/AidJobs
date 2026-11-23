@@ -160,17 +160,20 @@ export function promptFor(s: State, job: DemoJob, format: Format, step: Step, ke
       const text = edited ? `**${name}**: good now, or change something else?` : intro ? `${intro}First, **${name}**: good, or change something?` : `Here is **${name}**. Good, or change something?`;
       return [stepMsg(text, key, quick)];
     }
-    case 'details':
+    case 'details': {
+      // FW-2: after No project, do not re-offer the project card; Skip for now still may.
+      const offerProject = !job.pack?.project && !job.walk?.noProject;
       return [
         {
           ...stepMsg(
-            `Anything else for the listing: the number of positions, direct reports, the start date, or the donor?${job.pack?.project ? '' : ' You can still add a project page below if you skipped it earlier.'}`,
+            `Anything else for the listing: the number of positions, direct reports, the start date, or the donor?${offerProject ? ' You can still add a project page below if you skipped it earlier.' : ''}`,
             key,
             [NONE_OF_THESE],
           ),
-          ...(job.pack?.project ? {} : { card: 'project' as const }),
+          ...(offerProject ? { card: 'project' as const } : {}),
         },
       ];
+    }
     case 'sdgs':
       return [stepMsg(`No SDG is clear from this role. Shall I use your organisation's goals (${orgGoals(s)})? The job page then says ${s.org.name} works towards them.`, key, [orgGoalsAnswer(s), CHOOSE_SDGS, NO_SDGS])];
     case 'fixed': {

@@ -1068,9 +1068,17 @@ export function advanceFromAbout(id: string, said?: string) {
   ensureAsk(id);
 }
 
+/** True when the user said there is no project (Not Skip for now / later). FW-2. */
+function saidNoProject(said?: string): boolean {
+  const t = (said ?? '').trim();
+  if (!t || t === PROJECT_QUICK[1] || SKIP.test(t)) return false;
+  return t === PROJECT_QUICK[0] || /\bno project\b|\bnot a project\b/i.test(t);
+}
+
 /** After project setup: go to style (early facts are asked by nextStep while setup is style). */
 export function advanceFromProject(id: string, said?: string) {
   if (!ownerOnly()) return;
+  const noProject = saidNoProject(said);
   update((s) => ({
     ...s,
     jobs: s.jobs.map((j) => {
@@ -1078,7 +1086,13 @@ export function advanceFromProject(id: string, said?: string) {
       const intake = j.pageIntake;
       const pageIntake = intake?.about || intake?.project ? { ...intake, project: undefined } : undefined;
       const cleared = pageIntake && (pageIntake.about || pageIntake.project) ? pageIntake : undefined;
-      return { ...j, setup: 'style', pageIntake: cleared, chat: said ? [...j.chat, msg('user', said)] : j.chat };
+      const chat = said ? [...j.chat, msg('user', said)] : j.chat;
+      // FW-2: No project drops Project brief from the outline so writing cannot leave a `[to confirm]` publish block.
+      if (!noProject) return { ...j, setup: 'style' as const, pageIntake: cleared, chat };
+      const tags = j.tags.filter((k) => k !== 'background');
+      const sections = j.sections.filter((x) => x.key !== 'background');
+      const walk = { ...(j.walk ?? { approved: [], settled: [] }), noProject: true as const };
+      return { ...j, setup: 'style' as const, pageIntake: cleared, chat, tags, sections, walk };
     }),
   }));
   ensureAsk(id);

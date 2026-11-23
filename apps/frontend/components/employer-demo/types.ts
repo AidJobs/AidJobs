@@ -255,6 +255,11 @@ export type Walk = {
   parked?: string[];
   askedAgain?: Record<string, number>;
   hold?: string;
+  /**
+   * FW-2: user chose No project (not Skip for now). Outline drops Project brief / `background` so AI/rules do not write a
+   * `[to confirm]` placeholder that blocks Check. Cleared when a project page is later accepted.
+   */
+  noProject?: boolean;
 };
 
 export type Remark = {

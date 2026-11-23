@@ -20,7 +20,7 @@
 
 5. ~~Approve vs unsaved buffers; Add-panel blur/Escape~~ — **Fixed 20 Nov 2026** (Step A R1-06; Step B R1-11; user confirmed on preview)
 
-**Next (22 Nov 2026, after FW-1):** FW-1 **Fixed** (Option A). Next: FW-2 (Project after No) or Amplify EN-BLOCK #2+ when prioritised. R1-07 deferred. Phase 7 held until the user says English chrome is good enough.
+**Next (23 Nov 2026, after FW-2):** FW-2 **Fixed** (Option A). Next: FW-3 note only, or Amplify EN-BLOCK #2+ / Reach settle when prioritised. R1-07 deferred. Phase 7 held until the user says English chrome is good enough.
 
 ---
 
@@ -336,13 +336,14 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 22 Nov 2026 | EN-BLOCK #1 investigate | code only | `parkKey` has no `version` case → null; `afterCheck` always returns unreviewed `version` with no `parked(…)` guard; `parkedIn('langs')` only exact `langs`. Skip / not now / ask-again cannot park; walk stuck before review / Reach / flyer / publish. **Option A plan ready** (not built). |
 | 22 Nov 2026 | EN-BLOCK #1 (Option A) | `c244b97` | `parkKey`/`afterCheck`/`parkedIn`/`tidyParked` for `version:${lang}`. Tests `employerDemoEnBlock1.test.ts`. **Agent confirmed on preview** (`?v=enblock1`: French version step → skip → parked `version:fr` → Next question → Review Send/No; open Language versions unparks → version step returns). |
 | 22 Nov 2026 | FW-1 (Option A) | `fb74df0` | `emailAddress`/`withEmailAddress`; essentials+org; CTA+toast; NGO default + write/publish persist. Tests `employerDemoFw1.test.ts`. **Agent confirmed on preview** (`?v=fw1` Tumaini CHO: By email → `jobs@tumaini.example.org` in Email address without manual fill; Publish CTA named Project brief while unfinished, then **Publish free · your free standard listing** → Now → Live with Copy link / Amplify). |
+| 23 Nov 2026 | FW-2 (Option A) | *(push tip)* | No project drops `background` + `walk.noProject`; Skip keeps slot; details card respects noProject. Tests `employerDemoFw2.test.ts`. **Agent confirm on preview**. |
 
 ### Free walk leftovers (English; 22 Nov 2026)
 
 | ID | Status | Fault |
 | --- | --- | --- |
 | FW-1 | **Fixed** (22 Nov 2026; Option A) | ~~empty apply.address vs body email; vague toast~~ `emailAddress` / `withEmailAddress`; essentials+CTA+toast; NGO default + write/publish persist. |
-| FW-2 | OPEN | Choosing **No project** in setup can still leave a Project brief section `[to confirm]` that blocks Check until removed. |
+| FW-2 | **Fixed** (23 Nov 2026; Option A) | ~~No project left Project brief `[to confirm]`~~ On **No project page**, drop `background` from outline + `walk.noProject`; Skip for now keeps the slot; details card skipped when noProject; accept project clears flag. |
 | FW-3 | Note | Walk Details / Fixed text stay “to do” until chat settles them even when the Job pane already has facts and commitments; Free publish does not require those settles. |
 
 ### FW-1 — apply email + publish toast — **Fixed** (22 Nov 2026; Option A)
@@ -350,6 +351,12 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 **Was:** `applyLines` printed `jobs@domain` while `apply.address` stayed empty; Publish CTA ignored essentials; fail toast was vague.
 
 **Fix:** `emailAddress` / `withEmailAddress`; essentials(job, org); NGO `defaultApply(…, domain)`; persist on write/live-draft/publish/setMethod; CTA + toast use essentials / `publishBlock`. Tests `employerDemoFw1.test.ts`. **Confirmed on preview.**
+
+### FW-2 — No project / Project brief `[to confirm]` — **Fixed** (23 Nov 2026; Option A)
+
+**Was:** Choosing **No project page** still left Local NGO **Project brief** on the outline; AI wrote `[Project details to confirm]`, which blocked Check/Publish until removed.
+
+**Fix:** `advanceFromProject` on No project (not Skip) drops `background` from tags/sections and sets `walk.noProject`; details step skips the project card when noProject; accepting a project page clears the flag and restores the tag via `placeIn`. Tests `employerDemoFw2.test.ts`. Confirm on preview.
 
 ### EN-BLOCK #1 — version park — **Fixed** (22 Nov 2026; Option A)
 
@@ -365,7 +372,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 
 1. Read this file and `employer-side-plan.md` Phase 6 / polish status.  
 2. Confirm `demo/employer` tip and that English-first still holds.  
-3. **Default next:** FW-2 (Project after No), or Amplify EN-BLOCK #2–3 / Reach settle when the user prioritises. R1-07 stays deferred.  
+3. **Default next:** Amplify EN-BLOCK #2–3 / Reach settle when the user prioritises (FW leftovers closed except FW-3 note). R1-07 stays deferred.  
 4. Mark IDs Fixed in the tables and add a Fix log row in the same commit as the code.  
 5. Do not close Phase 7 until the user says English chrome is good enough.  
 6. Never stage leftover `apps/frontend/lib/__tests__/employerDemoPhase6Review.test.ts` or `apps/frontend/AGENTS.md` unless the user asks.

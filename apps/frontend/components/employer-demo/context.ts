@@ -124,11 +124,13 @@ export function savePageFieldText(id: string, kind: 'about' | 'project', raw: st
     const sections = existing ? j.sections.map((x) => (x.key === key ? placed : x)) : inOutlineOrder([...j.sections, placed], tags);
     const beforeBody = existing ? JSON.stringify({ lines: existing.lines, subs: existing.subs }) : '';
     const afterBody = JSON.stringify({ lines: placed.lines, subs: placed.subs });
+    const walk = kind === 'project' && j.walk?.noProject ? { ...j.walk, noProject: undefined } : j.walk;
     const base: DemoJob = {
       ...touched(j),
       ...liveEdit(j),
       tags,
       sections,
+      walk,
       pageIntake: withoutPageIntake(j.pageIntake, kind),
       versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${title}`, sections }],
       part: `s:${key}`,
@@ -173,6 +175,8 @@ export function acceptPageDraft(id: string, lines?: string[]) {
       const notes = [`**${LABEL[d.kind]}** is in the job, from ${source}.`, offerOrg ? "Your organisation has no About us yet: keep this one as its About us for every job? (Save it as your organisation's About us, on the section.)" : '', ask?.text ?? ''].filter(Boolean);
       const quick = ask?.quick;
       // U-3 Step B: no walk auto-approve; Undo via contentSnap (includes pack), not stepped/afterChange; put the draft card back on Undo.
+      // FW-2: accepting a project page undoes No project (outline tag restored via placeIn above).
+      const walk = d.kind === 'project' && j.walk?.noProject ? { ...j.walk, noProject: undefined } : j.walk;
       return {
         ...touched(j),
         ...liveEdit(j),
@@ -180,6 +184,7 @@ export function acceptPageDraft(id: string, lines?: string[]) {
         sections,
         renamed,
         pack,
+        walk,
         pageDraft: undefined,
         pageIntake: withoutPageIntake(j.pageIntake, d.kind),
         versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `${LABEL[d.kind]} from ${source}`, sections }],
