@@ -192,7 +192,7 @@ export const MOVE_ASKED = /\b(?:move|moving|put|place|swap|switch|reorder|re-ord
 
 /** The user asked to open, start from, rename, or delete a job profile (Phase 7 section F). */
 export const PROFILE_ASKED =
-  /\b(?:job profiles?|profiles? (?:page|list)|open (?:the )?(?:job )?profiles?|show (?:me )?(?:the )?(?:job )?profiles?|start (?:a (?:new )?job )?from (?:this |that |a |the )?profile|use (?:this |that |a |the )?profile(?: for a new job)?|rename (?:this |that |the |a )?profile|delete (?:this |that |the |a )?profile|remove (?:this |that |the |a )?profile)\b/i;
+  /\b(?:job profiles?|list (?:the |my |our )?(?:job )?profiles?|profiles? (?:page|list)|open (?:the |my |our )?(?:job )?profiles?|show (?:me )?(?:the |my |our )?(?:job )?profiles?|start (?:a (?:new )?job )?from (?:this |that |a |the |my |our )?(?:\S+ )?profile|use (?:this |that |a |the |my |our )?profile(?: for a new job)?|rename (?:this |that |the |a |my |our )?profile|delete (?:this |that |the |a |my |our )?profile|remove (?:this |that |the |a |my |our )?profile)\b/i;
 
 /** The user approved every section at once: "approve the rest", "all of them are good", not "all good" about one section. */
 export const ALL_ASKED = /\bapprove (?:them )?all\b|\bapprove (?:the rest|everything|every section|both|all (?:of them|the sections|sections))\b|\b(?:all (?:of them|the sections|sections)|the rest|everything|every section|both) (?:is |are |looks? )?(?:good|fine|ok|okay|approved)\b/i;

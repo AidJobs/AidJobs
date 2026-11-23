@@ -213,6 +213,10 @@ describe('Phase 7: profile data', () => {
 
   it('AI profile actions need PROFILE_ASKED and an id in the context list', () => {
     expect(PROFILE_ASKED.test('open the job profiles')).toBe(true);
+    expect(PROFILE_ASKED.test('list the profiles')).toBe(true);
+    expect(PROFILE_ASKED.test('list my profiles')).toBe(true);
+    expect(PROFILE_ASKED.test('open my profiles')).toBe(true);
+    expect(PROFILE_ASKED.test('start from the Juba profile')).toBe(true);
     expect(PROFILE_ASKED.test('go on')).toBe(false);
     const p = seedFinProfile();
     const open: OpenTarget[] = [];

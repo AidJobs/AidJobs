@@ -20,7 +20,7 @@
 
 5. ~~Approve vs unsaved buffers; Add-panel blur/Escape~~ — **Fixed 20 Nov 2026** (Step A R1-06; Step B R1-11; user confirmed on preview)
 
-**Next (23 Nov 2026):** Phase 7 review-fixes **approved** ([report](c941a08f-65ef-4951-9ffc-648a98063c65): approve; 0 must/should; 1 minor — `PROFILE_ASKED` misses “list the/my profiles”, “open my profiles”, “start from the Juba profile”). Recommend a tiny regex widen; then post-Phase-7 work. FW-3 note; R1-07 deferred; LANG-ONLY / flyer / UN later.
+**Next (23 Nov 2026):** Phase 7 review-fixes **approved**; `PROFILE_ASKED` minor widen building/pushed. Then post-Phase-7 work (FW-3 note; LANG-ONLY / flyer / UN; role-library leap). R1-07 deferred.
 
 ---
 
@@ -342,6 +342,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 23 Nov 2026 | Phase 7 independent review | tip `441f18e` | [Report](d7e41e28-616a-41d0-8922-6a8d2214bf82): **changes needed**. Must: Escape on display name still saves (blur after cancel); phone search unmounts the field; section F AI actions not in system prompt and not gated (id-in-list / user-asked). Should: Back/delete focus return; light-edit pay + other non-date facts incomplete vs existing editors. Minor: prompt Rename freezes fallback name; format-gone not in aria-label; `customGroups` not on profile; `context.profiles.total` always sent. |
 | 23 Nov 2026 | Phase 7 review fixes (all) | `ebf6531` | Escape cancel via `skipBlurSave`; phone search body field; `PROFILE_ASKED` + id-in-20 + SYSTEM docs; `profilesForContext` total only when >20; focus return target; pay mode/period + non-date facts + fuller ApplyEdit; Rename prompt seeds blank; format-gone aria-label; `customGroups` on profileOf/start. Tests extended in `employerDemoPhase7.test.ts`. **Agent confirmed on preview** (`?v=phase7fix`: fuller Facts/Apply editors; Escape on display name reverts without save; Back returns focus to Goma row). |
 | 23 Nov 2026 | Phase 7 review-fixes independent review | tip `8487921` / code `ebf6531` | [Report](c941a08f-65ef-4951-9ffc-648a98063c65): **approve**. All prior must/should/minor fixed. One new minor: `PROFILE_ASKED` refuses “list the/my profiles”, “open my profiles”, “start from the Juba profile”. |
+| 23 Nov 2026 | Phase 7 PROFILE_ASKED minor | *(tip)* | Widen `PROFILE_ASKED` for list/open my profiles and “start from the &lt;name&gt; profile”; phrase tests. |
 
 ### Free walk leftovers (English; 22 Nov 2026)
 
