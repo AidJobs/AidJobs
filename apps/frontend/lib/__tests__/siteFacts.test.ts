@@ -1,4 +1,45 @@
-import { factsOf, typicalExperience } from '../site/facts';
+import { EMPTY_FACTS, factsOf, parseFacts, typicalExperience } from '../site/facts';
+
+describe('parseFacts (server wire shape)', () => {
+  it('returns null for missing or non-object values', () => {
+    expect(parseFacts(undefined)).toBeNull();
+    expect(parseFacts(null)).toBeNull();
+    expect(parseFacts('Fixed term')).toBeNull();
+  });
+
+  it('keeps a valid server object and drops unknown enum values', () => {
+    expect(
+      parseFacts({
+        contract: 'Fixed term',
+        grade: 'P-3',
+        duration: null,
+        openTo: 'International',
+        remote: true,
+        language: 'French',
+        sectors: ['Education'],
+        sdgs: [{ goal: 4, name: 'Quality education', colour: '#C5192D' }],
+        level: 'Mid-career',
+        functions: ['Programme management'],
+      }),
+    ).toEqual({
+      contract: 'Fixed term',
+      grade: 'P-3',
+      duration: null,
+      openTo: 'International',
+      remote: true,
+      language: 'French',
+      sectors: ['Education'],
+      sdgs: [{ goal: 4, name: 'Quality education', colour: '#C5192D' }],
+      level: 'Mid-career',
+      functions: ['Programme management'],
+    });
+    expect(parseFacts({ ...EMPTY_FACTS, contract: 'not-a-contract', openTo: 'Everyone' })).toMatchObject({
+      contract: null,
+      openTo: null,
+      language: 'English',
+    });
+  });
+});
 
 describe('facts read from job titles', () => {
   it('reads contract, grade, level, open to, and sector with its SDG', () => {

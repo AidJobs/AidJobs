@@ -1,4 +1,5 @@
 import type { RawJob } from './jobs';
+import { EMPTY_FACTS, parseFacts } from './facts';
 
 /** The backend's page-size limit for `/api/search/query`. */
 export const PAGE_SIZE = 100;
@@ -13,6 +14,7 @@ type SearchItem = {
   deadline?: unknown;
   apply_url?: unknown;
   last_seen_at?: unknown;
+  facts?: unknown;
 };
 
 type SearchBody = {
@@ -37,6 +39,8 @@ function toRawJob(item: SearchItem): RawJob | null {
     deadline: text(item.deadline)?.slice(0, 10) ?? null,
     apply_url: applyUrl,
     last_seen_at: text(item.last_seen_at),
+    // Whitelist: keep facts; strip every other enrichment field from the search item.
+    facts: parseFacts(item.facts) ?? EMPTY_FACTS,
   };
 }
 

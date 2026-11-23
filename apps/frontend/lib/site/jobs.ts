@@ -1,6 +1,7 @@
 import { hasFlag } from 'country-flag-icons';
 import { countryName, isoFromName } from './countries';
 import { formatDate } from '../dates';
+import type { Facts } from './facts';
 
 export type RawJob = {
   id: string;
@@ -11,6 +12,8 @@ export type RawJob = {
   deadline: string | null;
   apply_url: string;
   last_seen_at?: string | null;
+  /** Server title facts (W-42); absent only if the payload skipped them. */
+  facts?: Facts;
 };
 
 export type Job = RawJob & {
