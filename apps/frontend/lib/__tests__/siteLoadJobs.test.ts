@@ -59,7 +59,54 @@ describe('loadOpenJobs', () => {
       deadline: '2026-11-01',
       apply_url: 'https://jobs.example.org/0',
       last_seen_at: '2026-10-22T10:00:00+00:00',
+      facts: {
+        contract: null,
+        grade: null,
+        duration: null,
+        openTo: null,
+        remote: false,
+        language: 'English',
+        sectors: [],
+        sdgs: [],
+        level: null,
+        functions: [],
+      },
     });
+  });
+
+  it('keeps server facts and strips other enrichment fields', async () => {
+    const { impl } = fakeFetch([
+      body(
+        [
+          item(0, {
+            facts: {
+              contract: 'Fixed term',
+              grade: 'P-3',
+              duration: null,
+              openTo: 'International',
+              remote: false,
+              language: 'English',
+              sectors: ['Education'],
+              sdgs: [{ goal: 4, name: 'Quality education', colour: '#C5192D' }],
+              level: 'Mid-career',
+              functions: [],
+            },
+            functional_role: ['should-not-pass'],
+            quality_score: 0.9,
+          }),
+        ],
+        1,
+      ),
+    ]);
+    const jobs = await loadOpenJobs({ origin: '', timeoutMs: 5000, fetchImpl: impl });
+    expect(jobs[0].facts).toMatchObject({
+      contract: 'Fixed term',
+      grade: 'P-3',
+      sectors: ['Education'],
+      level: 'Mid-career',
+    });
+    expect(jobs[0]).not.toHaveProperty('functional_role');
+    expect(jobs[0]).not.toHaveProperty('quality_score');
   });
 
   it('asks the site itself when the origin is empty, as in the browser', async () => {

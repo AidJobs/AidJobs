@@ -64,7 +64,7 @@ import {
 } from '@/lib/site/jobs';
 import { loadOpenJobs } from '@/lib/site/loadJobs';
 import { HOME_PATH as HOME } from '@/lib/site/siteUrl';
-import { CONTRACT_HINT, factsOf, gradeHint, LEVEL_HINT, LEVELS, SECTOR_SDG, typicalExperience, type Contract, type Facts } from '@/lib/site/facts';
+import { CONTRACT_HINT, EMPTY_FACTS, gradeHint, LEVEL_HINT, LEVELS, SECTOR_SDG, typicalExperience, type Contract, type Facts } from '@/lib/site/facts';
 
 type JobF = Job & { facts: Facts };
 type View = 'all' | 'saved';
@@ -857,7 +857,10 @@ export default function PublicSite({ initialJobs, serverToday }: { initialJobs: 
   const [clock, setClock] = useState<{ today: number; dayOf: DayOf }>(() => ({ today: serverToday, dayOf: utcDay }));
   const [ready, setReady] = useState(false);
   const jobs = useMemo<JobF[]>(
-    () => normaliseJobs(rawJobs, clock.today, clock.dayOf).filter(isOpen).map((j) => ({ ...j, facts: factsOf(j.title) })),
+    () =>
+      normaliseJobs(rawJobs, clock.today, clock.dayOf)
+        .filter(isOpen)
+        .map((j) => ({ ...j, facts: j.facts ?? EMPTY_FACTS })),
     [rawJobs, clock],
   );
 

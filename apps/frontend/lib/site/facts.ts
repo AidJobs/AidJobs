@@ -1,6 +1,7 @@
 /**
- * Facts read from job titles with fixed rules, no AI, when the page is built (UX-08 item 11).
- * Storing them on each job at save time is UX-22.
+ * Title-fact display helpers and the wire shape (W-42).
+ * Rules run on the server (`app/title_facts.py`). `factsOf` remains for unit parity
+ * tests only; the public site uses server `facts` from `/api/search/query`.
  */
 
 export type Contract = 'Consultancy' | 'Fixed term' | 'Temporary' | 'Internship' | 'Fellowship';
@@ -31,7 +32,66 @@ export type Facts = {
   sectors: string[];
   sdgs: Sdg[];
   level: Level | null;
+  functions: string[];
 };
+
+export const EMPTY_FACTS: Facts = {
+  contract: null,
+  grade: null,
+  duration: null,
+  openTo: null,
+  remote: false,
+  language: 'English',
+  sectors: [],
+  sdgs: [],
+  level: null,
+  functions: [],
+};
+
+const CONTRACTS = new Set<string>(['Consultancy', 'Fixed term', 'Temporary', 'Internship', 'Fellowship']);
+const OPEN_TOS = new Set<string>(['International', 'Nationals']);
+const LANGUAGES = new Set<string>(['English', 'French', 'Spanish', 'Portuguese']);
+const LEVEL_SET = new Set<string>(LEVELS);
+
+function asStringList(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter((x): x is string => typeof x === 'string');
+}
+
+function asSdgList(v: unknown): Sdg[] {
+  if (!Array.isArray(v)) return [];
+  const out: Sdg[] = [];
+  for (const row of v) {
+    if (!row || typeof row !== 'object') continue;
+    const r = row as Record<string, unknown>;
+    if (typeof r.goal !== 'number' || typeof r.name !== 'string' || typeof r.colour !== 'string') continue;
+    out.push({ goal: r.goal, name: r.name, colour: r.colour });
+  }
+  return out;
+}
+
+/** Parse the server `facts` object; null when missing or not an object. */
+export function parseFacts(raw: unknown): Facts | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const f = raw as Record<string, unknown>;
+  const contract = typeof f.contract === 'string' && CONTRACTS.has(f.contract) ? (f.contract as Contract) : null;
+  const openTo = typeof f.openTo === 'string' && OPEN_TOS.has(f.openTo) ? (f.openTo as OpenTo) : null;
+  const language =
+    typeof f.language === 'string' && LANGUAGES.has(f.language) ? (f.language as Language) : 'English';
+  const level = typeof f.level === 'string' && LEVEL_SET.has(f.level) ? (f.level as Level) : null;
+  return {
+    contract: f.contract === null ? null : contract,
+    grade: typeof f.grade === 'string' ? f.grade : null,
+    duration: typeof f.duration === 'string' ? f.duration : null,
+    openTo: f.openTo === null ? null : openTo,
+    remote: f.remote === true,
+    language,
+    sectors: asStringList(f.sectors),
+    sdgs: asSdgList(f.sdgs),
+    level: f.level === null ? null : level,
+    functions: asStringList(f.functions),
+  };
+}
 
 /** Official SDG names and colours; shown as a dot beside dark text, so contrast does not depend on the colour. */
 const SDG: Record<number, Sdg> = {
@@ -182,6 +242,7 @@ function languageOf(t: string): Language {
   return 'English';
 }
 
+/** Unit-parity helper only; production reads server facts via `parseFacts`. */
 export function factsOf(title: string): Facts {
   const grade = gradeOf(title);
   const contract = contractOf(title);
@@ -196,6 +257,7 @@ export function factsOf(title: string): Facts {
     sectors,
     sdgs: sdgsOf(sectors),
     level: levelOf(title, grade, contract),
+    functions: [],
   };
 }
 
