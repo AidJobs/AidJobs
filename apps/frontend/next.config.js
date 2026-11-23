@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  experimental: {
+    agentUpgrade: 'security',
+  },
   async headers() {
     // Same setting as SITE_INDEXABLE in lib/site/siteUrl.ts. Netlify never sets it, so its copies stay unindexed.
     if (process.env.NEXT_PUBLIC_SITE_INDEXABLE === 'true') return [];
