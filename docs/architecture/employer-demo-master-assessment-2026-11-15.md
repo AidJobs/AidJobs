@@ -20,7 +20,7 @@
 
 5. ~~Approve vs unsaved buffers; Add-panel blur/Escape~~ — **Fixed 20 Nov 2026** (Step A R1-06; Step B R1-11; user confirmed on preview)
 
-**Next (23 Nov 2026):** Phase 7 review-fixes **built** (all findings from [report](d7e41e28-616a-41d0-8922-6a8d2214bf82)). Await preview confirm + independent review of the fixes pass. FW-3 note; R1-07 deferred; LANG-ONLY / flyer / UN later.
+**Next (23 Nov 2026):** Phase 7 review-fixes **built and agent-confirmed on preview** (`?v=phase7fix`, tip `ebf6531` / `35ef17b`). Independent review of the fixes pass next. FW-3 note; R1-07 deferred; LANG-ONLY / flyer / UN later.
 
 ---
 
@@ -340,7 +340,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 23 Nov 2026 | EN-BLOCK #2–3 + Reach settle (Option A) | `0805174` | `langsToPay` counts reviewed only; `publicLangs` filter-then-slice; Invite does not settle Reach — `setReachPlan` / No thanks do. Tests `employerDemoEnBlock23.test.ts`. **Agent confirmed on preview** (`?v=enblock23`: Finance Officer Amplify → Reach 14/17 → Prepare invitations → Save `ana@example.org` → Reach 15/17, `walk.settled` includes `reach`, `reachPlan.candidates`). |
 | 23 Nov 2026 | Phase 7 Job profiles (locked plan) | `05ce0f2` / tip `f5a0346` | Side-menu Job profiles; `#profiles` / `#profiles/<id>`; rename; delete + `restoreProfile`; light fact edit; `startJobFromProfile`; grouping on save/start; AI `context.profiles` + actions. Tests `employerDemoPhase7.test.ts`. Build fix: `Profiles.tsx` → `JobProfiles.tsx` (casing vs `profiles.ts`); safeguarding select; apply link uses `address`. **Agent confirmed on preview** (`?v=phase7`: menu Job profiles · 6 before Org settings; list; open Goma panel + duration edit; Use for a new job → `#job/…` Health Officer; Delete Logistics + Undo restore; Amina hides menu item and `#profiles` refusal). |
 | 23 Nov 2026 | Phase 7 independent review | tip `441f18e` | [Report](d7e41e28-616a-41d0-8922-6a8d2214bf82): **changes needed**. Must: Escape on display name still saves (blur after cancel); phone search unmounts the field; section F AI actions not in system prompt and not gated (id-in-list / user-asked). Should: Back/delete focus return; light-edit pay + other non-date facts incomplete vs existing editors. Minor: prompt Rename freezes fallback name; format-gone not in aria-label; `customGroups` not on profile; `context.profiles.total` always sent. |
-| 23 Nov 2026 | Phase 7 review fixes (all) | `ebf6531` | Escape cancel via `skipBlurSave`; phone search body field; `PROFILE_ASKED` + id-in-20 + SYSTEM docs; `profilesForContext` total only when >20; focus return target; pay mode/period + non-date facts + fuller ApplyEdit; Rename prompt seeds blank; format-gone aria-label; `customGroups` on profileOf/start. Tests extended in `employerDemoPhase7.test.ts`. Preview confirm + independent review of fixes next. |
+| 23 Nov 2026 | Phase 7 review fixes (all) | `ebf6531` | Escape cancel via `skipBlurSave`; phone search body field; `PROFILE_ASKED` + id-in-20 + SYSTEM docs; `profilesForContext` total only when >20; focus return target; pay mode/period + non-date facts + fuller ApplyEdit; Rename prompt seeds blank; format-gone aria-label; `customGroups` on profileOf/start. Tests extended in `employerDemoPhase7.test.ts`. **Agent confirmed on preview** (`?v=phase7fix`: fuller Facts/Apply editors; Escape on display name reverts without save; Back returns focus to Goma row). Independent review of fixes next. |
 
 ### Free walk leftovers (English; 22 Nov 2026)
 
@@ -384,6 +384,6 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 
 1. Read this file and `employer-side-plan.md` Phase 6 / polish status.  
 2. Confirm `demo/employer` tip and that English-first still holds.  
-3. **Default next:** Preview-confirm Phase 7 review fixes; independent review of that pass; then post-Phase-7 work (FW-3 note; LANG-ONLY / flyer / UN; role-library leap in plan section J). R1-07 stays deferred.  
+3. **Default next:** Independent review of Phase 7 review-fixes pass; then post-Phase-7 work (FW-3 note; LANG-ONLY / flyer / UN; role-library leap in plan section J). R1-07 stays deferred.  
 4. Mark IDs Fixed in the tables and add a Fix log row in the same commit as the code.  
 5. Never stage leftover `apps/frontend/lib/__tests__/employerDemoPhase6Review.test.ts` or `apps/frontend/AGENTS.md` unless the user asks.
