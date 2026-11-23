@@ -267,9 +267,9 @@ _GRADE_DESC_RE = re.compile(
     r"\bat\s+(P|NO|G|GS|D)[- ]?([1-7]|[A-E])\b",
     re.I,
 )
+# Cued lengths only — not "6 months of experience" or "within 6 months".
 _DURATION_MONTH_RE = re.compile(
     r"(?:for|duration(?:\s+of)?|period(?:\s+of)?)\s+"
-    r"(\d+(?:[.,]\d+)?)\s*(months?|mois|meses)\b|"
     r"(\d+(?:[.,]\d+)?)\s*(months?|mois|meses)\b",
     re.I,
 )
@@ -521,13 +521,10 @@ def _grade_of_description(text: str) -> Optional[str]:
 
 
 def _contract_of_description(text: str) -> Optional[str]:
-    """Prefer staff/consult contracts over a mention of an internship programme."""
-    if re.search(r"\bFT\b|fixed[- ]term|\bFTA\b|continuing|permanent", text, re.I):
-        return "Fixed term"
-    if re.search(r"\bTA\b|temporary|temporaire|\b364 days\b", text, re.I):
-        return "Temporary"
+    """Prefer explicit consult/intern labels; staff words need an appointment cue."""
     if re.search(
-        r"consult(ant|ancy|ante|ance|oría|oria|or)\b|\bconsultor",
+        r"consult(?:ants?|ancies|ancy|ante|ance|oría|oria|ors?)\b|"
+        r"\bconsultors?\b",
         text,
         re.I,
     ):
@@ -541,21 +538,35 @@ def _contract_of_description(text: str) -> Optional[str]:
         re.I,
     ):
         return "Internship"
+    # permanent/continuing/temporary only with a contract/appointment cue —
+    # not "permanently based" or "temporary accommodation".
+    if re.search(
+        r"(?:\bFT\b|\bFTA\b|fixed[- ]term|"
+        r"(?:continuing|permanent)\s+(?:appointment|contract|post|position)|"
+        r"(?:appointment|contract)\s+(?:is\s+)?(?:continuing|permanent))",
+        text,
+        re.I,
+    ):
+        return "Fixed term"
+    if re.search(
+        r"(?:\bTA\b|\b364 days\b|"
+        r"temporary\s+(?:appointment|contract|post|position)|"
+        r"(?:appointment|contract)\s+(?:is\s+)?temporary|"
+        r"\btemporaire\b)",
+        text,
+        re.I,
+    ):
+        return "Temporary"
     return None
 
 
 def _duration_of_description(text: str) -> Optional[str]:
-    """Prefer an explicit month/period length over an apply-within-N-days notice."""
+    """Prefer an explicit for/duration/period length over experience or notice prose."""
     match = _DURATION_MONTH_RE.search(text)
     if match:
-        number = (match.group(1) or match.group(3) or "").replace(",", ".")
-        unit_raw = (match.group(2) or match.group(4) or "").lower()
-        en = "month"
-        if unit_raw.startswith("mes"):
-            en = "month"
+        number = match.group(1).replace(",", ".")
         plural = "" if number == "1" else "s"
-        return f"{number} {en}{plural}"
-    # Weeks/days only with an explicit for/duration/period cue.
+        return f"{number} month{plural}"
     match = re.search(
         r"(?:for|duration(?:\s+of)?|period(?:\s+of)?)\s+"
         r"(\d+(?:[.,]\d+)?)\s*(weeks?|semaines|days?|jours)\b",

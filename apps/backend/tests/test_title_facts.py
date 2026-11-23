@@ -168,6 +168,26 @@ def test_description_ignores_visa_annex_days_and_remote_area():
     assert f["level"] == "Mid-career"
 
 
+def test_description_prefers_cued_duration_and_explicit_consultancy():
+    f = facts_of(
+        "Specialist",
+        "Minimum 6 months of experience. Results expected within 6 months. "
+        "Appointment at P-3 for 12 months.",
+    )
+    assert f["duration"] == "12 months"
+    assert f["grade"] == "P-3"
+    f2 = facts_of(
+        "Specialist",
+        "The consultant will be permanently based in Nairobi. "
+        "Temporary accommodation is provided.",
+    )
+    assert f2["contract"] == "Consultancy"
+    assert facts_of(
+        "Specialist",
+        "continuing to recruit consultants for the project.",
+    )["contract"] == "Consultancy"
+
+
 def test_international_in_parens_is_not_nationals():
     f = facts_of("Specialist", "Fixed Term Appointment at P-4 (International).")
     assert f["grade"] == "P-4"
