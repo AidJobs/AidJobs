@@ -597,7 +597,7 @@ Approved plan, 23 October 2026:
 
 **Replaced on 30 October 2026** by ledger W-42: facts are worked out when read, on the server, in one shared module, and not stored (UX-08 item 11 amended; revision of 30 October 2026). The text below is kept as the record.
 
-**Status:** Replaced by W-42 (done on merge of W-42 pull request 3, 23 November 2026): facts are worked out when read on the server, cached in memory, attached on search/jobs responses, and consumed by `/v2`; nothing stored on job rows. **Contract decision:** enrichment expansion is out of scope in §2. The decision is brought forward to UX-08 (item 2), because the approved design uses title facts at launch; where the facts are read is UX-08 item 11 (amended 30 October 2026 / W-42).
+**Status:** Replaced by W-42 (done, 23 November 2026: PR #197 `e0a2be6` after PR #195/`99760ba` and PR #196/`476feab`): facts are worked out when read on the server, cached in memory, attached on search/jobs responses, and consumed by `/v2`; nothing stored on job rows. **Contract decision:** enrichment expansion is out of scope in §2. The decision is brought forward to UX-08 (item 2), because the approved design uses title facts at launch; where the facts are read is UX-08 item 11 (amended 30 October 2026 / W-42).
 
 - **Scope:** at save time, read UN grade, contract type, duration, eligibility, and remote work from titles, stored on the job.
 - **Depends on:** the contract decision; W-24 (clean titles) planned alongside.
