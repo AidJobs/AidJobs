@@ -12,7 +12,7 @@ import Home from './Home';
 import Tip from '@/components/site/Tip';
 import { usePersistentState } from '@/components/site/SiteRoot';
 import Jobs from './Jobs';
-import Profiles from './Profiles';
+import JobProfiles from './JobProfiles';
 import Public from './Public';
 import Publish from './Publish';
 import { Onboarding, OrgSettings, SignIn, Styles, Team } from './Settings';
@@ -268,7 +268,7 @@ export default function EmployerDemo() {
       screen = <OrgSettings />;
       break;
     case 'profiles':
-      screen = <Profiles />;
+      screen = <JobProfiles />;
       break;
     case 'public':
       screen = <Public key={route.id ?? 'list'} id={route.id} />;

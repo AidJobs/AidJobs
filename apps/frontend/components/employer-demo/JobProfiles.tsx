@@ -16,7 +16,7 @@ import type { ApplySettings, Facts, JobLang, JobProfile, State } from './types';
 import { Field, HeaderSlot, inputStyle, Section } from './ui';
 
 /** Phase 7: Job profiles list and open-profile panel. */
-export default function Profiles() {
+export default function JobProfiles() {
   const s = useDemo();
   const route = useRoute();
   if (s.reviewerAs) {
@@ -274,7 +274,13 @@ function Detail({ s, profile: p }: { s: State; profile: JobProfile }) {
               })
             }
           />
-          <FactInput label="Safeguarding" value={p.facts.safeguarding ?? ''} onChange={(safeguarding) => updateProfile(p.id, { facts: { safeguarding } })} />
+          <FactSelect
+            label="Safeguarding"
+            value={p.facts.safeguarding ?? ''}
+            options={['', 'low', 'medium', 'high']}
+            labels={{ '': 'None', low: 'Low', medium: 'Medium', high: 'High' }}
+            onChange={(safeguarding) => updateProfile(p.id, { facts: { safeguarding: safeguarding as Facts['safeguarding'] } })}
+          />
           <FactInput label="Duration" value={p.facts.duration ?? ''} onChange={(duration) => updateProfile(p.id, { facts: { duration } })} />
           <FactSelect
             label="Arrangement"
@@ -400,7 +406,7 @@ function ApplyEdit({ apply, onChange }: { apply: ApplySettings; onChange: (a: Ap
       />
       {apply.method === 'email' && <FactInput label="Email address" value={apply.address} onChange={(address) => onChange({ ...apply, address })} />}
       {(apply.method === 'system' || apply.method === 'form' || apply.method === 'formOnly') && (
-        <FactInput label="Link" value={apply.url} onChange={(url) => onChange({ ...apply, url })} />
+        <FactInput label="Link" value={apply.address} onChange={(address) => onChange({ ...apply, address })} />
       )}
     </div>
   );
