@@ -41,6 +41,9 @@ import {
   setReachPlan,
   startAsUsual,
   startFromProfile,
+  startJobFromProfile,
+  renameProfile,
+  deleteProfile,
   writeVersionSection,
   changeSub,
   headingOf,
@@ -71,7 +74,7 @@ import { amplifying, ASKS, asksOf, checkPoints, DECLINABLE, FIXED_SECTIONS, full
 import { planFor } from './invites';
 import { isPublished, STATE_LABEL, stateActionsOf, type StateAction } from './lifecycle';
 import { sdgsOf, STYLES, usualTemplate } from './setup';
-import { getState } from './store';
+import { getState, go } from './store';
 import { jobLang, langOf } from './translate';
 import type { AskKind, ChatMsg, DemoJob, Engagement, Facts, JobLang, Message, ReachPlan, State } from './types';
 
@@ -138,6 +141,10 @@ const ORDER = [
   'set_apply',
   'settle',
   'use_profile',
+  'open_profiles',
+  'start_job_from_profile',
+  'rename_profile',
+  'delete_profile',
   'start',
   'use_template',
   'set_style',
@@ -579,6 +586,39 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         const p = profileFor(s, j);
         if (j.setup !== 'template' || !p || a.profile !== p.id) refused.push('a saved job profile that is not offered for this job');
         else startFromProfile(id, p.id);
+        break;
+      }
+      case 'open_profiles': {
+        // Phase 7: open the list or one known profile; refused for reviewers and unknown ids.
+        if (s.reviewerAs) refused.push('job profiles: only your organisation manages them');
+        else {
+          const pid = typeof a.profile === 'string' ? a.profile : '';
+          if (pid && !(s.profiles ?? []).some((p) => p.id === pid)) refused.push('a job profile the demo does not have');
+          else go('profiles', pid || undefined);
+        }
+        break;
+      }
+      case 'start_job_from_profile': {
+        const pid = typeof a.profile === 'string' ? a.profile : '';
+        const known = (s.profiles ?? []).some((p) => p.id === pid);
+        if (s.reviewerAs) refused.push('starting from a profile: only your organisation can');
+        else if (!pid || !known) refused.push('a job profile the demo does not have');
+        else if (!startJobFromProfile(pid)) refused.push('starting from that profile: its JD format is gone');
+        break;
+      }
+      case 'rename_profile': {
+        const pid = typeof a.profile === 'string' ? a.profile : '';
+        const name = typeof a.name === 'string' ? a.name : '';
+        if (s.reviewerAs) refused.push('renaming a profile: only your organisation can');
+        else if (!pid || !(s.profiles ?? []).some((p) => p.id === pid)) refused.push('a job profile the demo does not have');
+        else if (!renameProfile(pid, name)) refused.push('renaming that profile');
+        break;
+      }
+      case 'delete_profile': {
+        const pid = typeof a.profile === 'string' ? a.profile : '';
+        if (s.reviewerAs) refused.push('deleting a profile: only your organisation can');
+        else if (!pid || !(s.profiles ?? []).some((p) => p.id === pid)) refused.push('a job profile the demo does not have');
+        else if (!deleteProfile(pid)) refused.push('deleting that profile');
         break;
       }
       case 'start':

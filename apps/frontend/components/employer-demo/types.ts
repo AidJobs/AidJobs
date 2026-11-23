@@ -93,15 +93,23 @@ export type Org = {
   fixedWording?: Partial<Record<JobLang, Record<string, string>>>;
 };
 
-/** A job's facts and choices, saved automatically when it is published, for the next job like it (managed with the profiles page, later). */
+/**
+ * A job's facts and choices, saved automatically when it is published, for the next job like it
+ * (Phase 7: managed on the Job profiles page). Optional display `name`; grouping without section text.
+ */
 export type JobProfile = {
   id: string;
   from: string;
   title: string;
   location: string;
+  /** Optional display name for the chat offer; blank clears it. Does not change title+place match. */
+  name?: string;
   family: string;
   format: string;
   tags: string[];
+  /** Own grouping from the published job (Phase 7); absent on older profiles. */
+  groupOrder?: string[];
+  groupOf?: Record<string, string>;
   facts: Partial<Facts>;
   style?: string[];
   apply: ApplySettings;
@@ -557,8 +565,11 @@ export type Pack = { id: string; jobs: number; left: number; ends: string; at: n
 /** "Always hiring": a number of jobs each month; unused ones lapse at renewal; cancelled, it runs to the renewal date. */
 export type Subscription = { since: string; renews: string; left: number; cancelled: boolean };
 
-/** `restore` offers to bring back a job just deleted (it is in Recently deleted); `unprofile` to forget a job profile just saved. */
-export type Notice = { text: string; undo?: DemoJob[]; restore?: string; unprofile?: string } | null;
+/**
+ * `restore` brings back a job just deleted; `unprofile` forgets a profile just saved on publish;
+ * `restoreProfile` undoes a delete from the Job profiles page (Phase 7).
+ */
+export type Notice = { text: string; undo?: DemoJob[]; restore?: string; unprofile?: string; restoreProfile?: JobProfile } | null;
 
 /** A deleted job, restorable for 14 days, then erased (plan section 17, decision 2). */
 export type DeletedJob = { job: DemoJob; at: number; by: string; told: string[]; was?: JobStatus };

@@ -288,6 +288,11 @@ export function contextFor(s: State, j: DemoJob, focus: string | undefined, firs
     ...(carry ? { carry: carryFor(j, s, carry) } : {}),
     publishing: publishingFor(s, j, version && j.translations?.[version] ? version : undefined),
     returning: returningFor(s, j),
+    // Phase 7: short list for open / start / rename / delete; no fact bodies.
+    profiles: (() => {
+      const all = s.profiles ?? [];
+      return { total: all.length, list: all.slice(0, 20).map((p) => ({ id: p.id, name: profileName(p) })) };
+    })(),
     recommendation: {
       key: rec.key,
       label: recFormat.label,

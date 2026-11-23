@@ -20,7 +20,7 @@
 
 5. ~~Approve vs unsaved buffers; Add-panel blur/Escape~~ — **Fixed 20 Nov 2026** (Step A R1-06; Step B R1-11; user confirmed on preview)
 
-**Next (23 Nov 2026, after EN-BLOCK #2–3 + Reach):** EN-BLOCK #2–3 and Reach settle **Fixed** and **confirmed on preview**. English Amplify chrome is good enough for Phase 7 (FW-3 remains a note). R1-07 deferred. LANG-ONLY / flyer clip / UN stay later.
+**Next (23 Nov 2026, after Phase 7 build):** Phase 7 Job profiles **built** on `demo/employer` (await preview confirm + independent review). FW-3 note; R1-07 deferred; LANG-ONLY / flyer / UN later.
 
 ---
 
@@ -338,6 +338,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 22 Nov 2026 | FW-1 (Option A) | `fb74df0` | `emailAddress`/`withEmailAddress`; essentials+org; CTA+toast; NGO default + write/publish persist. Tests `employerDemoFw1.test.ts`. **Agent confirmed on preview** (`?v=fw1` Tumaini CHO: By email → `jobs@tumaini.example.org` in Email address without manual fill; Publish CTA named Project brief while unfinished, then **Publish free · your free standard listing** → Now → Live with Copy link / Amplify). |
 | 23 Nov 2026 | FW-2 (Option A) | `92ad8f8` | No project drops `background` + `walk.noProject`; Skip keeps slot; details card respects noProject. Tests `employerDemoFw2.test.ts`. **Agent confirmed on preview** (`?v=fw2` Tumaini CHO → Local NGO → No project page → tags without `background`, `walk.noProject`, style stage). |
 | 23 Nov 2026 | EN-BLOCK #2–3 + Reach settle (Option A) | `0805174` | `langsToPay` counts reviewed only; `publicLangs` filter-then-slice; Invite does not settle Reach — `setReachPlan` / No thanks do. Tests `employerDemoEnBlock23.test.ts`. **Agent confirmed on preview** (`?v=enblock23`: Finance Officer Amplify → Reach 14/17 → Prepare invitations → Save `ana@example.org` → Reach 15/17, `walk.settled` includes `reach`, `reachPlan.candidates`). |
+| 23 Nov 2026 | Phase 7 Job profiles (locked plan) | *(build tip)* | Side-menu Job profiles; `#profiles` / `#profiles/<id>`; rename; delete + `restoreProfile`; light fact edit; `startJobFromProfile`; grouping on save/start; AI `context.profiles` + actions. Tests `employerDemoPhase7.test.ts`. Preview confirm + independent review next. |
 
 ### Free walk leftovers (English; 22 Nov 2026)
 
@@ -381,7 +382,6 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 
 1. Read this file and `employer-side-plan.md` Phase 6 / polish status.  
 2. Confirm `demo/employer` tip and that English-first still holds.  
-3. **Default next:** Phase 7 when the user says English chrome is good enough (FW-3 note only). R1-07 stays deferred.  
+3. **Default next:** Confirm Phase 7 on preview; then independent review of Phase 7; then post-Phase-7 work (FW-3 note; LANG-ONLY / flyer / UN; role-library leap in plan section J). R1-07 stays deferred.  
 4. Mark IDs Fixed in the tables and add a Fix log row in the same commit as the code.  
-5. Do not close Phase 7 until the user says English chrome is good enough.  
-6. Never stage leftover `apps/frontend/lib/__tests__/employerDemoPhase6Review.test.ts` or `apps/frontend/AGENTS.md` unless the user asks.
+5. Never stage leftover `apps/frontend/lib/__tests__/employerDemoPhase6Review.test.ts` or `apps/frontend/AGENTS.md` unless the user asks.

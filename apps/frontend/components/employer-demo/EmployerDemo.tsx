@@ -1,6 +1,6 @@
 'use client';
 
-import { Archive, Briefcase, Building2, CreditCard, Eye, Globe2, LayoutDashboard, Menu, Palette, Plus, RotateCcw, Sparkles, Users } from 'lucide-react';
+import { Archive, Briefcase, Building2, CreditCard, Eye, FileStack, Globe2, LayoutDashboard, Menu, Palette, Plus, RotateCcw, Sparkles, Users } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { chooseAiModel, probeAi, useAi } from './ai';
 import SideMenu, { type MenuEntry } from '@/components/site/SideMenu';
@@ -12,6 +12,7 @@ import Home from './Home';
 import Tip from '@/components/site/Tip';
 import { usePersistentState } from '@/components/site/SiteRoot';
 import Jobs from './Jobs';
+import Profiles from './Profiles';
 import Public from './Public';
 import Publish from './Publish';
 import { Onboarding, OrgSettings, SignIn, Styles, Team } from './Settings';
@@ -234,12 +235,14 @@ export default function EmployerDemo() {
     entry('jobs', 'Manage jobs', <Briefcase size={15} strokeWidth={1.8} />, liveCount),
     entry('styles', 'JD formats', <Palette size={15} strokeWidth={1.8} />),
     entry('team', 'Team and roles', <Users size={15} strokeWidth={1.8} />, s.team.length),
+    // Phase 7: Job profiles before Organisation settings; hidden for reviewers.
+    ...(!s.reviewerAs ? [entry('profiles', 'Job profiles', <FileStack size={15} strokeWidth={1.8} />, (s.profiles ?? []).length || undefined)] : []),
     entry('org', 'Organisation settings', <Building2 size={15} strokeWidth={1.8} />),
     entry('public', 'Your page on AidJobs', <Globe2 size={15} strokeWidth={1.8} />),
   ];
 
   const workspace = (route.screen === 'create' || route.screen === 'studio' || route.screen === 'job') && Boolean(route.id);
-  const full = !['publish', 'jobs', 'styles', 'team', 'org', 'public', 'home', 'billing', 'archive'].includes(route.screen);
+  const full = !['publish', 'jobs', 'styles', 'team', 'org', 'public', 'home', 'billing', 'archive', 'profiles'].includes(route.screen);
   let screen: ReactNode;
   switch (route.screen) {
     case 'create':
@@ -263,6 +266,9 @@ export default function EmployerDemo() {
       break;
     case 'org':
       screen = <OrgSettings />;
+      break;
+    case 'profiles':
+      screen = <Profiles />;
       break;
     case 'public':
       screen = <Public key={route.id ?? 'list'} id={route.id} />;

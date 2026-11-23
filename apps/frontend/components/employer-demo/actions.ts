@@ -30,6 +30,7 @@ import {
   lengthRequest,
   outlineOrder,
   placeIn,
+  placeOf,
   recommendSections,
   suggestTitle,
   toneRequest,
@@ -52,6 +53,7 @@ import { ALL_GOOD, ABOUT_QUICK, APPROVE_FIXED, ASK_TEXT as WALK_ASK, CHANGE_NO, 
 import {
   addToGroup,
   applyOp,
+  cleanGrouping,
   formatGrouping,
   grouped,
   groupingFrom,
@@ -72,7 +74,7 @@ import {
 import { canWord, fixedLabel, fixedList, fixedMarked, fixedShown, fixedStore, fixedWordingNow, isLocked, offeredFixed, ORG_LANG, orgWording } from './fixed';
 import { diffViews, isEmpty, langsOf, linkedTo, mirror, viewOf, withView, type Diff, type LangView } from './langs';
 import { hasFields, keepJdPart, sectionPart } from './parts';
-import type { ApplySettings, AskKind, ChatMsg, Content, ContextPack, CustomGroup, DeletedJob, Delivery, DemoJob, Facts, FixedOwn, Format, Grouping, JobLang, Pace, PayRequest, Person, Plan, ReachPlan, Recipient, Review, Section, State, Tone, Translation, UndoStep } from './types';
+import type { ApplySettings, AskKind, ChatMsg, Content, ContextPack, CustomGroup, DeletedJob, Delivery, DemoJob, Facts, FixedOwn, Format, Grouping, JobLang, JobProfile, Pace, PayRequest, Person, Plan, ReachPlan, Recipient, Review, Section, State, Tone, Translation, UndoStep } from './types';
 
 export const KEEP_PROFILE_ABOUT = "Keep our profile's About us";
 
@@ -936,8 +938,9 @@ export function startAsUsual(id: string, said?: string) {
 }
 
 /**
- * "Same as last time": the job starts from a saved profile, its template, sections, facts, the way to apply, style, and fixed text. The
- * place and dates typed now are kept; the closing date and the positions are asked.
+ * "Same as last time": the job starts from a saved profile, its template, sections, facts, the way to apply, style, fixed text, and
+ * grouping when the profile has it (Phase 7). Section text, renamed headings, per-job fixed wording, and links stay off the profile.
+ * The place and dates typed now are kept; the closing date and the positions are asked.
  */
 export function startFromProfile(id: string, profileId: string, said?: string) {
   const p0 = getState().profiles?.find((p) => p.id === profileId);
@@ -954,15 +957,16 @@ export function startFromProfile(id: string, profileId: string, said?: string) {
       const facts: Facts = { ...j.facts, ...p.facts, ...typed, title: j.facts.title || p.title, deadline: j.facts.deadline, closingTime: j.facts.closingTime, startDate: j.facts.startDate, positions: j.facts.positions };
       const style = p.style ?? proposedStyle(s);
       const settled = Array.from(new Set([...j.walk.settled, 'title', 'place', 'contract', 'grade', 'eligibility', 'languages', 'safeguarding', 'salary', 'method', 'fixed']));
+      const tags = p.tags.filter((k) => SECTION_BY_KEY[k]);
+      const hasGrouping = Boolean(p.groupOrder?.length || (p.groupOf && Object.keys(p.groupOf).length));
+      const groupedJob = hasGrouping
+        ? regrouped({ ...j, customGroups: undefined }, cleanGrouping({ groupOrder: p.groupOrder, groupOf: p.groupOf }, tags), tags)
+        : { ...j, tags: outlineOrder(tags), groupOrder: undefined, groupOf: undefined, customGroups: undefined };
       const base: DemoJob = {
-        ...j,
+        ...groupedJob,
         facts,
         family: p.family,
         format: format.key,
-        // A job profile has no fields for the grouping (section 19, phase 6): it keeps only its sections.
-        tags: outlineOrder(p.tags.filter((k) => SECTION_BY_KEY[k])),
-        groupOrder: undefined,
-        groupOf: undefined,
         style,
         tone: toneOf(style),
         apply: { ...p.apply },
@@ -3699,7 +3703,8 @@ export function publish(id: string, o: PublishOptions): boolean {
     if (!out) return { ...s, jobs };
     // Scheduled, the job holds its free listing (plans.allowance); it is used only when it goes live.
     if (!o.schedule) s = spendFreeAt(s, out);
-    const profile = profileOf(out);
+    const replaced = (s.profiles ?? []).find((p) => p.title === out.facts.title && p.location === out.facts.location);
+    const profile = { ...profileOf(out), ...(replaced?.name?.trim() ? { name: replaced.name.trim() } : {}) };
     const saved = `Saved as a job profile for next time: ${out.facts.title}${out.facts.location ? `, ${out.facts.location.split(',')[0]}` : ''}.`;
     return {
       ...s,
@@ -3712,9 +3717,117 @@ export function publish(id: string, o: PublishOptions): boolean {
   return true;
 }
 
-/** Undo for a job profile just saved. */
+/** Undo for a job profile just saved on publish (`unprofile`). */
 export function forgetProfile(profileId: string) {
+  if (!ownerOnly()) return;
   update((s) => ({ ...s, profiles: (s.profiles ?? []).filter((p) => p.id !== profileId), notice: { text: 'The job profile was not kept.' } }));
+}
+
+/** Phase 7: rename a profile's display name. Blank clears it. Does not change id, title, location, or `at`. */
+export function renameProfile(profileId: string, name: string): boolean {
+  if (!ownerOnly()) return false;
+  const trimmed = name.trim();
+  let ok = false;
+  update((s) => {
+    const profiles = (s.profiles ?? []).map((p) => {
+      if (p.id !== profileId) return p;
+      ok = true;
+      const next = { ...p };
+      if (trimmed) next.name = trimmed;
+      else delete next.name;
+      return next;
+    });
+    return ok ? { ...s, profiles } : s;
+  });
+  return ok;
+}
+
+/**
+ * Phase 7: delete a profile with Undo via `restoreProfile`. Does not set `unprofile`.
+ * Undo restores the same object unless a newer same title+place was saved meanwhile.
+ */
+export function deleteProfile(profileId: string): boolean {
+  if (!ownerOnly()) return false;
+  let removed: JobProfile | undefined;
+  update((s) => {
+    const profiles = s.profiles ?? [];
+    removed = profiles.find((p) => p.id === profileId);
+    if (!removed) return s;
+    return {
+      ...s,
+      profiles: profiles.filter((p) => p.id !== profileId),
+      notice: { text: `Removed the job profile “${profileName(removed)}”.`, restoreProfile: removed },
+    };
+  });
+  return Boolean(removed);
+}
+
+/** Phase 7: Undo for deleteProfile. */
+export function restoreProfile(): boolean {
+  if (!ownerOnly()) return false;
+  let ok = false;
+  update((s) => {
+    const p = s.notice?.restoreProfile;
+    if (!p) return s;
+    const clash = (s.profiles ?? []).some((x) => x.title === p.title && x.location === p.location);
+    if (clash) return { ...s, notice: { text: 'A newer profile for that role is already saved; the removed one was not restored.' } };
+    ok = true;
+    return { ...s, profiles: [p, ...(s.profiles ?? [])], notice: { text: `Restored the job profile “${profileName(p)}”.` } };
+  });
+  return ok;
+}
+
+/** Phase 7: light fact / apply / commitment edits on a profile only. Title and place stay the match key. */
+export function updateProfile(profileId: string, patch: { facts?: Partial<Facts>; apply?: ApplySettings; commitments?: string[] }): boolean {
+  if (!ownerOnly()) return false;
+  let ok = false;
+  update((s) => {
+    const profiles = (s.profiles ?? []).map((p) => {
+      if (p.id !== profileId) return p;
+      ok = true;
+      const locked = COMMITMENTS.filter((c) => isLocked(s.org, c.key)).map((c) => c.key);
+      let commitments = patch.commitments ?? p.commitments;
+      for (const k of locked) if (!commitments.includes(k)) commitments = [...commitments, k];
+      const facts = patch.facts ? { ...p.facts, ...patch.facts, title: p.title, location: p.location } : p.facts;
+      return { ...p, facts, ...(patch.apply ? { apply: patch.apply } : {}), commitments };
+    });
+    return ok ? { ...s, profiles } : s;
+  });
+  return ok;
+}
+
+/**
+ * Phase 7: start a new window job from a profile (same outcome as "Same as last time", without re-asking).
+ * Refuses for reviewers or when the format is gone. Does not copy section text.
+ */
+export function startJobFromProfile(profileId: string): string | null {
+  if (!ownerOnly()) return null;
+  const s = getState();
+  const p = s.profiles?.find((x) => x.id === profileId);
+  if (!p || !s.formats.some((f) => f.key === p.format)) return null;
+  const place = placeOf(p.location);
+  const id = nextId('job');
+  const seed = emptyFacts();
+  const facts: Facts = {
+    ...seed,
+    ...p.facts,
+    title: p.title,
+    location: p.location,
+    country: p.facts.country || place?.country || seed.country,
+    iso: p.facts.iso || place?.iso || seed.iso,
+    timezone: p.facts.timezone || place?.tz || seed.timezone,
+    deadline: '',
+    closingTime: '',
+    startDate: '',
+    positions: '',
+  };
+  const job = newJob(s, id, facts, p.family || 'programme', p.format);
+  const waiting: DemoJob = { ...job, setup: 'template', walk: { approved: [], settled: [] }, ...(p.lang && p.lang !== 'en' ? { lang: p.lang as JobLang } : {}) };
+  waiting.chat = [];
+  update((st) => ({ ...st, jobs: [waiting, ...st.jobs] }));
+  startFromProfile(id, profileId);
+  go('job', id);
+  return id;
 }
 
 /**

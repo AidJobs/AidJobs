@@ -5,7 +5,7 @@ import { createContext, useContext, useEffect, useId, useRef, useState, type Key
 import { createPortal } from 'react-dom';
 import BottomSheet, { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
-import { forgetProfile, restoreDeleted } from './actions';
+import { forgetProfile, restoreDeleted, restoreProfile } from './actions';
 import { jobUrl } from './links';
 import { dismissNotice, notify, undo, useDemo } from './store';
 import type { DemoJob, JobStatus } from './types';
@@ -428,6 +428,11 @@ export function NoticeBar() {
         )}
         {notice.unprofile && (
           <button type="button" className="inline-flex items-center gap-1" style={{ border: 'none', background: 'transparent', color: 'inherit', fontWeight: 700, cursor: 'pointer' }} onClick={() => notice.unprofile && forgetProfile(notice.unprofile)}>
+            <Undo2 size={13} strokeWidth={2} /> Undo
+          </button>
+        )}
+        {notice.restoreProfile && (
+          <button type="button" className="inline-flex items-center gap-1" style={{ border: 'none', background: 'transparent', color: 'inherit', fontWeight: 700, cursor: 'pointer' }} onClick={() => restoreProfile()}>
             <Undo2 size={13} strokeWidth={2} /> Undo
           </button>
         )}
