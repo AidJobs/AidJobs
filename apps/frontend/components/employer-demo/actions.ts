@@ -2196,8 +2196,16 @@ function laterAnswer(s: State, j: DemoJob, step: NonNullable<ReturnType<typeof n
         settle(j.id, 'reach', text, `Added ${[candidates.length ? `${candidates.length} to invite` : '', team.length ? `${team.length} from your team` : ''].filter(Boolean).join(' and ')}. They get the emails when the job goes live; both are in the Reach tab, to check or change.`);
         return true;
       }
-      if (t === INVITE || /^(?:yes|ok|okay|sure|invite)\b/i.test(t)) settle(j.id, 'reach', text, 'The invitations are in the Reach tab: add the people, check both emails, and save. They go when the job goes live.');
-      else if (t === NO_THANKS || t === NOT_NOW || NO_MORE.test(t)) settle(j.id, 'reach', text, 'Fine. You can invite people later from the job’s page while it is live.');
+      // EN-BLOCK Reach: Invite opens the tab but does not settle — Save (setReachPlan) or No thanks closes the step.
+      if (t === INVITE || /^(?:yes|ok|okay|sure|invite)\b/i.test(t)) {
+        updateJob(j.id, (x) => ({
+          ...x,
+          part: 'reach',
+          chat: [...x.chat, msg('user', text), msg('ai', 'The invitations are in the Reach tab: add the people, check both emails, and save. They go when the job goes live.')],
+        }));
+        return true;
+      }
+      if (t === NO_THANKS || t === NOT_NOW || NO_MORE.test(t)) settle(j.id, 'reach', text, 'Fine. You can invite people later from the job’s page while it is live.');
       else return false;
       return true;
     }
@@ -3709,11 +3717,18 @@ export function forgetProfile(profileId: string) {
   update((s) => ({ ...s, profiles: (s.profiles ?? []).filter((p) => p.id !== profileId), notice: { text: 'The job profile was not kept.' } }));
 }
 
-/** Saves the people and the messages for the next Reach round. Team emails go only to the organisation's own domain. */
+/**
+ * Saves the people and the messages for the next Reach round. Team emails go only to the organisation's own domain.
+ * EN-BLOCK Reach: saving settles the walk step so the progress line and chat agree (Invite alone does not settle).
+ */
 export function setReachPlan(id: string, plan: ReachPlan) {
   if (!ownerOnly()) return;
   const domain = getState().org.domain;
-  updateJob(id, (j) => ({ ...j, reachPlan: { ...plan, team: plan.team.filter((e) => e.endsWith(`@${domain}`)) } }));
+  updateJob(id, (j) => {
+    const reachPlan = { ...plan, team: plan.team.filter((e) => e.endsWith(`@${domain}`)) };
+    if (!j.walk || j.walk.settled.includes('reach')) return { ...j, reachPlan };
+    return { ...j, reachPlan, walk: { ...j.walk, settled: [...j.walk.settled, 'reach'] } };
+  });
 }
 
 /** "Invite more" for a live amplified job: the prepared round is sent now. */

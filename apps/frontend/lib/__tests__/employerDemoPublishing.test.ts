@@ -98,7 +98,8 @@ describe('Amplify’s parts, review, and publishing, in order (section 19, steps
     expect(last(id)?.quick).toEqual(['Add French', 'Add Arabic', 'Add Spanish', 'Add Portuguese', 'No other languages']);
     sendChat(id, 'French and Spanish');
     expect(Object.keys(job(id).translations ?? {}).sort()).toEqual(['es', 'fr']);
-    expect(job(id).chat.find((m) => m.text.startsWith('Drafted French and Spanish'))?.text).toContain('That is 1 beyond what Amplify includes: US$5, added to the payment.');
+    // EN-BLOCK #2: drafts are not charged; the payment line only counts reviewed versions.
+    expect(job(id).chat.find((m) => m.text.startsWith('Drafted French and Spanish'))?.text).toBe('Drafted French and Spanish, each in its own tab.');
     sendChat(id, 'No other languages');
     expect(step(id)).toEqual({ kind: 'version', lang: 'fr' });
     sendChat(id, 'Mark it as reviewed');

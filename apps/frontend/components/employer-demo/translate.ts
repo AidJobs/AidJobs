@@ -556,13 +556,13 @@ export function stale(job: DemoJob, t: Translation): boolean {
 }
 
 /**
- * The versions shown on the public job page: reviewed, only for an amplified job, and only as many as it includes or has paid for, in
- * the order they were added. A version that is behind the job's own text stays until the user updates it or keeps it.
+ * The versions shown on the public job page: reviewed ones only, for an amplified job, up to what it includes or has paid for
+ * (EN-BLOCK #3: reviewed first so an earlier draft cannot steal a slot from a later reviewed version). Order among reviewed is
+ * add order. A version that is behind the job's own text stays until the user updates it or keeps it.
  */
 export function publicLangs(job: DemoJob): JobLang[] {
   if (job.plan !== 'amplify' || !job.translations) return [];
   return versionsOf(job)
-    .filter((k) => k !== jobLang(job))
-    .slice(0, langSlots(job))
-    .filter((k) => job.translations?.[k]?.reviewed);
+    .filter((k) => k !== jobLang(job) && job.translations?.[k]?.reviewed)
+    .slice(0, langSlots(job));
 }

@@ -306,7 +306,9 @@ export function LangsPart({ job, s, open }: { job: DemoJob; s: State; open: Open
         })}
       </ul>
       <span className="aj-faint">
-        {versionsOf(job).length} of {slots} included {slots === 1 ? 'version' : 'versions'} used{extra ? `; ${extra} more at ${usd(extra * LANGUAGE_PRICE)}${isPublished(job) ? '' : ', added to the payment'}` : ''}.
+        {versionsOf(job).filter((k) => job.translations?.[k]?.reviewed).length} of {slots} included {slots === 1 ? 'version' : 'versions'} used
+        {versionsOf(job).some((k) => !job.translations?.[k]?.reviewed) ? ` · ${versionsOf(job).filter((k) => !job.translations?.[k]?.reviewed).length} draft` : ''}
+        {extra ? `; ${extra} more at ${usd(extra * LANGUAGE_PRICE)}${isPublished(job) ? '' : ', added to the payment'}` : ''}.
       </span>
       {owner && isPublished(job) && job.plan === 'amplify' && extra > 0 && (
         <button type="button" className="aj-ink-btn self-start" onClick={() => setPaying(true)}>

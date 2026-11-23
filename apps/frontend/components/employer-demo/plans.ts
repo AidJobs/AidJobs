@@ -36,9 +36,14 @@ export function viaFor(s: State, j: DemoJob): PaidVia {
   return nextPaidJob(s) || (j.payWith && j.payWith !== 'one' && j.payWith !== 'free') ? 'package' : 'single';
 }
 
-/** The versions beyond what is included and already paid for: added to the job's checkout, or bought on their own after publishing. */
+/**
+ * Reviewed versions beyond what is included and already paid for (EN-BLOCK #2): drafts never go public, so they are not charged.
+ * Checkout and the live “pay for more languages” button use this count.
+ */
 export function langsToPay(j: DemoJob, plan: Plan | null = j.plan, via: PaidVia = j.paidVia ?? 'single'): number {
-  return plan === 'amplify' ? Math.max(0, Object.keys(j.translations ?? {}).length - langSlots(j, plan, via)) : 0;
+  if (plan !== 'amplify') return 0;
+  const reviewed = Object.values(j.translations ?? {}).filter((t) => t.reviewed).length;
+  return Math.max(0, reviewed - langSlots(j, plan, via));
 }
 
 export const BADGE = 'Actively hiring';
