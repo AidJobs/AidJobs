@@ -923,9 +923,20 @@ class CrawlerOrchestrator:
             health = await asyncio.to_thread(self.health_score, source_id)
         for attempt in (1, 2):
             try:
-                return await asyncio.to_thread(
+                ok = await asyncio.to_thread(
                     self._finish, source_id, run_id, result, mode=mode, health=health
                 )
+                # W-42: whole open-job facts map, only after a successful commit.
+                if ok:
+                    try:
+                        from app.title_facts_cache import schedule_rebuild_after_finish
+                        schedule_rebuild_after_finish(True)
+                    except Exception:
+                        logger.exception(
+                            "[orchestrator] title-facts rebuild schedule failed for %s",
+                            source.get("org_name"),
+                        )
+                return ok
             except Exception:
                 logger.error(
                     "[orchestrator] Error finishing crawl for %s (attempt %d)",

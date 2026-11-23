@@ -276,7 +276,14 @@ async def search_jobs(
             else:
                 job_dict['source'] = None  # Source doesn't exist or is deleted
             items.append(job_dict)
-        
+
+        # W-42: open-job cache miss → title-only facts (admin includes expired rows).
+        try:
+            from app.title_facts_cache import attach_facts_to_items
+            attach_facts_to_items(items)
+        except Exception:
+            logger.exception("title facts attach failed for admin jobs search")
+
         return {
             "status": "ok",
             "data": {

@@ -109,7 +109,14 @@ def test_single_job_from_meilisearch_drops_raw_and_internal_fields(monkeypatch, 
 
     result = asyncio.run(service.get_job_by_id("job-2"))
 
-    assert result["data"] == {"id": "job-2", "title": "Officer"}
+    data = result["data"]
+    assert data["id"] == "job-2"
+    assert data["title"] == "Officer"
+    assert "raw_metadata" not in data
+    assert "_rankingScore" not in data
+    # W-42: title facts attached after the public fields are chosen.
+    assert isinstance(data.get("facts"), dict)
+    assert data["facts"]["language"] == "English"
 
 
 DRIVER_ERROR = (

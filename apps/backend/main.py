@@ -74,7 +74,14 @@ async def lifespan(app: FastAPI):
             logger.warning("[orchestrator] No PostgreSQL database URL configured (need SUPABASE_DB_URL or DATABASE_URL), scheduler not started")
     except Exception as e:
         log_failure(logger, "[orchestrator] Failed to start scheduler", e)
-    
+
+    # W-42: title-facts cache for open jobs (bounded; miss falls back to title-only).
+    try:
+        from app.title_facts_cache import ensure_startup_rebuild
+        await ensure_startup_rebuild()
+    except Exception as e:
+        log_failure(logger, "[title_facts] startup rebuild failed", e)
+
     yield
     
     # Shutdown
