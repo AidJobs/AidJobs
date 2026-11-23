@@ -336,7 +336,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 | 22 Nov 2026 | EN-BLOCK #1 investigate | code only | `parkKey` has no `version` case → null; `afterCheck` always returns unreviewed `version` with no `parked(…)` guard; `parkedIn('langs')` only exact `langs`. Skip / not now / ask-again cannot park; walk stuck before review / Reach / flyer / publish. **Option A plan ready** (not built). |
 | 22 Nov 2026 | EN-BLOCK #1 (Option A) | `c244b97` | `parkKey`/`afterCheck`/`parkedIn`/`tidyParked` for `version:${lang}`. Tests `employerDemoEnBlock1.test.ts`. **Agent confirmed on preview** (`?v=enblock1`: French version step → skip → parked `version:fr` → Next question → Review Send/No; open Language versions unparks → version step returns). |
 | 22 Nov 2026 | FW-1 (Option A) | `fb74df0` | `emailAddress`/`withEmailAddress`; essentials+org; CTA+toast; NGO default + write/publish persist. Tests `employerDemoFw1.test.ts`. **Agent confirmed on preview** (`?v=fw1` Tumaini CHO: By email → `jobs@tumaini.example.org` in Email address without manual fill; Publish CTA named Project brief while unfinished, then **Publish free · your free standard listing** → Now → Live with Copy link / Amplify). |
-| 23 Nov 2026 | FW-2 (Option A) | *(push tip)* | No project drops `background` + `walk.noProject`; Skip keeps slot; details card respects noProject. Tests `employerDemoFw2.test.ts`. **Agent confirm on preview**. |
+| 23 Nov 2026 | FW-2 (Option A) | `92ad8f8` | No project drops `background` + `walk.noProject`; Skip keeps slot; details card respects noProject. Tests `employerDemoFw2.test.ts`. **Agent confirmed on preview** (`?v=fw2` Tumaini CHO → Local NGO → No project page → tags without `background`, `walk.noProject`, style stage). |
 
 ### Free walk leftovers (English; 22 Nov 2026)
 
@@ -356,7 +356,7 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 
 **Was:** Choosing **No project page** still left Local NGO **Project brief** on the outline; AI wrote `[Project details to confirm]`, which blocked Check/Publish until removed.
 
-**Fix:** `advanceFromProject` on No project (not Skip) drops `background` from tags/sections and sets `walk.noProject`; details step skips the project card when noProject; accepting a project page clears the flag and restores the tag via `placeIn`. Tests `employerDemoFw2.test.ts`. Confirm on preview.
+**Fix:** `advanceFromProject` on No project (not Skip) drops `background` from tags/sections and sets `walk.noProject`; details step skips the project card when noProject; accepting a project page clears the flag and restores the tag via `placeIn`. Tests `employerDemoFw2.test.ts`. **Confirmed on preview.**
 
 ### EN-BLOCK #1 — version park — **Fixed** (22 Nov 2026; Option A)
 
