@@ -521,7 +521,15 @@ class SearchService:
                 "size": size,
                 "source": "none",
             }
-        
+
+        # W-42: attach title facts after the page is chosen (both Meili and SQL paths).
+        # Do not filter or change totals — loadOpenJobs requires a complete page set.
+        try:
+            from app.title_facts_cache import attach_facts_to_items
+            attach_facts_to_items(result.get("items") or [])
+        except Exception:
+            logger.exception("title facts attach failed")
+
         env = os.getenv("AIDJOBS_ENV", "").lower()
         if env == "dev":
             if "debug" not in result:
@@ -1132,7 +1140,11 @@ class SearchService:
                             job['last_seen_at'] = job['last_seen_at'].isoformat()
                         if job.get('id'):
                             job['id'] = str(job['id'])
-                        
+                        try:
+                            from app.title_facts_cache import attach_facts
+                            attach_facts(job)
+                        except Exception:
+                            logger.exception("title facts attach failed for job %s", job_id)
                         return {
                             "status": "ok",
                             "data": job,
@@ -1152,7 +1164,11 @@ class SearchService:
                 if doc:
                     if isinstance(doc, dict):
                         doc = {k: v for k, v in doc.items() if not k.startswith('_') and k != 'raw_metadata'}
-                    
+                    try:
+                        from app.title_facts_cache import attach_facts
+                        attach_facts(doc)
+                    except Exception:
+                        logger.exception("title facts attach failed for meili job %s", job_id)
                     return {
                         "status": "ok",
                         "data": doc,
