@@ -1084,7 +1084,54 @@ Phase 7; new AI features beyond walk order and one-reply; changing what custom g
 
 ### Phase 7 plan (managing saved profiles; approved by the user, 15 November 2026; rewritten after the independent plan review the same day)
 
-**Status.** **Built 23 November 2026** on `demo/employer` (user approved the build the same day after English Amplify chrome; tip `f5a0346` / code `05ce0f2` after a Vercel build fix renaming the page to `JobProfiles.tsx`). **Agent confirmed on preview** the same day (`?v=phase7`). Independent review of the build the same day ([the report](d7e41e28-616a-41d0-8922-6a8d2214bf82): **changes needed**, 3 must-fix, 2 should-fix, 4 minor). Recommend fixing all before post-Phase-7 work. Phase 6 and its review fixes were already done. The three locked recommendations stand: light fact editing; side-menu **Job profiles**; `groupOrder` / `groupOf` on save. Plan review of 15 November 2026 ([the report](e6078bdd-e337-4018-896c-fcb84fd207f9)) was already folded into this text. The merge rule does not apply: `demo/employer` is never merged.
+**Status.** **Built 23 November 2026** on `demo/employer` (user approved the build the same day after English Amplify chrome; tip `f5a0346` / code `05ce0f2` after a Vercel build fix renaming the page to `JobProfiles.tsx`). **Agent confirmed on preview** the same day (`?v=phase7`). Independent review of the build the same day ([the report](d7e41e28-616a-41d0-8922-6a8d2214bf82): **changes needed**, 3 must-fix, 2 should-fix, 4 minor). **Review-fixes plan** below (investigate → plan approved 23 November 2026; await approve-to-build). Phase 6 and its review fixes were already done. The three locked recommendations stand: light fact editing; side-menu **Job profiles**; `groupOrder` / `groupOf` on save. Plan review of 15 November 2026 ([the report](e6078bdd-e337-4018-896c-fcb84fd207f9)) was already folded into this text. The merge rule does not apply: `demo/employer` is never merged.
+
+#### Phase 7 review fixes (plan; all findings from [the report](d7e41e28-616a-41d0-8922-6a8d2214bf82))
+
+**Scope.** Fix every must-fix, should-fix, and minor in one pass on `demo/employer`. Never merge. No production crawl. English chrome / langs / flyer / UN / R1-18 out of scope.
+
+**Order of work (build as one commit series, then one preview confirm):**
+
+1. **Must — Escape cancel on display name** (`JobProfiles.tsx` Detail).  
+   Evidence: Escape sets `nameDraft` then `blur()`; `onBlur` runs `saveName` with the old draft still in the closure / same turn, so rename commits.  
+   Fix: a `skipBlurSave` ref (or equivalent) set `true` before Escape blur; `saveName` / `onBlur` no-ops when that flag is set, then clears it. Enter still blurs to save. After Escape, the field shows the previous name and `renameProfile` is not called. Test: Escape after typing does not change `profiles[].name`; Enter/blur still saves.
+
+2. **Must — Phone search** (`JobProfiles.tsx` List).  
+   Evidence: `{(!phone || !searching) && search}` in `HeaderSlot` only; `useIsPhone` is ≤1023px, so at 360/390/412 the open field unmounts. Manage jobs keeps the open field in the body: `{phone && <div>…{searching ? search : …}</div>}` (`Jobs.tsx`).  
+   Fix: same pattern — when `phone && searching`, render the search field in the list body (below the heading / HeaderSlot), not only in the header. Escape and the cross still clear and return focus to the icon. Test or manual check at 390: icon → field appears → type → Escape closes to icon.
+
+3. **Must — Section F AI: prompt + gates** (`model.ts` SYSTEM; `aiActions.ts`; `ai.ts` `context.profiles`).  
+   Evidence: handlers exist but SYSTEM never documents `context.profiles` or `open_profiles` / `start_job_from_profile` / `rename_profile` / `delete_profile`. Handlers accept any id in `s.profiles` and do not require the user asked (unlike `move_section` + `MOVE_ASKED`). `total` is always sent.  
+   Fix:  
+   - SYSTEM: document `context.profiles` (`list` newest-first ≤20 of `{id,name}`; `total` only when more than 20) and the four actions; refuse creating profiles or editing facts from chat; leave `use_profile` as today.  
+   - Export a small `PROFILE_ASKED` regex (open / list / start from profile / rename / delete / job profiles — mirror `MOVE_ASKED` style). Each of the four actions: refuse when `said` is null/empty or `!PROFILE_ASKED.test(said)`; refuse when a profile id is set and not in the same ≤20 list that `context.profiles` exposes (helper shared with `contextFor`); reviewer refusals stay. Open-list (no id) still needs the user-asked gate.  
+   - `context.profiles`: omit `total` when `all.length ≤ 20`; include it only when longer.  
+   Tests: unasked / empty-`said` rename and delete refused; id outside the 20 refused; asked + id in list runs; `use_profile` unchanged; context shape omits `total` at ≤20.
+
+4. **Should — Focus return** (`JobProfiles.tsx`).  
+   Evidence: panel focuses on open; Back/delete do not focus the row or heading.  
+   Fix: remember the opened profile id (module ref or `data-profile-id` on the row). On Back and on delete-from-detail, after navigation to the list, focus that row if it exists, else the list `h1`. Row delete: after remove, focus the list `h1` (row is gone). Opening still focuses the panel. Prefer a short `useEffect` in `List` that consumes a one-shot focus target — no new route param.
+
+5. **Should — Light edit completeness** (`JobProfiles.tsx` Facts / ApplyEdit; still via `updateProfile` only).  
+   Evidence: pay is min/max/currency only (sample scale/grade/hidden modes ignore amounts); eligibility omits `righttowork`; missing non-date facts; apply is method+address only. Plan D: existing-editor scope; dates/positions stay off the profile match key and stay empty on start.  
+   Fix (profile-only controls; do not mount job-bound `ApplyFields` / `SalaryDialog`):  
+   - Pay: `salaryMode` select (same modes as FactBar `SALARY_MODES`); show amount/currency/period only for `range` | `exact` | `daily`, matching FactBar. Keep the “Pay as saved” line.  
+   - Eligibility: add `righttowork`.  
+   - Other non-date facts: engagement (updates contract options), `subjectToFunding` when engagement is job, `directReports`, `donor`, and when recruitment is roster/proposal the availability / client / keyPersonnel fields (same conditions as FactBar Type/More). Never edit `deadline`, `closingTime`, `startDate`, or `positions` on the profile.  
+   - How to apply: expand `ApplyEdit` to the ApplySettings fields already on the profile (documents toggles, cv pages, statement words, references, email subject/one PDF/max MB when email, plus the process flags already on `ApplySettings` that `ApplyFields` exposes). Still `updateProfile({ apply })` only — never `org.keptApply` or the source job.  
+   Tests: `updateProfile` pay mode + amounts; eligibility `righttowork`; apply documents; `at` unchanged; source job and `org.keptApply` untouched; reviewer still refused.
+
+6. **Minor — Row Rename prompt** (`JobProfiles.tsx` Row). Seed `window.prompt` with `p.name ?? ''`, not `profileName(p)`, so confirming without a custom name does not freeze city+title into `name`. Blank still clears via `renameProfile`.
+
+7. **Minor — Format-gone a11y.** Row `aria-label`: display name, and when the format is gone append “, format no longer available”. Keep Use disabled + `title` as today.
+
+8. **Minor — `customGroups` on the profile.** Add optional `customGroups?: CustomGroup[]` on `JobProfile`. `profileOf` copies the job’s `customGroups` when present. `startFromProfile` / grouping path passes them into `cleanGrouping` / `regrouped` so `g-…` ids are not dropped. Publish replace still rebuilds from the published job. Old profiles without the field behave as today. Test: save with a custom group → start → group survives.
+
+9. **Minor — `context.profiles.total`.** Covered in step 3.
+
+**Checks.** Extend `employerDemoPhase7.test.ts` (and a small AI action test file or the same file) for steps 1, 3, 5, 6, 8; phone search and focus return verified on preview at 390 + keyboard. Type check, lint, production build. Push `demo/employer` (never merge). Record tip + preview confirm in the assessment and this status block. One independent review of the review-fixes pass after preview confirm.
+
+**Not in this pass.** Section J role-library leap; FW-3 note; LANG-ONLY / flyer / UN; changing Hire again; creating profiles from chat; editing profile facts via AI.
 
 **What already exists (so this page only manages it).** On publish, a profile is saved automatically (`profileOf`): title, place, family, JD format, section keys, facts without dates and positions, style, how to apply, fixed-text keys (commitments), and language. A newer profile with the same title and place replaces the older. Undo on the notice calls `forgetProfile`. A matching profile is offered at the start of a new job ("Same as your last **Juba Finance Officer**?"). Hire again still copies the written text; a profile does not. There is no screen for the list. That is all this step adds.
 

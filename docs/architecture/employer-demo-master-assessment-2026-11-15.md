@@ -20,7 +20,7 @@
 
 5. ~~Approve vs unsaved buffers; Add-panel blur/Escape~~ — **Fixed 20 Nov 2026** (Step A R1-06; Step B R1-11; user confirmed on preview)
 
-**Next (23 Nov 2026, after Phase 7 independent review):** Phase 7 Job profiles built, preview-confirmed (`?v=phase7`), and independently reviewed ([report](d7e41e28-616a-41d0-8922-6a8d2214bf82): **changes needed**, 3 must-fix, 2 should-fix, 4 minor). Recommend fixing all of them before post-Phase-7 work. FW-3 note; R1-07 deferred; LANG-ONLY / flyer / UN later.
+**Next (23 Nov 2026):** Phase 7 review-fixes **plan ready** (all must + should + minor from [report](d7e41e28-616a-41d0-8922-6a8d2214bf82); see `employer-side-plan.md` “Phase 7 review fixes”). Await approve-to-build (covers review of the fixes + push; never merge). FW-3 note; R1-07 deferred; LANG-ONLY / flyer / UN later.
 
 ---
 
@@ -383,6 +383,6 @@ Live preview checked (390×844): Communications Intern, Child Protection Special
 
 1. Read this file and `employer-side-plan.md` Phase 6 / polish status.  
 2. Confirm `demo/employer` tip and that English-first still holds.  
-3. **Default next:** Fix Phase 7 review findings (all must + should + cheap minors; [report](d7e41e28-616a-41d0-8922-6a8d2214bf82)); then post-Phase-7 work (FW-3 note; LANG-ONLY / flyer / UN; role-library leap in plan section J). R1-07 stays deferred.  
+3. **Default next:** Approve Phase 7 review-fixes plan to build (in `employer-side-plan.md`); then preview confirm + independent review of that pass; then post-Phase-7 work (FW-3 note; LANG-ONLY / flyer / UN; role-library leap in plan section J). R1-07 stays deferred.  
 4. Mark IDs Fixed in the tables and add a Fix log row in the same commit as the code.  
 5. Never stage leftover `apps/frontend/lib/__tests__/employerDemoPhase6Review.test.ts` or `apps/frontend/AGENTS.md` unless the user asks.
