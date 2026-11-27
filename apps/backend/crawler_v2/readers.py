@@ -246,9 +246,10 @@ def general_vacancy_count(jobs) -> int:
     so opened on their job page), by the normalised link the observation path uses. Navigation
     and category links are not vacancies (ICRC, 28 November 2026). A link on the page twice counts
     once, so it cannot make the count match the stated total while a real vacancy goes unread."""
+    rows = list(jobs)
     links = set()
-    for index in page_verdicts(list(jobs), "html"):
-        link = observation_link(jobs[index].get("apply_url"))
+    for index in page_verdicts(rows, "html"):
+        link = observation_link(rows[index].get("apply_url"))
         if link:
             links.add(link)
     return len(links)

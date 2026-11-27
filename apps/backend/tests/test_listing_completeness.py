@@ -119,18 +119,30 @@ def test_vacancies_above_the_page_cap_stay_incomplete():
 
 
 def test_a_duplicated_vacancy_link_counts_once_so_a_missed_vacancy_is_not_hidden():
-    # Ten distinct vacancies, one of them linked twice (a second anchor, another title), on a
-    # page that says 11 of 11: the eleventh is unread, so the listing must not complete.
-    html = _label_page(11)
+    # Ten distinct vacancies, one of them linked twice (a second anchor, another title, and the
+    # same link with a tracking parameter and a trailing slash), on a page that says 11 of 11:
+    # the eleventh is unread, so the listing must not complete. Through GeneralReader.read, so
+    # the wiring is covered too (review, 28 November 2026).
+    first = _vacancy_rows(10)[0]["apply_url"]
     jobs = _vacancy_rows(10) + [
-        {"title": "Apply now", "apply_url": _vacancy_rows(10)[0]["apply_url"]}
+        {"title": "Apply now", "apply_url": first},
+        {"title": "Apply again", "apply_url": first + "/?utm_source=mobile"},
     ] + _navigation_rows(12)
-    assert len(page_verdicts(jobs, "html")) == 11
+    assert len(page_verdicts(jobs, "html")) == 12
     assert general_vacancy_count(jobs) == 10
-    report = general_html_report(html, jobs, vacancies=general_vacancy_count(jobs), page_cap=40)
-    assert report["complete"] is False
-    assert report["expected"] == 11
-    assert "read 10 vacancies" in report["stop"]
+
+    class _Crawler:
+        def _extract_jobs_sync(self, body, url):
+            return jobs, "selector-links"
+
+    result = asyncio.run(
+        GeneralReader(_Crawler()).read(
+            Response(200, _label_page(11)), {"careers_url": "https://careers.icrc.org/go/x/"}
+        )
+    )
+    assert result.complete is False
+    assert result.report()["expected"] == 11
+    assert "read 10 vacancies" in result.report()["stop"]
 
 
 def test_vacancy_count_boundaries_are_pinned():
