@@ -211,7 +211,54 @@ def test_a_feed_that_does_not_answer_200_is_reported(monkeypatch, no_database):
     from crawler_v2.api_crawler import SimpleAPICrawler
     monkeypatch.setattr(SimpleAPICrawler, "fetch_api_response", feed)
     result = asyncio.run(probe.probe_address("https://job-boards.greenhouse.io/x"))
-    assert result == {"ok": False, "error": "Refused: HTTP 503", "error_category": "runtime"}
+    assert result == {"ok": False, "error": "HTTP 503", "error_category": "runtime"}
+
+
+def _feed_setup(monkeypatch, feed, simulate=None):
+    reader = SimpleNamespace(budget_group=None)
+    request = SimpleNamespace(
+        url="https://apply.workable.com/api/v1/widget/accounts/x", accept=None
+    )
+    from crawler_v2.api_crawler import SimpleAPICrawler
+    monkeypatch.setattr(probe, "resolve_feed_request", lambda readers, source: (reader, request))
+    monkeypatch.setattr(SimpleAPICrawler, "fetch_api_response", feed)
+    if simulate is not None:
+        monkeypatch.setattr(probe, "simulate_api", simulate)
+
+
+def test_a_feed_error_with_raw_text_is_not_echoed(monkeypatch, no_database):
+    async def feed(self, url, headers=None, budget_group=None):
+        return Response(0, "", stop="connect to 10.0.0.5 failed for jobs.internal")
+
+    _feed_setup(monkeypatch, feed)
+    result = asyncio.run(probe.probe_address("https://apply.workable.com/example"))
+    assert result == {"ok": False, "error": probe.NO_READ, "error_category": "runtime"}
+    assert "10.0.0.5" not in str(result)
+
+
+def test_a_feed_body_that_is_not_json_is_reported_not_raised(monkeypatch, no_database):
+    async def feed(self, url, headers=None, budget_group=None):
+        return Response(200, "<html>maintenance</html>", content_type="text/html")
+
+    async def simulate(body, careers_url, fetch=None):
+        raise ValueError("API body is not JSON")
+
+    _feed_setup(monkeypatch, feed, simulate)
+    result = asyncio.run(probe.probe_address("https://apply.workable.com/example"))
+    assert result == {"ok": False, "error": probe.UNREADABLE, "error_category": "runtime"}
+
+
+def test_a_page_that_cannot_be_parsed_is_reported_not_raised(monkeypatch, no_database):
+    async def fetch(url, **kwargs):
+        return Page(text="<html>listing</html>")
+
+    async def simulate(crawler, html, careers_url):
+        raise ValueError("cannot parse")
+
+    monkeypatch.setattr(probe, "fetch_url", fetch)
+    monkeypatch.setattr(probe, "simulate_html", simulate)
+    result = asyncio.run(probe.probe_address(ADDRESS))
+    assert result == {"ok": False, "error": probe.UNREADABLE, "error_category": "runtime"}
 
 
 # Time ------------------------------------------------------------------------------------

@@ -307,7 +307,7 @@ def create_source(
     source: SourceCreate,
     admin: str = Depends(admin_required)
 ):
-    """Create a new source with auto-queue (next_run_at=now())."""
+    """Create a new source as pending (W-40): not crawled until it is activated."""
     check_source_type(source.source_type)
     if not psycopg2:
         raise HTTPException(status_code=503, detail="Database driver not available")
@@ -345,7 +345,7 @@ def create_source(
                         time_window = COALESCE(%s, time_window),
                         next_run_at = NULL,
                         updated_at = NOW()
-                    WHERE id::text = %s
+                    WHERE id::text = %s AND status = 'deleted'
                     RETURNING id::text, org_name, careers_url, source_type, org_type, status,
                               crawl_frequency_days, next_run_at, last_crawled_at, last_crawl_status,
                               parser_hint, time_window, created_at, updated_at
@@ -360,6 +360,13 @@ def create_source(
                 ))
                 
                 restored = cursor.fetchone()
+                if restored is None:
+                    # Changed since it was read (restored or deleted again): nothing is written.
+                    conn.rollback()
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Source changed while it was being added. Try again.",
+                    )
                 conn.commit()
                 
                 logger.info(f"[sources] Restored source {restored['id']} as pending (W-40)")
@@ -494,7 +501,9 @@ def update_source(
         updates.append("updated_at = NOW()")
         params.append(source_id)
         # A pending source leaves pending only through Activate (W-40); other fields may change.
-        pending_guard = f" AND status IS DISTINCT FROM '{PENDING}'" if update.status is not None else ""
+        pending_guard = (
+            f" AND status IS DISTINCT FROM '{PENDING}'" if update.status is not None else ""
+        )
         
         sql_query = f"""
             UPDATE sources
@@ -889,8 +898,8 @@ async def probe_source(
     """Read a careers address once and report what it holds (W-40). Writes nothing: no source,
     no crawl run, no saved page. The address is checked by the fetch policy, as Test is."""
     from crawler_v2.probe import probe_address
-    db_url = os.getenv("SUPABASE_DB_URL") or os.getenv("DATABASE_URL") or ""
-    return await probe_address(body.careers_url, db_url)
+    # No database URL: the probe's readers open no connection, so none is handed to them.
+    return await probe_address(body.careers_url)
 
 
 @router.post("/api/admin/sources/{source_id}/activate")

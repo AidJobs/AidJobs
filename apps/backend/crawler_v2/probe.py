@@ -13,7 +13,7 @@ import asyncio
 from typing import Any, Dict, Optional
 from urllib.parse import urlsplit
 
-from contracts.outbound import FetchError, crawl_budget, fetch_message, fetch_url
+from contracts.outbound import FETCH_MESSAGES, FetchError, crawl_budget, fetch_message, fetch_url
 from contracts.refusal import refusal
 from crawler_v2.readers import api_readers, resolve_feed_request
 from crawler_v2.simulate import simulate_api, simulate_html
@@ -29,6 +29,8 @@ SAMPLE_ROWS = 3
 ADDRESS_REFUSED = "Enter a careers address that starts with http:// or https:// and names a host."
 ADDRESS_TOO_LONG = "The careers address is too long."
 NO_ANSWER = "The address did not answer in time."
+UNREADABLE = "The address did not return a readable listing."
+NO_READ = "The address could not be read."
 
 
 def address_refusal(url: str) -> Optional[str]:
@@ -52,11 +54,17 @@ def _cap(value: Any) -> Any:
 
 
 def _refused(stop: Optional[str], status: int) -> Dict[str, Any]:
-    return {
-        "ok": False,
-        "error": f"Refused: {stop}" if stop else f"HTTP {status}",
-        "error_category": "runtime",
-    }
+    if stop:
+        text = f"Refused: {stop}"
+    elif status:
+        text = f"HTTP {status}"
+    else:
+        text = NO_READ
+    return {"ok": False, "error": text, "error_category": "runtime"}
+
+
+def _unreadable() -> Dict[str, Any]:
+    return {"ok": False, "error": UNREADABLE, "error_category": "runtime"}
 
 
 def _report(summary: Dict[str, Any], suggested_type: str) -> Dict[str, Any]:
@@ -99,9 +107,14 @@ async def _read(url: str, db_url: str) -> Dict[str, Any]:
             budget_group=getattr(chosen, "budget_group", None),
         )
         if answer.stop or answer.status != 200 or not answer.body:
-            return _refused(answer.stop, answer.status)
-        # fetch=None: the reader does not open detail pages (Greenhouse) for a probe.
-        return _report(await simulate_api(answer.body, url), "api")
+            # The feed path carries the fetch error's raw text; only the fixed messages pass.
+            stop = answer.stop if answer.stop in FETCH_MESSAGES else None
+            return _refused(stop, answer.status)
+        try:
+            # fetch=None: the reader does not open detail pages (Greenhouse) for a probe.
+            return _report(await simulate_api(answer.body, url), "api")
+        except ValueError:
+            return _unreadable()
 
     try:
         result = await fetch_url(url, headers=_html_request_headers(), timeout=30.0)
@@ -114,10 +127,10 @@ async def _read(url: str, db_url: str) -> Dict[str, Any]:
         return _refused(stop or None, result.status_code)
     if not result.text:
         return {"ok": False, "error": "The page was empty.", "error_category": "runtime"}
-    return _report(
-        await simulate_html(SimpleCrawler(db_url), result.text, url),
-        "html",
-    )
+    try:
+        return _report(await simulate_html(SimpleCrawler(db_url), result.text, url), "html")
+    except ValueError:
+        return _unreadable()
 
 
 async def probe_address(careers_url: str, db_url: str = "") -> Dict[str, Any]:

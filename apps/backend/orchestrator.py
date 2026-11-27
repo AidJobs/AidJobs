@@ -524,6 +524,14 @@ class CrawlerOrchestrator:
                     if cur.fetchone() is None:
                         conn.rollback()
                         return None, False, "locked"
+                    if not scheduled:
+                        # A pending source is not crawled by hand either (W-40): it may have been
+                        # added as pending after the admin's check of its status.
+                        cur.execute("SELECT status FROM sources WHERE id = %s", (source_id,))
+                        status_row = cur.fetchone()
+                        if status_row and status_row[0] == "pending_validation":
+                            conn.rollback()
+                            return None, False, "not due"
                     if scheduled:
                         cur.execute(
                             """

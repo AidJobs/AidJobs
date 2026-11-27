@@ -49,6 +49,9 @@ export default function AdminSourcesPage() {
   const [probeResult, setProbeResult] = useState<any>(null);
   const [probeLoading, setProbeLoading] = useState(false);
   const [activatingSourceId, setActivatingSourceId] = useState<string | null>(null);
+  const [creatingSource, setCreatingSource] = useState(false);
+  // Counts the address checks; a reply for an older check or an earlier address is ignored.
+  const probeRequest = useRef(0);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingSource, setEditingSource] = useState<Source | null>(null);
   const [testResult, setTestResult] = useState<any>(null);
@@ -459,6 +462,8 @@ export default function AdminSourcesPage() {
   };
 
   const handleAddSource = async () => {
+    if (creatingSource) return;
+    setCreatingSource(true);
     try {
       // Validate required fields
       if (!formData.careers_url) {
@@ -506,11 +511,15 @@ export default function AdminSourcesPage() {
       console.error('Failed to create source:', error);
       const errorMsg = error instanceof Error ? error.message : 'Failed to create source';
       toast.error(errorMsg);
+    } finally {
+      setCreatingSource(false);
     }
   };
 
   /** Reads the careers address once (W-40). Nothing is saved; the report fills the form's type. */
   const handleCheckAddress = async () => {
+    const request = ++probeRequest.current;
+    const current = () => request === probeRequest.current;
     setProbeLoading(true);
     setProbeResult(null);
     try {
@@ -525,19 +534,21 @@ export default function AdminSourcesPage() {
         return;
       }
       const json = await res.json().catch(() => ({ ok: false, error: 'The check could not be read.' }));
+      if (!current()) return;
       setProbeResult(json);
       if (json.ok && json.suggested_source_type) {
-        setFormData((current) => ({ ...current, source_type: json.suggested_source_type }));
+        setFormData((form) => ({ ...form, source_type: json.suggested_source_type }));
       }
     } catch {
-      setProbeResult({ ok: false, error: 'The check could not be sent. Try again.' });
+      if (current()) setProbeResult({ ok: false, error: 'The check could not be sent. Try again.' });
     } finally {
-      setProbeLoading(false);
+      if (current()) setProbeLoading(false);
     }
   };
 
-  /** Activates a pending source, which queues its first crawl (W-40). */
+  /** Activates a pending source, which queues its first crawl (W-40). One at a time. */
   const handleActivateSource = async (sourceId: string) => {
+    if (activatingSourceId !== null) return;
     setActivatingSourceId(sourceId);
     try {
       const res = await fetch(`/api/admin/sources/${encodeURIComponent(sourceId)}/activate`, {
@@ -856,8 +867,14 @@ export default function AdminSourcesPage() {
     setAddEditModalPosition({ x: 0, y: 0 }); // Reset position when opening
   };
 
-  const resetForm = () => {
+  const invalidateProbe = () => {
+    probeRequest.current += 1;
     setProbeResult(null);
+    setProbeLoading(false);
+  };
+
+  const resetForm = () => {
+    invalidateProbe();
     setFormData({
       org_name: '',
       careers_url: '',
@@ -1290,7 +1307,7 @@ export default function AdminSourcesPage() {
                     value={formData.careers_url}
                     onChange={(e) => {
                       setFormData({ ...formData, careers_url: e.target.value });
-                      setProbeResult(null);
+                      invalidateProbe();
                     }}
                     className="w-full border border-[#D2D2D7] rounded-lg px-3 py-2 bg-white text-[#1D1D1F] text-body-sm placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20 transition-all"
                     placeholder={

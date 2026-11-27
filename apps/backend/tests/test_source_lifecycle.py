@@ -375,6 +375,21 @@ def test_a_restored_source_is_pending_with_no_crawl_queued(database):
     assert "next_run_at = NOW()" not in update
 
 
+def test_a_restore_that_finds_the_source_changed_is_refused_and_commits_nothing(database):
+    # The guarded UPDATE matches no row when another request changed the source first (W-40).
+    log = database({
+        "SELECT id::text, status FROM sources": [{"id": SID, "status": "deleted"}],
+        "UPDATE sources": [],
+    })
+    response = _sources_app().post("/api/admin/sources", json={
+        "careers_url": "https://jobs.example.org/", "source_type": "html"})
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Source changed while it was being added. Try again."
+    update = next(s for s in log if s.startswith("UPDATE sources"))
+    assert "AND status = 'deleted'" in update
+    assert "COMMIT" not in log
+
+
 def test_activate_moves_only_a_pending_source_and_queues_its_crawl(database):
     log = database({"UPDATE sources": [{"id": SID, "status": "active"}]})
     response = _sources_app().post(f"/api/admin/sources/{SID}/activate")
