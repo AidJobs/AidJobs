@@ -13,7 +13,7 @@ import asyncio
 from typing import Any, Dict, Optional
 from urllib.parse import urlsplit
 
-from contracts.outbound import FETCH_MESSAGES, FetchError, crawl_budget, fetch_message, fetch_url
+from contracts.outbound import FetchError, crawl_budget, fetch_message, fetch_url
 from contracts.refusal import refusal
 from crawler_v2.readers import api_readers, resolve_feed_request
 from crawler_v2.simulate import simulate_api, simulate_html
@@ -107,9 +107,9 @@ async def _read(url: str, db_url: str) -> Dict[str, Any]:
             budget_group=getattr(chosen, "budget_group", None),
         )
         if answer.stop or answer.status != 200 or not answer.body:
-            # The feed path carries the fetch error's raw text; only the fixed messages pass.
-            stop = answer.stop if answer.stop in FETCH_MESSAGES else None
-            return _refused(stop, answer.status)
+            # The feed's stop is a fixed word: a refusal or challenge label, a fixed fetch
+            # message, or "fetch failed" (api_crawler never passes a raw fetch error on).
+            return _refused(answer.stop, answer.status)
         try:
             # fetch=None: the reader does not open detail pages (Greenhouse) for a probe.
             return _report(await simulate_api(answer.body, url), "api")
@@ -128,7 +128,8 @@ async def _read(url: str, db_url: str) -> Dict[str, Any]:
     if not result.text:
         return {"ok": False, "error": "The page was empty.", "error_category": "runtime"}
     try:
-        return _report(await simulate_html(SimpleCrawler(db_url), result.text, url), "html")
+        crawler = SimpleCrawler(db_url, store_html=False)
+        return _report(await simulate_html(crawler, result.text, url), "html")
     except ValueError:
         return _unreadable()
 

@@ -27,7 +27,7 @@ from contracts.canary import (
     previous_kept_from_logs,
     previous_reader_from_logs,
 )
-from contracts.outbound import FetchError, current_budget, fetch_url, host_group
+from contracts.outbound import FetchError, current_budget, fetch_message, fetch_url, host_group
 from contracts.reader import Fetch, ListingResult, Request, Response
 from contracts.refusal import refusal
 from contracts.run_ownership import OwnershipLost, save_failure_outcome
@@ -168,7 +168,8 @@ class SimpleAPICrawler:
             )
         except FetchError as exc:
             logger.error("Error fetching API %s: %s", url, exc)
-            reason = str(exc) if str(exc) else "fetch failed"
+            # Only a fixed message leaves the fetch policy; any other error text is not echoed.
+            reason = fetch_message(exc) or "fetch failed"
             return Response(0, "", stop=reason)
         except Exception as exc:
             logger.error("Error fetching API %s: %s", url, exc)

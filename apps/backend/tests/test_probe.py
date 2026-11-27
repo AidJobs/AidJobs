@@ -211,7 +211,7 @@ def test_a_feed_that_does_not_answer_200_is_reported(monkeypatch, no_database):
     from crawler_v2.api_crawler import SimpleAPICrawler
     monkeypatch.setattr(SimpleAPICrawler, "fetch_api_response", feed)
     result = asyncio.run(probe.probe_address("https://job-boards.greenhouse.io/x"))
-    assert result == {"ok": False, "error": "HTTP 503", "error_category": "runtime"}
+    assert result == {"ok": False, "error": "Refused: HTTP 503", "error_category": "runtime"}
 
 
 def _feed_setup(monkeypatch, feed, simulate=None):
@@ -226,14 +226,54 @@ def _feed_setup(monkeypatch, feed, simulate=None):
         monkeypatch.setattr(probe, "simulate_api", simulate)
 
 
-def test_a_feed_error_with_raw_text_is_not_echoed(monkeypatch, no_database):
-    async def feed(self, url, headers=None, budget_group=None):
-        return Response(0, "", stop="connect to 10.0.0.5 failed for jobs.internal")
+def _real_feed_setup(monkeypatch, fetch):
+    """The feed's own fetch_api_response runs; only the policy's fetch_url is replaced."""
+    reader = SimpleNamespace(budget_group=None)
+    request = SimpleNamespace(
+        url="https://apply.workable.com/api/v1/widget/accounts/x", accept=None
+    )
+    monkeypatch.setattr(probe, "resolve_feed_request", lambda readers, source: (reader, request))
+    monkeypatch.setattr("crawler_v2.api_crawler.fetch_url", fetch)
 
-    _feed_setup(monkeypatch, feed)
+
+def test_a_feed_error_with_raw_text_is_not_echoed(monkeypatch, no_database):
+    async def fetch(url, **kwargs):
+        raise FetchError("connect to 10.0.0.5 failed for jobs.internal")
+
+    _real_feed_setup(monkeypatch, fetch)
     result = asyncio.run(probe.probe_address("https://apply.workable.com/example"))
-    assert result == {"ok": False, "error": probe.NO_READ, "error_category": "runtime"}
+    assert result == {"ok": False, "error": "Refused: fetch failed", "error_category": "runtime"}
     assert "10.0.0.5" not in str(result)
+
+
+def test_a_feed_challenge_keeps_its_name(monkeypatch, no_database):
+    async def fetch(url, **kwargs):
+        return Page(status_code=200, text="<title>Just a moment...</title>")
+
+    _real_feed_setup(monkeypatch, fetch)
+    result = asyncio.run(probe.probe_address("https://apply.workable.com/example"))
+    assert result == {
+        "ok": False,
+        "error": "Refused: HTTP 200 (Cloudflare challenge)",
+        "error_category": "runtime",
+    }
+
+
+def test_the_page_branch_writes_no_html_storage(monkeypatch, no_database):
+    seen = {}
+
+    async def fetch(url, **kwargs):
+        return Page(text="<html>listing</html>")
+
+    async def simulate(crawler, html, careers_url):
+        seen["storage"] = crawler.html_storage
+        return _summary()
+
+    monkeypatch.setattr(probe, "fetch_url", fetch)
+    monkeypatch.setattr(probe, "simulate_html", simulate)
+    result = asyncio.run(probe.probe_address(ADDRESS))
+    assert result["ok"] is True
+    assert seen == {"storage": None}
 
 
 def test_a_feed_body_that_is_not_json_is_reported_not_raised(monkeypatch, no_database):
