@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { adminDateTime } from '@/lib/dates';
 import { sourceRowActions } from '@/lib/admin/danger';
-import { Plus, Upload, Play, Pause, Edit, TestTube, FileCode, Download, X, ChevronDown, ChevronUp, Check, XCircle, Info, History, AlertCircle, CheckCircle } from 'lucide-react';
+import { Plus, Upload, Play, Pause, Edit, TestTube, FileCode, Download, X, ChevronDown, ChevronUp, Check, XCircle, Info, History, AlertCircle, CheckCircle, Search } from 'lucide-react';
 
 type Source = {
   id: string;
@@ -46,6 +46,9 @@ export default function AdminSourcesPage() {
   const [statusFilter, setStatusFilter] = useState('active');
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [probeResult, setProbeResult] = useState<any>(null);
+  const [probeLoading, setProbeLoading] = useState(false);
+  const [activatingSourceId, setActivatingSourceId] = useState<string | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingSource, setEditingSource] = useState<Source | null>(null);
   const [testResult, setTestResult] = useState<any>(null);
@@ -491,7 +494,7 @@ export default function AdminSourcesPage() {
 
       const json = await res.json();
       if (json.status === 'ok') {
-        toast.success('Source created and queued for crawl');
+        toast.success(json.message || 'Source added as pending');
         setShowAddModal(false);
         setAddEditModalPosition({ x: 0, y: 0 });
         resetForm();
@@ -503,6 +506,58 @@ export default function AdminSourcesPage() {
       console.error('Failed to create source:', error);
       const errorMsg = error instanceof Error ? error.message : 'Failed to create source';
       toast.error(errorMsg);
+    }
+  };
+
+  /** Reads the careers address once (W-40). Nothing is saved; the report fills the form's type. */
+  const handleCheckAddress = async () => {
+    setProbeLoading(true);
+    setProbeResult(null);
+    try {
+      const res = await fetch('/api/admin/sources/probe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ careers_url: formData.careers_url }),
+      });
+      if (res.status === 401) {
+        router.push('/admin/login');
+        return;
+      }
+      const json = await res.json().catch(() => ({ ok: false, error: 'The check could not be read.' }));
+      setProbeResult(json);
+      if (json.ok && json.suggested_source_type) {
+        setFormData((current) => ({ ...current, source_type: json.suggested_source_type }));
+      }
+    } catch {
+      setProbeResult({ ok: false, error: 'The check could not be sent. Try again.' });
+    } finally {
+      setProbeLoading(false);
+    }
+  };
+
+  /** Activates a pending source, which queues its first crawl (W-40). */
+  const handleActivateSource = async (sourceId: string) => {
+    setActivatingSourceId(sourceId);
+    try {
+      const res = await fetch(`/api/admin/sources/${encodeURIComponent(sourceId)}/activate`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (res.status === 401) {
+        router.push('/admin/login');
+        return;
+      }
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json.status !== 'ok') {
+        throw new Error(json.error || json.detail || `HTTP ${res.status}: Failed to activate source`);
+      }
+      toast.success(json.message || 'Source activated');
+      fetchSources();
+    } catch (error: any) {
+      toast.error(error instanceof Error ? error.message : 'Failed to activate source');
+    } finally {
+      setActivatingSourceId(null);
     }
   };
 
@@ -802,6 +857,7 @@ export default function AdminSourcesPage() {
   };
 
   const resetForm = () => {
+    setProbeResult(null);
     setFormData({
       org_name: '',
       careers_url: '',
@@ -865,6 +921,7 @@ export default function AdminSourcesPage() {
                 className="border border-[#D2D2D7] rounded-lg px-3 py-1.5 bg-white text-[#1D1D1F] text-caption focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
               >
                 <option value="active">Active</option>
+                <option value="pending_validation">Pending</option>
                 <option value="paused">Paused</option>
                 <option value="deleted">Deleted</option>
                 <option value="all">All</option>
@@ -940,6 +997,7 @@ export default function AdminSourcesPage() {
                           <div className={`w-2 h-2 rounded-full ${
                             source.status === 'active' ? 'bg-[#30D158]' :
                             source.status === 'paused' ? 'bg-[#86868B]' :
+                            source.status === 'pending_validation' ? 'bg-[#FF9500]' :
                             'bg-[#FF3B30]'
                           }`}></div>
                           <span className="text-caption text-[#1D1D1F]">{source.status}</span>
@@ -992,7 +1050,24 @@ export default function AdminSourcesPage() {
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex gap-1 flex-wrap">
-                          {!sourceRowActions(source.status).run && (
+                          {sourceRowActions(source.status).activate && (
+                          <button
+                            onClick={() => handleActivateSource(source.id)}
+                            disabled={activatingSourceId === source.id}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#30D158] bg-opacity-10 hover:bg-opacity-20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors relative group border border-[#30D158] border-opacity-30"
+                            title="Activate"
+                          >
+                            {activatingSourceId === source.id ? (
+                              <div className="w-4 h-4 border-2 border-[#30D158] border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <CheckCircle className="w-4 h-4 text-[#30D158]" />
+                            )}
+                            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-50 shadow-lg">
+                              Activate and queue the first crawl
+                            </span>
+                          </button>
+                          )}
+                          {source.status === 'deleted' && (
                             <span className="text-caption-sm text-[#86868B] self-center" title="A deleted source is restored by adding it again with the same careers URL">
                               Deleted: add it again to restore
                             </span>
@@ -1213,7 +1288,10 @@ export default function AdminSourcesPage() {
                   <input
                     type="url"
                     value={formData.careers_url}
-                    onChange={(e) => setFormData({ ...formData, careers_url: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, careers_url: e.target.value });
+                      setProbeResult(null);
+                    }}
                     className="w-full border border-[#D2D2D7] rounded-lg px-3 py-2 bg-white text-[#1D1D1F] text-body-sm placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20 transition-all"
                     placeholder={
                       formData.source_type === 'api' 
@@ -1224,6 +1302,58 @@ export default function AdminSourcesPage() {
                     }
                     required
                   />
+                  {showAddModal && (
+                    <div className="mt-2">
+                      <button
+                        type="button"
+                        onClick={handleCheckAddress}
+                        disabled={probeLoading || !formData.careers_url}
+                        className="px-3 py-1.5 rounded-lg bg-white border border-[#D2D2D7] text-caption text-[#1D1D1F] hover:bg-[#F5F5F7] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                      >
+                        <Search className="w-3.5 h-3.5" />
+                        {probeLoading ? 'Checking…' : 'Check address'}
+                      </button>
+                      <p className="text-caption-sm text-[#86868B] mt-1">
+                        Reads this address once. Nothing is saved; the source is added as pending and is not crawled until you activate it.
+                      </p>
+                      {probeResult && !probeResult.ok && (
+                        <p className="text-caption text-[#FF3B30] mt-2">{probeResult.error || 'The check failed.'}</p>
+                      )}
+                      {probeResult?.ok && (
+                        <div className="mt-2 border border-[#D2D2D7] rounded-lg p-3 bg-[#F5F5F7] text-caption text-[#1D1D1F] space-y-1">
+                          <p>
+                            Reader <span className="font-mono">{probeResult.reader}</span>, source type {probeResult.suggested_source_type}. Found {probeResult.count}
+                            {probeResult.expected != null ? ` of ${probeResult.expected} expected` : ''}
+                            {probeResult.complete ? ', complete.' : ', not confirmed complete.'}
+                          </p>
+                          <p>
+                            Would admit {probeResult.admitted}; reject {probeResult.rejected}
+                            {Object.keys(probeResult.rejected_by_reason || {}).length > 0
+                              ? ` (${Object.entries(probeResult.rejected_by_reason).map(([reason, n]) => `${reason}: ${n}`).join(', ')})`
+                              : ''}.
+                          </p>
+                          <p className="text-caption-sm text-[#86868B]">{probeResult.fill_basis}</p>
+                          <ul className="list-disc pl-5">
+                            {Object.entries(probeResult.fill_rates || {}).map(([name, fill]: [string, any]) => (
+                              <li key={name}>
+                                {name}: {fill.rate === null || fill.rate === undefined ? 'n/a' : `${fill.rate}%`}
+                                {fill.total ? ` (${fill.filled ?? 0} of ${fill.total})` : ''}
+                              </li>
+                            ))}
+                          </ul>
+                          {(probeResult.sample || []).length > 0 && (
+                            <ul className="list-disc pl-5">
+                              {probeResult.sample.map((row: any, index: number) => (
+                                <li key={index}>
+                                  {row.title || row.apply_url || '(no title)'} · {row.verdict}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -1338,11 +1468,11 @@ export default function AdminSourcesPage() {
               <button
                 onClick={showAddModal ? handleAddSource : handleEditSource}
                 className="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-[#D2D2D7] hover:bg-[#F5F5F7] transition-colors relative group"
-                title={showAddModal ? 'Create Source' : 'Save Changes'}
+                title={showAddModal ? 'Add as pending' : 'Save Changes'}
               >
                 <Check className="w-4 h-4 text-[#86868B]" />
                 <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 px-2 py-1 bg-[#1D1D1F] text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap transition-opacity z-[9999] shadow-lg">
-                  {showAddModal ? 'Create Source' : 'Save Changes'}
+                  {showAddModal ? 'Add as pending' : 'Save Changes'}
                 </span>
               </button>
             </div>
@@ -1680,6 +1810,7 @@ export default function AdminSourcesPage() {
                           <div className={`w-2 h-2 rounded-full ${
                             selectedSourceForDetails.status === 'active' ? 'bg-[#30D158]' :
                             selectedSourceForDetails.status === 'paused' ? 'bg-[#86868B]' :
+                            selectedSourceForDetails.status === 'pending_validation' ? 'bg-[#FF9500]' :
                             'bg-[#FF3B30]'
                           }`}></div>
                           <span className="text-body-sm text-[#1D1D1F]">{selectedSourceForDetails.status}</span>

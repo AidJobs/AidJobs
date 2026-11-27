@@ -21,11 +21,23 @@ export function sourceDangerActions(status: string | null | undefined): { delete
 
 /**
  * Which row actions the sources list offers. The backend refuses to crawl or edit a deleted
- * source; it is restored by adding it again.
+ * source; it is restored by adding it again. A pending source (not yet activated) cannot be
+ * crawled or paused or resumed; it can be edited (not its status) and activated.
  */
-export function sourceRowActions(status: string | null | undefined): { run: boolean; toggle: boolean; edit: boolean } {
-  const live = status !== 'deleted';
-  return { run: live, toggle: live, edit: live };
+export function sourceRowActions(status: string | null | undefined): {
+  run: boolean;
+  toggle: boolean;
+  edit: boolean;
+  activate: boolean;
+} {
+  const deleted = status === 'deleted';
+  const pending = status === 'pending_validation';
+  return {
+    run: !deleted && !pending,
+    toggle: !deleted && !pending,
+    edit: !deleted,
+    activate: pending,
+  };
 }
 
 export type ImpactCount =

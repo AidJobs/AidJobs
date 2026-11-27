@@ -15,7 +15,7 @@ from psycopg2 import errors as psycopg2_errors  # type: ignore
 
 from app.errors import InternalError
 from app.log_safety import redact_exception
-from app.sources import DELETED_SOURCE
+from app.sources import DELETED_SOURCE, PENDING, PENDING_CRAWL
 from security.admin_auth import admin_required
 from orchestrator import get_orchestrator
 
@@ -104,6 +104,9 @@ async def run_source(request: RunSourceRequest, admin=Depends(admin_required)):
             # Its new jobs would be saved live under a deleted source. Paused sources may run.
             if source["status"] == "deleted":
                 raise HTTPException(status_code=409, detail=DELETED_SOURCE)
+            # A pending source is crawled only after Activate (W-40)
+            if source["status"] == PENDING:
+                raise HTTPException(status_code=409, detail=PENDING_CRAWL)
     finally:
         conn.close()
     
