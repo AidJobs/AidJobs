@@ -9,12 +9,8 @@ import { COMMITMENTS, commitmentText } from './engine';
 import { jobLang } from './translate';
 import type { DemoJob, FixedOwn, JobLang, Org, State } from './types';
 
-/** The language the organisation writes its fixed texts in (defaults to English). */
+/** The language the organisation writes its fixed texts in, in the demo. */
 export const ORG_LANG: JobLang = 'en';
-
-export function orgLang(org?: Pick<Org, 'primaryLang'>): JobLang {
-  return org?.primaryLang ?? ORG_LANG;
-}
 
 /** The fixed texts the demo offers this organisation. */
 export function offeredFixed(org: Org): string[] {
@@ -42,16 +38,17 @@ export function fixedStore(job: DemoJob, lang: JobLang = jobLang(job)): Record<s
 
 /** The organisation's own wording of a fixed text in a language, used word for word; in its own language, its text in Settings. */
 export function orgWording(org: Org, key: string, lang: JobLang): string | undefined {
-  if (lang === orgLang(org)) return org.standard.find((c) => c.key === key)?.text;
+  if (lang === ORG_LANG) return org.standard.find((c) => c.key === key)?.text;
   return org.fixedWording?.[lang]?.[key]?.trim() || undefined;
 }
 
 /**
- * Whether a fixed text may be worded for this job in a language: unlocked texts always; locked texts can never be edited ad-hoc
- * on a job (in any language) — locked translations come from Organisation settings or owner-approved translation.
+ * Whether a fixed text may be worded for this job in a language: a text not locked, always; a locked one only as a translation, in a
+ * language the organisation wrote no wording for (a version could not show it otherwise).
  */
-export function canWord(org: Org, key: string, _lang: JobLang): boolean {
-  return !isLocked(org, key);
+export function canWord(org: Org, key: string, lang: JobLang): boolean {
+  if (!isLocked(org, key)) return true;
+  return lang !== ORG_LANG && !orgWording(org, key, lang);
 }
 
 export type FixedShown = {
@@ -85,10 +82,9 @@ export function fixedShown(job: DemoJob, s: Pick<State, 'org'>, key: string, lan
   if (mine?.text && (mine.machine || canWord(s.org, key, lang))) return { ...shared, text: mine.text, own: !mine.machine, machine: Boolean(mine.machine && !mine.approved), toTranslate: false };
   const published = job.fixedPublished?.[lang]?.[key];
   if (published) return { ...shared, text: published, own: false, machine: false, toTranslate: false };
-  const primary = orgLang(s.org);
-  const wording = lang === primary ? base.text : orgWording(s.org, key, lang);
+  const wording = lang === ORG_LANG ? base.text : orgWording(s.org, key, lang);
   if (wording) return { ...shared, text: wording, own: false, machine: false, toTranslate: false };
-  return { ...shared, text: base.text, own: false, machine: false, toTranslate: true, textLang: primary };
+  return { ...shared, text: base.text, own: false, machine: false, toTranslate: true, textLang: ORG_LANG };
 }
 
 /** Every fixed text's wording in every language the job has, as it would be published now. */

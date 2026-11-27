@@ -3,11 +3,10 @@
 import { Printer } from 'lucide-react';
 import qrcode from 'qrcode-generator';
 import { useMemo, useState } from 'react';
-import { emailAddress } from './apply';
-import { inOutlineOrder, salaryText } from './engine';
+import { inOutlineOrder } from './engine';
 import { amplifying, flyerStale, reachOpen } from './flow';
-import { fixedList, fixedShown } from './fixed';
-import { countryName, jobLang, langOf, localDate, stale, tableLang, term, ui, versionsOf } from './translate';
+import { fixedLabel, fixedList } from './fixed';
+import { commitmentLabel, countryName, jobLang, langOf, localDate, stale, tableLang, term, ui, versionsOf } from './translate';
 import type { DemoJob, JobLang, State } from './types';
 import { Dialog, OrgMark, radioKeys } from './ui';
 
@@ -39,9 +38,6 @@ export function FlyerNotice({ job, s, url, lang }: { job: DemoJob; s: State; url
   const purpose = sections.find((x) => x.key === 'purpose') ?? sections.find((x) => x.key !== 'about');
   const duties = (sections.find((x) => x.key === 'responsibilities')?.lines ?? []).filter((x) => x.startsWith('- ')).slice(0, 4);
   const place = job.facts.location ? job.facts.location.replace(job.facts.country, countryName(job.facts.iso, job.facts.country, l)) : term('Remote', l);
-  const pay = salaryText(job.facts);
-  const applyTarget = job.apply.method === 'email' ? emailAddress(job.apply, s.org) : job.apply.address.trim() || url;
-  const commitments = fixedList(job, shown).map((k) => fixedShown(job, s, k, shown));
   return (
     <div className="ej-flyer" lang={shown} dir={langOf(shown).dir}>
       <div className="flex items-center gap-2">
@@ -52,21 +48,14 @@ export function FlyerNotice({ job, s, url, lang }: { job: DemoJob; s: State; url
       <h2 className="ej-flyer-title">{job.facts.title}</h2>
       <div className="ej-flyer-facts">
         <span>{place}</span>
-        {[job.facts.contract, job.facts.duration, job.facts.grade].filter(Boolean).map((x) => (
+        {[job.facts.contract, job.facts.duration].filter(Boolean).map((x) => (
           <span key={x}>{term(x, l)}</span>
         ))}
-        {pay && <span>{pay}</span>}
       </div>
-      {job.facts.rolling ? (
-        <div className="ej-flyer-deadline">Open until filled</div>
-      ) : (
-        job.facts.deadline && (
-          <div className="ej-flyer-deadline">
-            {say('Closes', 'closes')} {localDate(job.facts.deadline, l)}
-            {job.facts.closingTime ? ` at ${job.facts.closingTime}` : ''}
-            {job.facts.timezone ? ` ${job.facts.timezone}` : ''}
-          </div>
-        )
+      {job.facts.deadline && (
+        <div className="ej-flyer-deadline">
+          {say('Closes', 'closes')} {localDate(job.facts.deadline, l)}
+        </div>
       )}
       {purpose && <p className="ej-flyer-text">{purpose.lines[0]}</p>}
       {duties.length > 0 && (
@@ -80,35 +69,21 @@ export function FlyerNotice({ job, s, url, lang }: { job: DemoJob; s: State; url
         <QrCode text={url} label={`QR code for ${url}`} />
         <div className="flex min-w-0 flex-col gap-1">
           <strong>{say('Scan to read the full job and apply', 'scan')}</strong>
-          <a
-            href={
-              job.apply.method === 'email' && applyTarget.includes('@')
-                ? `mailto:${encodeURIComponent(applyTarget)}`
-                : applyTarget && /^https?:\/\//i.test(applyTarget)
-                  ? applyTarget
-                  : url
-            }
-            target={job.apply.method === 'email' && applyTarget.includes('@') ? undefined : '_blank'}
-            rel={job.apply.method === 'email' && applyTarget.includes('@') ? undefined : 'noopener noreferrer'}
-            style={{ wordBreak: 'break-all', fontSize: 12, color: 'inherit' }}
-          >
-            {applyTarget || url}
+          <a href={url} target="_blank" rel="noopener noreferrer" style={{ wordBreak: 'break-all', fontSize: 12, color: 'inherit' }}>
+            {url}
           </a>
         </div>
       </div>
-      {commitments.length > 0 && (
-        <div className="ej-flyer-text flex flex-col gap-1" style={{ fontSize: 11.5 }}>
-          <strong>{say('Our commitments', 'commitments')}:</strong>
-          {commitments.map((c) => (
-            <span key={c.key}>
-              <strong>{c.label}:</strong> {c.text}
-            </span>
-          ))}
-        </div>
+      {fixedList(job, shown).length > 0 && (
+        <p className="ej-flyer-text" style={{ fontSize: 12 }}>
+          <strong>{say('Our commitments', 'commitments')}:</strong> {fixedList(job, shown).map((k) => commitmentLabel(k, fixedLabel(k), shown)).join(' · ')}
+        </p>
       )}
       <div className="ej-flyer-foot">
         <strong>{say(`Applying is free. ${s.org.short} never asks for money at any stage.`, 'free', { org: s.org.short })}</strong>
-        <span>{say('Posted on AidJobs', 'onAidJobs')}</span>
+        <span>
+          {say('Posted on AidJobs', 'onAidJobs')} · Sample from the AidJobs demo, not a real vacancy
+        </span>
       </div>
     </div>
   );

@@ -14,14 +14,14 @@ import { jobLang, langOf } from './translate';
 import { placeFor } from './MenuButton';
 import { draftGroupBreaks, groupLabelOf, groupOfKey, groupOrderOf, grouped, KEPT, placeSaid } from './outline';
 import { contractPicks, deadlinePicks, eligibilityPicks, gradePicks, languagePicks, methodPicks, placePatch, placePicks, salaryPicks, safeguardingPicks, type Pick } from './answers';
-import { DOCUMENTS, emailAddress } from './apply';
+import { DOCUMENTS } from './apply';
 import { PROJECT_SECTION, saveAboutForOrg, savePageFieldText } from './context';
 import Composer, { type ComposerHandle } from './Composer';
 import { addDays, commitmentText, COMMITMENTS, completeText, findInclusive, GROUPS, headingFor, inOutlineOrder, longDate, looseLocation, PLACES, quality, recommendSections, SECTIONS, suggestTitle, titleSuggestions, type QualityItem } from './engine';
 import { MAX_TEXT } from './pages';
 import type { ApplySettings, ChatMsg, DemoJob, Facts, GroupKey, JobLang, Section as Sec, State } from './types';
 import { RevealBlock } from './Reveal';
-import { getState, update } from './store';
+import { getState } from './store';
 import { Dialog, Field, inputStyle, scrollInside } from './ui';
 
 /**
@@ -79,9 +79,9 @@ function MarkedText({ text, job, section, onFlag }: { text: string; job: DemoJob
 
 const SLOTS: Record<string, 'place' | 'closes'> = { 'Duty station': 'place', 'Closing date': 'closes' };
 
-/** Text with clickable placeholders for missing facts ("[Closing date]", "[Apply email or link]"); each opens its editor. */
+/** Text with clickable placeholders for missing facts ("[Closing date]"); each opens the fact's editor. */
 function SlotText({ text, job, section, onFlag }: { text: string; job: DemoJob; section: string; onFlag: (f: Flag) => void }) {
-  const parts = text.split(/\[(Duty station|Closing date|Apply email or link)\]/);
+  const parts = text.split(/\[(Duty station|Closing date)\]/);
   if (parts.length === 1) return <MarkedText text={text} job={job} section={section} onFlag={onFlag} />;
   const reviewing = Boolean(getState().reviewerAs);
   return (
@@ -91,15 +91,7 @@ function SlotText({ text, job, section, onFlag }: { text: string; job: DemoJob; 
           <span key={i} className="ej-slot">{part}</span>
         ) : i % 2 ? (
           <Tip key={i} label={`Missing: ${part.toLowerCase()}. Click to add it.`}>
-            <button
-              type="button"
-              className="ej-slot"
-              onClick={() =>
-                part === 'Apply email or link'
-                  ? window.dispatchEvent(new CustomEvent('ej-open-apply'))
-                  : window.dispatchEvent(new CustomEvent('ej-open-fact', { detail: SLOTS[part] }))
-              }
-            >
+            <button type="button" className="ej-slot" onClick={() => window.dispatchEvent(new CustomEvent('ej-open-fact', { detail: SLOTS[part] }))}>
               {part}
             </button>
           </Tip>
@@ -149,41 +141,9 @@ function Lines({ lines, job, section, onFlag }: { lines: string[]; job: DemoJob;
   return <>{blocks}</>;
 }
 
-export function ApplyDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
-  const s = getState();
-  const isOwner = s.me.role === 'owner' && !s.reviewerAs;
-  const [saveDefault, setSaveDefault] = useState(false);
-  const done = () => {
-    if (isOwner && saveDefault) {
-      const latest = getState().jobs.find((x) => x.id === job.id);
-      if (latest) {
-        update((st) => ({ ...st, org: { ...st.org, keptApply: { ...latest.apply } } }));
-      }
-    }
-    onClose();
-  };
+function ApplyDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
   return (
-    <Dialog
-      title="How to apply"
-      subtitle="Writes the section for you"
-      onClose={done}
-      wide
-      footer={
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          {isOwner ? (
-            <label className="flex items-center gap-2 aj-muted" style={{ fontSize: 12.5 }}>
-              <input type="checkbox" checked={saveDefault} onChange={(e) => setSaveDefault(e.target.checked)} />
-              <span>Save as default for future jobs</span>
-            </label>
-          ) : (
-            <span />
-          )}
-          <button type="button" className="aj-ink-btn" onClick={done}>
-            Done
-          </button>
-        </div>
-      }
-    >
+    <Dialog title="How to apply" subtitle="Writes the section for you" onClose={onClose} wide footer={<div className="flex justify-end"><button type="button" className="aj-ink-btn" onClick={onClose}>Done</button></div>}>
       <ApplyFields job={job} />
     </Dialog>
   );
@@ -270,7 +230,7 @@ export function ApplyFields({ job }: { job: DemoJob }) {
   );
 }
 
-type SectionProps = { job: DemoJob; sec: Sec; s: State; notes: QualityItem[]; onFlag: (f: Flag) => void; onSeeChat?: () => void; current?: boolean; noteEdits?: boolean; since?: number; draft?: DraftTools; tailoring?: boolean };
+type SectionProps = { job: DemoJob; sec: Sec; s: State; notes: QualityItem[]; onFlag: (f: Flag) => void; onSeeChat?: () => void; current?: boolean; noteEdits?: boolean; since?: number; draft?: DraftTools };
 
 /** What the window's draft gives each section (section 19, phase 6, C): its grip's moves and the + panel opened from it. */
 type DraftTools = { grip: (sec: Sec) => GripAction[]; onKey: (key: string, by: -1 | 1) => void; onDrag: (key: string, y: number | null, done: boolean) => void; dropAfter: string | null | undefined };
@@ -356,7 +316,7 @@ function sectionStartsEmpty(sec: Sec, pageKind: 'about' | 'project' | null): boo
   return sec.lines.length === 0;
 }
 
-function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits, since, draft, tailoring }: SectionProps) {
+function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits, since, draft }: SectionProps) {
   const reviewing = Boolean(s.reviewerAs);
   const pageKind = sec.key === 'about' ? 'about' : sec.key === PROJECT_SECTION ? 'project' : null;
   const [editing, setEditing] = useState(() => !reviewing && sectionStartsEmpty(sec, pageKind));
@@ -388,11 +348,6 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
         {sinceLastRound && (
           <span className="aj-chip" data-tone="amber">
             Changed since round {job.review.round - 1}
-          </span>
-        )}
-        {tailoring && !editing && !sec.edited && (
-          <span className="ej-shimmer" aria-live="polite">
-            <Sparkles size={11} strokeWidth={2} /> Tailoring…
           </span>
         )}
         {!draft && sec.edited && <span className="aj-chip">Your text</span>}
@@ -454,20 +409,13 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
             </button>
           </Tip>
         )}
-        {!reviewing && sec.key === 'apply' && !editing && (() => {
-          const needsContact = job.apply.method === 'email' ? !emailAddress(job.apply, s.org) : !job.apply.address.trim() && !s.org.careersUrl.trim();
-          return needsContact ? (
-            <button type="button" className="aj-pill" style={{ height: 28, background: 'var(--amber-bg)', color: 'var(--amber)', borderColor: 'color-mix(in srgb, var(--amber) 35%, transparent)', fontWeight: 650 }} onClick={() => setApplyOpen(true)}>
-              <Settings2 size={12} strokeWidth={2} /> Add how to apply
+        {!draft && !reviewing && sec.key === 'apply' && (
+          <Tip label="Set up how to apply">
+            <button type="button" className="aj-icon-btn" onClick={() => setApplyOpen(true)} aria-label="Set up how to apply">
+              <Settings2 size={13} strokeWidth={1.8} />
             </button>
-          ) : (
-            <Tip label="Configure how candidates apply">
-              <button type="button" className="aj-pill" style={{ height: 26, fontSize: 11.5 }} onClick={() => setApplyOpen(true)}>
-                <Settings2 size={12} strokeWidth={1.8} /> Configure
-              </button>
-            </Tip>
-          );
-        })()}
+          </Tip>
+        )}
         {!reviewing && !editing && (
           <span className={icons ? 'ej-sec-tools' : 'contents'}>
             <Tip label={icons ? editTip : `Edit ${sec.title}`}>
@@ -507,6 +455,12 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
       ))}
       {editing ? (
         <div className="flex flex-col gap-2">
+          {draft && sec.key === 'apply' && (
+            <div className="flex flex-col gap-2 rounded-xl border p-3 aj-hair">
+              <span className="ej-panel-label">How people apply</span>
+              <ApplyFields job={job} />
+            </div>
+          )}
           {/* Heading + other-title chips for every section, including Project (R2-P0-4: Save body still never force-renames to About the project). */}
           <label className="flex flex-col gap-1">
             <span className="aj-faint" style={{ fontSize: 11.5 }}>
@@ -552,65 +506,30 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
               <Plus size={12} strokeWidth={2} aria-hidden /> Add a heading inside this section
             </button>
           )}
-          {/* Approval / live-job confirm banner matching the save buttons below (INGO #21). */}
-          {job.review.state === 'approved' && !pageKind ? (
-            <div className="rounded-xl px-3 py-2" style={{ background: 'var(--amber-bg)', fontSize: 12 }}>
-              <strong>{job.status === 'live' ? 'This job is live and approved.' : 'This job is approved.'}</strong> Minor typo fixes keep approval intact; material changes mark the job for re-review.
-            </div>
-          ) : job.status === 'live' ? (
-            <div className="rounded-xl px-3 py-2" style={{ background: 'var(--amber-bg)', fontSize: 12 }}>
-              <strong>This job is live.</strong> Saving updates the published listing and records the edit in the job&apos;s history.
-            </div>
-          ) : null}
           {/* R2-P1-10: sticky on phone so Save/Cancel stay above the keyboard while editing. */}
-          <div className="ej-edit-actions flex flex-wrap gap-1.5">
-            {job.review.state === 'approved' && !pageKind ? (
-              <>
-                <button
-                  type="button"
-                  className="aj-ink-btn"
-                  onClick={() => {
-                    editSection(job.id, sec.key, text, noteEdits, { title, subs: subs.map((x) => ({ id: x.id, title: x.title, text: x.text })), minor: true });
-                    setEditing(false);
-                  }}
-                >
-                  Save minor fix (keep approval)
-                </button>
-                <button
-                  type="button"
-                  className="aj-pill"
-                  onClick={() => {
-                    editSection(job.id, sec.key, text, noteEdits, { title, subs: subs.map((x) => ({ id: x.id, title: x.title, text: x.text })) });
-                    setEditing(false);
-                  }}
-                >
-                  Material edit (re-open review)
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="aj-ink-btn"
-                onClick={() => {
-                  if (pageKind === 'project') {
-                    if (text.trim()) savePageFieldText(job.id, 'project', text);
-                    const next = title.trim();
-                    if (next && next !== sec.title) renameSection(job.id, sec.key, next);
-                    setEditing(false);
-                    return;
-                  }
-                  if (pageKind === 'about') {
-                    editSection(job.id, sec.key, text, noteEdits, { title });
-                    setEditing(false);
-                    return;
-                  }
-                  editSection(job.id, sec.key, text, noteEdits, { title, subs: subs.map((x) => ({ id: x.id, title: x.title, text: x.text })) });
+          <div className="ej-edit-actions flex gap-1.5">
+            <button
+              type="button"
+              className="aj-ink-btn"
+              onClick={() => {
+                if (pageKind === 'project') {
+                  if (text.trim()) savePageFieldText(job.id, 'project', text);
+                  const next = title.trim();
+                  if (next && next !== sec.title) renameSection(job.id, sec.key, next);
                   setEditing(false);
-                }}
-              >
-                Save
-              </button>
-            )}
+                  return;
+                }
+                if (pageKind === 'about') {
+                  editSection(job.id, sec.key, text, noteEdits, { title });
+                  setEditing(false);
+                  return;
+                }
+                editSection(job.id, sec.key, text, noteEdits, { title, subs: subs.map((x) => ({ id: x.id, title: x.title, text: x.text })) });
+                setEditing(false);
+              }}
+            >
+              Save
+            </button>
             <button type="button" className="aj-pill" onClick={() => setEditing(false)}>
               Cancel
             </button>
@@ -1022,7 +941,7 @@ function RemovedNote({ job }: { job: DemoJob }) {
 }
 
 /** `current`: the section in view in the window, marked; `noteEdits`: the window's chat notices hand edits; `draft`: the window's icons. */
-export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inWindow, tailoring }: { job: DemoJob; s: State; onSeeChat?: () => void; current?: string | null; noteEdits?: boolean; draft?: boolean; tailoring?: boolean; open?: (t: OpenTarget) => void }) {
+export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inWindow }: { job: DemoJob; s: State; onSeeChat?: () => void; current?: string | null; noteEdits?: boolean; draft?: boolean; open?: (t: OpenTarget) => void }) {
   const [flag, setFlag] = useState<Flag | null>(null);
   const [since] = useState(() => Date.now());
   const [adding, setAdding] = useState<{ after: string | null; anchor: HTMLElement; end: boolean } | null>(null);
@@ -1145,7 +1064,7 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inW
                 </div>
               )}
               {sec ? (
-                <SectionView job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === k)} onFlag={setFlag} onSeeChat={onSeeChat} current={current === k} noteEdits={noteEdits} since={since} draft={tools} tailoring={tailoring} />
+                <SectionView job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === k)} onFlag={setFlag} onSeeChat={onSeeChat} current={current === k} noteEdits={noteEdits} since={since} draft={tools} />
               ) : (
                 <section id={`ej-sec-${k}`} className="rounded-2xl px-3 py-2" data-drop-key={icons ? k : undefined} data-drop-group={icons ? groupOfKey(g, k) : undefined} data-drop={dropAfter === k ? 'after' : undefined} aria-label={`${heading(k)}, not written yet`} style={{ scrollMarginTop: 12 }}>
                   <h3 className="aj-faint">{heading(k)}</h3>

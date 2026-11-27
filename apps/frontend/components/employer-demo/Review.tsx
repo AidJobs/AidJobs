@@ -305,7 +305,7 @@ function AddRemark({ job, on }: { job: DemoJob; on?: string }) {
  * Review in the workspace's right-hand panel (plan section 16, phase 4), for the author and the reviewer: the status, what changed since the
  * last round, every comment and suggestion with its section, and the decision.
  */
-export function ReviewPanel({ job, s, onSend, on, onSection, onAskAi }: { job: DemoJob; s: State; onSend: () => void; on?: string; onSection?: (key: string) => void; onAskAi?: (prompt: string) => void }) {
+export function ReviewPanel({ job, s, onSend, on, onSection }: { job: DemoJob; s: State; onSend: () => void; on?: string; onSection?: (key: string) => void }) {
   const [settledOpen, setSettledOpen] = useState(false);
   const goToSection = (k: string) => (onSection ? onSection(k) : scrollToSection(k));
   const reviewing = Boolean(s.reviewerAs);
@@ -379,16 +379,6 @@ export function ReviewPanel({ job, s, onSend, on, onSection, onAskAi }: { job: D
                     Resolve
                   </button>
                 )}
-                {onAskAi && (
-                  <button
-                    type="button"
-                    className="aj-text-btn"
-                    style={{ height: 28, fontSize: 12 }}
-                    onClick={() => onAskAi(`Address ${r.author}'s review remark on ${titleOf(job, r.section)}: "${r.text}"`)}
-                  >
-                    Ask AI to draft edit
-                  </button>
-                )}
               </div>
             )}
           </div>
@@ -421,18 +411,6 @@ export function ReviewPanel({ job, s, onSend, on, onSection, onAskAi }: { job: D
           <Send size={13} strokeWidth={2} /> Review again
         </button>
       )}
-    </div>
-  );
-}
-
-/** Reviewers' left-pane column across all language versions (cannot edit the job, only comment/suggest/decide). */
-export function ReviewColumn({ job, s, on, onSection }: { job: DemoJob; s: State; on?: string; onSection: (key: string) => void }) {
-  return (
-    <div className="aj-scroll flex h-full min-h-0 flex-col" role="region" aria-label="Review">
-      <ReviewPanel job={job} s={s} onSend={() => {}} on={on} onSection={onSection} />
-      <p className="aj-faint m-0 px-3 pb-3" style={{ fontSize: 11.5 }}>
-        Reviewers comment, suggest, and decide across all language versions; only the author changes the job.
-      </p>
     </div>
   );
 }

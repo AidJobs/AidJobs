@@ -43,7 +43,7 @@ import { changeWithUndo, getState, go, nextId, notify, update, updateJob } from 
 import { changeSummary, tellOffer } from './changes';
 import { addRound, invitedCount, planFor, REACH_EMAILS, reachRoom, reachUsed } from './invites';
 import { canReopen, isPublished } from './lifecycle';
-import { advancedSource, detectLang, draftTranslation, draftVersionSection, headingIn, inLanguage, jobLang, keptTranslation, langOf, redraftTranslation, sourceOf, totalLines, untranslated, versionChoices, versionsOf } from './translate';
+import { advancedSource, detectLang, draftTranslation, draftVersionSection, headingIn, inLanguage, jobLang, keptTranslation, langOf, redraftTranslation, sourceOf, versionChoices, versionsOf } from './translate';
 import { contentOf, describeStyle, proposedStyle, recommendation, styleFromReply, styleWords, toneOf, TYPE_REASONS, usualTemplate, wordsFor } from './setup';
 import { profileFor, profileName, profileOf } from './profiles';
 import { aiWrites, ASKS, asksOf, checkPoints, contentPrint, essentials, ESSENTIAL_WORDS, FIXED_SECTIONS, isOutlineGapPoint, isSettled, isWritten, nextStep, parkedIn, parkKey, sectionPublishBlock, stepKey, type Step } from './flow';
@@ -774,12 +774,9 @@ function memoryHint(s: State, title: string): string | null {
   return past ? `You hired ${article(past.facts.title)} ${past.facts.title} before (${past.facts.location}). Say "start from last time" to reuse it.` : null;
 }
 
-/** The fixed text a job starts with: what the organisation kept for every job, or the template's own, always including locked commitments. */
+/** The fixed text a job starts with: what the organisation kept for every job, or the template's own. */
 function fixedFor(s: State, format: Format): string[] {
-  const base = s.org.keptFixed ? [...s.org.keptFixed] : format.commitments.filter((c) => c !== 'mds' || s.org.mdsMember);
-  const locked = s.org.standard.filter((c) => c.locked).map((c) => c.key);
-  for (const k of locked) if (!base.includes(k)) base.push(k);
-  return base;
+  return s.org.keptFixed ? [...s.org.keptFixed] : format.commitments.filter((c) => c !== 'mds' || s.org.mdsMember);
 }
 
 function newJob(s: State, id: string, facts: Facts, roleKey: string, formatKey: string): DemoJob {
@@ -813,29 +810,15 @@ function newJob(s: State, id: string, facts: Facts, roleKey: string, formatKey: 
 export function startJob(text: string, formatKey?: string, extra: string[] = [], inWindow = false): string {
   const s = getState();
   const id = nextId('job');
-  const { facts, role, engagement } = extractFacts(text, s.today, undefined, s.org.scale.map((g) => g.grade));
+  const { facts, role, engagement } = extractFacts(text, s.today);
   if (facts.salaryMode === 'hidden') facts.salaryMode = s.org.orgType === 'charity' ? 'range' : s.org.orgType === 'un' ? 'grade' : s.org.orgType === 'ingo' ? 'scale' : 'hidden';
   const job = newJob(s, id, facts, role?.key ?? 'programme', formatKey ?? (inWindow ? usualTemplate(s)?.key : undefined) ?? defaultFormatKey(s));
   if (extra.length) job.tags = orderSections([...job.tags, ...extra.filter((k) => !job.tags.includes(k))], formatOf(s, job.format));
   if (inWindow) {
     const lang = detectLang(text);
-    const live = withLiveDraft(s, { ...job, ...(lang !== 'en' ? { lang } : {}) });
-    const prof = profileFor(s, live);
-    const missing = essentials(live, s.org);
-    const fmt = formatOf(s, live.format);
-    const missingNote = missing.length ? ` Still needed before publishing: ${missing.map((k) => ESSENTIAL_WORDS[k]).join(', ')}.` : '';
-    const welcome = prof
-      ? msg(
-          'ai',
-          `Drafted in **${fmt.label}** on the right. You also have a saved profile (**${profileName(prof)}**) — use that instead, or keep this fresh draft?`,
-          [`Use ${profileName(prof)}`, 'Keep fresh draft'],
-        )
-      : msg(
-          'ai',
-          `Drafted in **${fmt.label}** on the right.${missingNote} Edit any section directly, click a missing detail above the draft, or tell me what to change.`,
-        );
-    live.chat = [msg('user', text), welcome];
-    update((st) => ({ ...st, jobs: [live, ...st.jobs] }));
+    const waiting: DemoJob = { ...job, setup: 'template', walk: { approved: [], settled: [] }, ...(lang !== 'en' ? { lang } : {}) };
+    waiting.chat = [msg('user', text), ...firstQuestion(s, waiting, Boolean(engagement) || Boolean(facts.contract))];
+    update((st) => ({ ...st, jobs: [waiting, ...st.jobs] }));
     return id;
   }
   const live = withLiveDraft(s, job);
@@ -1299,7 +1282,7 @@ export function changeSub(id: string, key: string, op: { add: string } | { renam
  * Sections written by the AI chat: kept when the facts change, with a version, and shown as the last change with its undo. With no
  * draft yet, the other sections are written by the rules so the job description is whole.
  */
-export function writeSections(id: string, writes: Array<{ key: string; lines: string[] }>, note: string, preserveEdited = false) {
+export function writeSections(id: string, writes: Array<{ key: string; lines: string[] }>, note: string) {
   if (!ownerOnly()) return;
   update((s) => ({
     ...s,
@@ -1311,7 +1294,6 @@ export function writeSections(id: string, writes: Array<{ key: string; lines: st
       const sections = inOutlineOrder(
         [
           ...base.map((sec) => {
-            if (preserveEdited && sec.edited) return sec;
             const w = writes.find((v) => v.key === sec.key);
             return w ? { ...sec, lines: w.lines, ai: true, edited: undefined } : sec;
           }),
@@ -2358,7 +2340,7 @@ function chatTurn(id: string, text: string, focus?: string) {
     return;
   }
   if (!j.sections.length) {
-    const { facts, role } = extractFacts(text, s.today, j.facts, s.org.scale.map((g) => g.grade));
+    const { facts, role } = extractFacts(text, s.today, j.facts);
     update((st) => ({
       ...st,
       jobs: st.jobs.map((x) => {
@@ -2886,31 +2868,7 @@ const linesOf = (text: string) => text.split('\n').map((l) => l.replace(/^[•*]
  * titles, applied only when saved) and the headings inside it (phase 6, B: added, renamed, and removed only here). `subs`, when given,
  * is the whole list: each heading's text, and its title when it is new or renamed.
  */
-/** Opt-in guided section-by-section walk (Phase C): only started when the user clicks "Walk through section by section". */
-export function startGuidedWalk(id: string) {
-  if (!ownerOnly()) return;
-  updateJob(id, (j) => {
-    if (j.walk) return j;
-    const firstKey = j.tags[0];
-    const firstTitle = j.sections.find((x) => x.key === firstKey)?.title ?? firstKey;
-    return {
-      ...j,
-      walk: { pace: 'all', approved: [], settled: [] },
-      chat: [...j.chat, msg('ai', `Let's walk through section by section. First up is **${firstTitle}** — tell me if it looks right or what you'd like changed.`, ['Good, next'])],
-    };
-  });
-}
-
-/** Dismiss a Tier-3 proposed suggestion chip (e.g. 'salary', 'deadline') so it stays hidden on this job. */
-export function dismissProposal(id: string, key: string) {
-  if (!ownerOnly()) return;
-  updateJob(id, (j) => ({
-    ...j,
-    dismissedProposals: j.dismissedProposals?.includes(key) ? j.dismissedProposals : [...(j.dismissedProposals ?? []), key],
-  }));
-}
-
-export function editSection(id: string, key: string, text: string, note = false, extra: { title?: string; subs?: Array<{ id: string; title?: string; text: string }>; minor?: boolean } = {}) {
+export function editSection(id: string, key: string, text: string, note = false, extra: { title?: string; subs?: Array<{ id: string; title?: string; text: string }> } = {}) {
   if (!ownerOnly()) return;
   const heading = extra.title?.trim();
   const start = getState().jobs.find((j) => j.id === id);
@@ -2939,25 +2897,18 @@ export function editSection(id: string, key: string, text: string, note = false,
     const nextSec = { ...old, title, lines, edited: true as const, subs: subs?.length ? subs : undefined };
     const sections = inOutlineOrder(existing ? j.sections.map((x) => (x.key === key ? nextSec : x)) : [...j.sections, nextSec], tags);
     const marks = Object.fromEntries(Object.entries(j.toUpdate ?? {}).filter(([k]) => k !== key));
-    // Minor typo fixes on an approved job preserve approval; material edits call touched(j) to re-open review.
-    const afterApprovalChange = extra.minor ? j : touched(j);
-    const base = {
-      ...afterApprovalChange,
-      lastEditedByUser: key,
-      tags,
-      renamed,
-      toUpdate: Object.keys(marks).length ? marks : undefined,
-      sections,
-      versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `${extra.minor ? 'Minor fix in' : 'Edited'} ${title}`, sections }],
-      ...liveEdit(j),
-    };
+    const base = { ...touched(j), tags, renamed, toUpdate: Object.keys(marks).length ? marks : undefined, sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${title}`, sections }], ...liveEdit(j) };
     const next: DemoJob = withoutWalkApproval(stepped(start ?? j, base, `Edited ${title}`, 'doc', { keys: [key] }), key);
-    // Phase C: silence routine manual-edit chat spam; lastEditedByUser feeds AI context cleanly.
+    // Window pencil passes note=true so the chat can say so. Do not open a fields card (How to apply) on Save — R1-28.
+    // note=false (earlier workspace): leave part alone.
     if (!note) return next;
     const pinned = sectionPart(key);
-    if (hasFields(pinned)) return next;
-    return { ...next, part: pinned };
+    const chat = [...j.chat, msg('ai', `You changed **${title}** by hand. I'll keep your wording; ask me if another section should change to match.`)];
+    // Sections with their own fields card (How to apply): keep the current part so Save does not open that card at the top.
+    if (hasFields(pinned)) return { ...next, chat };
+    return { ...next, part: pinned, chat };
   });
+  if (note) ensureAsk(id);
 }
 
 export function restoreVersion(id: string, n: number) {
@@ -2992,7 +2943,7 @@ export function bringDocument(id: string, text: string): boolean {
     updateJob(id, (x) => ({ ...x, chat: [...x.chat, msg('ai', 'No headings or text were found in it. Headings work best on their own lines.')] }));
     return false;
   }
-  const { facts, role } = extractFacts(text, s.today, j.facts, s.org.scale.map((g) => g.grade));
+  const { facts, role } = extractFacts(text, s.today, j.facts);
   update((st) => ({
     ...st,
     jobs: st.jobs.map((x) =>
@@ -3052,7 +3003,7 @@ export function importPasted(text: string, fromHost?: string): string | null {
   const s = getState();
   const merged = readDocument(text);
   if (!merged.length) return null;
-  const { facts, role } = extractFacts(text, s.today, undefined, s.org.scale.map((g) => g.grade));
+  const { facts, role } = extractFacts(text, s.today);
   const fkey = `pasted-${s.seq + 1}`;
   const format: Format = {
     key: fkey,
@@ -3334,39 +3285,21 @@ export function keepTranslation(id: string, lang: JobLang) {
 
 export function removeTranslation(id: string, lang: JobLang) {
   if (!ownerOnly()) return;
-  const current = getState().jobs.find((j) => j.id === id);
-  if (!current?.translations?.[lang]) return;
-  changeWithUndo(`Removed the ${langOf(lang).label} version.`, (s) => ({
-    ...s,
-    jobs: s.jobs.map((j) => {
-      if (j.id !== id || !j.translations?.[lang]) return j;
-      const rest = { ...j.translations };
-      delete rest[lang];
-      const linked = (j.linked ?? []).filter((l) => l !== lang);
-      return { ...touched(j), ...liveEdit(j), translations: Object.keys(rest).length ? rest : undefined, linked: linked.length ? linked : undefined };
-    }),
-  }));
+  updateJob(id, (j) => {
+    if (!j.translations?.[lang]) return j;
+    const rest = { ...j.translations };
+    delete rest[lang];
+    const linked = (j.linked ?? []).filter((l) => l !== lang);
+    return { ...touched(j), ...liveEdit(j), translations: Object.keys(rest).length ? rest : undefined, linked: linked.length ? linked : undefined };
+  });
 }
 
-export function restoreTranslation(id: string, lang: JobLang, snapshot: Translation) {
-  if (!ownerOnly()) return;
-  updateJob(id, (j) => ({
-    ...j,
-    ...liveEdit(j),
-    translations: { ...j.translations, [lang]: snapshot },
-    audit: [...j.audit, { at: Date.now(), who: getState().me.name, what: `Restored ${langOf(lang).label} version` }],
-  }));
-}
-
-/**
- * Editing a language version marks that version unreviewed (and marks a live job "Updated"),
- * without wiping approval on the primary-language job description (INGO #21).
- */
+/** A changed language version is an edit like any other (section 19, phase 5, C): it reopens an approval, and a live job says "Updated". */
 function withVersion(j: DemoJob, lang: JobLang, fn: (t: Translation) => Translation): DemoJob {
   const t = j.translations?.[lang];
   if (!t) return j;
   const next = fn(t);
-  return next === t ? j : { ...j, ...liveEdit(j), translations: { ...j.translations, [lang]: { ...next, reviewed: false } } };
+  return next === t ? j : { ...touched(j), ...liveEdit(j), translations: { ...j.translations, [lang]: { ...next, reviewed: false } } };
 }
 
 /** An edit to a version needs a new review. */
@@ -3482,17 +3415,9 @@ export function buyLanguages(id: string, n: number, beforePublishing = false): b
  * A version marked as reviewed; its machine-translated fixed texts are approved with it (section 19, phase 6, E), and the owner is then
  * asked once whether to keep those wordings for every job in that language.
  */
-export function reviewTranslation(id: string, lang: JobLang): boolean {
-  if (!ownerOnly()) return false;
+export function reviewTranslation(id: string, lang: JobLang) {
+  if (!ownerOnly()) return;
   const s = getState();
-  const cur = s.jobs.find((x) => x.id === id);
-  const t0 = cur?.translations?.[lang];
-  if (!cur || !t0) return false;
-  const total = totalLines(t0);
-  if (total > 0 && untranslated(cur, t0) >= total) {
-    notify(`Translate at least one line into ${langOf(lang).label} before marking this version as reviewed.`);
-    return false;
-  }
   updateJob(id, (j) => {
     const t = j.translations?.[lang];
     if (!t) return j;
@@ -3502,7 +3427,6 @@ export function reviewTranslation(id: string, lang: JobLang): boolean {
     const chat = ask ? [...j.chat, { ...msg('ai', `The ${langOf(lang).label} version is reviewed, with its translated fixed texts (${machine.map(fixedLabel).join(', ')}). Use these ${langOf(lang).label} wordings for every job? Later ${langOf(lang).label} jobs then use them without a mark.`, [USE_WORDINGS, NOT_NOW]), step: `wordings:${lang}` }] : j.chat;
     return { ...j, chat, ...(ask ? { wordingAsk: lang } : {}), translations: { ...j.translations, [lang]: { ...t, reviewed: true, fixed } }, audit: [...j.audit, { at: Date.now(), who: s.me.name, what: `${langOf(lang).label} version reviewed` }] };
   });
-  return true;
 }
 
 export const USE_WORDINGS = 'Yes, for every job';
@@ -3717,16 +3641,6 @@ export function publishBlock(s: State, id: string, o: PublishOptions): string | 
   // Empty / unfinished outline sections must not go live (R2-P0-1), Free or Amplify.
   const sections = sectionPublishBlock(j);
   if (sections) return sections;
-  // Locked commitments (Safeguarding, PSEA, MDS) must have approved text in every language going live.
-  const lockedLangs: JobLang[] = [jobLang(j), ...versionsOf(j).filter((l) => j.translations?.[l]?.reviewed)];
-  for (const l of lockedLangs) {
-    for (const k of fixedList(j, l)) {
-      if (!isLocked(s.org, k)) continue;
-      const shown = fixedShown(j, s, k, l);
-      if (shown.toTranslate) return `Add ${langOf(l).label} wording for locked commitment: ${shown.label}`;
-      if (shown.machine) return `Approve ${langOf(l).label} wording for locked commitment: ${shown.label}`;
-    }
-  }
   if (approvalRequired(s, j) && !approvedFor(s, j)) return 'Waiting for approval';
   const block = scheduleBlock(s, j, o.schedule);
   if (block) return block;
@@ -3809,22 +3723,6 @@ export function publish(id: string, o: PublishOptions): boolean {
   });
   if (sending) simulateDelivery(id);
   return true;
-}
-
-/** Save the current job as a reusable job profile on demand (e.g. from the ⋯ More menu). */
-export function saveJobProfile(id: string) {
-  if (!ownerOnly()) return;
-  update((s) => {
-    const out = s.jobs.find((x) => x.id === id);
-    if (!out || !out.facts.title.trim()) return s;
-    const replaced = (s.profiles ?? []).find((p) => p.title === out.facts.title && p.location === out.facts.location);
-    const profile = { ...profileOf(out), ...(replaced?.name?.trim() ? { name: replaced.name.trim() } : {}) };
-    return {
-      ...s,
-      profiles: [profile, ...(s.profiles ?? []).filter((p) => !(p.title === profile.title && p.location === profile.location))],
-      notice: { text: `Saved as a job profile: ${profileName(profile)}.`, unprofile: profile.id },
-    };
-  });
 }
 
 /** Undo for a job profile just saved on publish (`unprofile`). */
@@ -4441,21 +4339,11 @@ export function hireAgain(id: string, place?: string): string | null {
   const j = s.jobs.find((x) => x.id === id);
   if (!j) return null;
   const nid = nextId('job');
-  let facts: Facts = { ...j.facts };
+  let facts: Facts = { ...j.facts, deadline: addDays(s.today, 27) };
   if (place) {
-    const { facts: f } = extractFacts(place, s.today, emptyFacts(), s.org.scale.map((g) => g.grade));
+    const { facts: f } = extractFacts(place, s.today, emptyFacts());
     facts = { ...facts, location: f.location || place, country: f.country, iso: f.iso, timezone: f.timezone || facts.timezone };
   }
-  facts = { ...facts, deadline: workingDay(addDays(s.today, 27), facts.iso) };
-  // Preserve reviewed language versions as unreviewed drafts so translators don't lose work on re-hires.
-  const keptLangs = j.translations
-    ? Object.fromEntries(
-        Object.entries(j.translations)
-          .filter(([, t]) => t.reviewed)
-          .map(([k, t]) => [k, { ...t, reviewed: false }]),
-      )
-    : undefined;
-  const translations = keptLangs && Object.keys(keptLangs).length ? keptLangs : undefined;
   const from = `${j.facts.title}${j.facts.location ? `, ${j.facts.location.split(',')[0]}` : ''}`;
   const base: DemoJob = { ...j, id: nid, facts, walk: undefined, setup: undefined };
   const copy: DemoJob = {
@@ -4464,13 +4352,8 @@ export function hireAgain(id: string, place?: string): string | null {
     plan: null,
     review: { state: 'none', reviewers: [], due: '', round: 0, rule: s.org.approvalRule, remarks: [] },
     reach: null,
-    chat: [
-      msg(
-        'ai',
-        `Copied from **${from}** with a fresh working-day closing date (${longDate(facts.deadline)}).${translations ? ' Previous reviewed translations were kept as drafts for a quick check.' : ''} Edit any detail directly or tell me what changed.`,
-      ),
-    ],
-    walk: undefined,
+    chat: [],
+    walk: { pace: 'all', approved: [], settled: [...ASKS, 'details', 'sdgs', 'fixed', 'suggest'], again: from },
     choice: undefined,
     publishOn: undefined,
     payWith: undefined,
@@ -4488,7 +4371,7 @@ export function hireAgain(id: string, place?: string): string | null {
     reachDeclined: undefined,
     listingChoice: undefined,
     paidFor: undefined,
-    translations,
+    translations: undefined,
     reachPlan: undefined,
     reachDismissed: undefined,
     reachReminders: undefined,

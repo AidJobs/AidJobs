@@ -1,13 +1,11 @@
 'use client';
 
-import { Paperclip, Star } from 'lucide-react';
+import { Star } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { LINK_REPLY, startFromDocument, startJob } from './actions';
 import Composer, { type ComposerHandle } from './Composer';
 import { FactSlot, PlusMenu } from './ComposerTools';
-import { addDays, article, completeText, detectRole, extractFacts, PLACES, readPasted, recognise, ROLE_FAMILIES } from './engine';
-import { workingDay } from './market';
-import { usualTemplate } from './setup';
+import { article, completeText, detectRole, extractFacts, PLACES, recognise, ROLE_FAMILIES } from './engine';
 import { go, READING_KEY, useDemo } from './store';
 import { readJobFile } from './readFile';
 import type { State } from './types';
@@ -36,7 +34,6 @@ function examplesFor(s: State): string[] {
 export default function CreateEntry() {
   const s = useDemo();
   const [text, setText] = useState('');
-  const [formatKey, setFormatKey] = useState<string>(() => usualTemplate(s)?.key ?? '');
   const [dialog, setDialog] = useState<'upload' | null>(null);
   const [offer, setOffer] = useState('');
   const [note, setNote] = useState('');
@@ -48,27 +45,13 @@ export default function CreateEntry() {
     const t = setInterval(() => setExample((n) => n + 1), 4000);
     return () => clearInterval(t);
   }, [text]);
-  const { facts } = extractFacts(text, s.today, undefined, s.org.scale.map((g) => g.grade));
+  const { facts } = extractFacts(text, s.today);
   const { role } = detectRole(text);
-  const formats = s.formats.filter((f) => !f.key.startsWith('pasted-'));
-  const suggestedClose = workingDay(addDays(s.today, 21), facts.iso || '');
-  const cityHint = s.org.countries[0] ? PLACES.find((p) => p.country === s.org.countries[0]) : null;
-  const scopeChips: Array<{ label: string; phrase: string }> = [
-    ...(!facts.location && facts.arrangement !== 'remote'
-      ? [{ label: cityHint ? `+ ${cityHint.city}` : '+ Duty station', phrase: cityHint ? `, based in ${cityHint.city}, ${cityHint.country}` : ', based in Nairobi, Kenya' }]
-      : []),
-    ...(facts.engagement === 'job' && !facts.contract ? [{ label: '+ Fixed-term (12 months)', phrase: ', 12-month fixed-term' }] : []),
-    ...(!facts.deadline && !facts.rolling ? [{ label: `+ Closes ${suggestedClose}`, phrase: `, closing ${suggestedClose}` }] : []),
-    ...(facts.engagement === 'internship' && !facts.paidStipend ? [{ label: '+ Paid / stipend', phrase: ', with a monthly stipend' }] : []),
-    ...(facts.engagement === 'consultancy' && !facts.duration ? [{ label: '+ 40 working days', phrase: ', 40 working days over 3 months' }] : []),
-    ...(s.org.orgType === 'un' && !facts.grade ? [{ label: '+ Grade P3', phrase: ', grade P3' }] : []),
-    ...(facts.eligibility === 'anyone' && text.trim().length > 0 ? [{ label: '+ Nationals only', phrase: ', open to nationals only' }] : []),
-  ];
   const own = [...s.jobs.map((j) => j.facts.title).filter(Boolean), ...s.org.countries.flatMap((c) => PLACES.filter((p) => p.country === c).map((p) => `${p.city}, ${p.country}`))];
   const have = [
     { ok: Boolean(role || facts.title), name: 'the role' },
     { ok: Boolean(facts.location) || facts.arrangement === 'remote', name: 'the duty station' },
-    { ok: Boolean(facts.deadline || facts.rolling), name: 'the closing date' },
+    { ok: Boolean(facts.deadline), name: 'the closing date' },
     { ok: Boolean(facts.contract || facts.duration), name: 'the contract' },
   ];
   const readiness = { done: have.filter((h) => h.ok).length, total: have.length, missing: have.filter((h) => !h.ok).map((h) => h.name) };
@@ -92,7 +75,7 @@ export default function CreateEntry() {
   };
   const send = (v: string) => {
     if (LINK.test(v)) return setNote(LINK_REPLY);
-    const id = startJob(v, formatKey || undefined, [], true);
+    const id = startJob(v, undefined, [], true);
     try {
       localStorage.setItem(READING_KEY, id);
     } catch {
@@ -126,9 +109,7 @@ export default function CreateEntry() {
             readiness={text.trim() ? readiness : undefined}
             placeholder={examples[example % examples.length]}
             marks={text ? recognise(text, s.today, s.org.scale.map((g) => g.grade)) : undefined}
-            onPasteLong={(t) => {
-              if (readPasted(t).length >= 2) setOffer(t);
-            }}
+            onPasteLong={setOffer}
             onFile={(f) => void dropped(f)}
             label="Describe the role"
             large
@@ -140,40 +121,6 @@ export default function CreateEntry() {
               </>
             }
           />
-          {scopeChips.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5" aria-label="Quick scope details">
-              <span className="aj-faint" style={{ fontSize: 11.5 }}>
-                Add to brief:
-              </span>
-              {scopeChips.map((chip) => (
-                <button key={chip.label} type="button" className="aj-pill" style={{ height: 28, fontSize: 12 }} onClick={() => add(chip.phrase)}>
-                  {chip.label}
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5" style={{ fontSize: 12.5 }}>
-            <label className="flex items-center gap-1.5 aj-muted">
-              <span>JD format:</span>
-              <select
-                className="ej-select"
-                style={{ height: 30, fontSize: 12.5, padding: '0 26px 0 9px' }}
-                value={formatKey}
-                onChange={(e) => setFormatKey(e.target.value)}
-                aria-label="JD format"
-              >
-                <option value="">Recommended for {s.org.short}</option>
-                {formats.map((f) => (
-                  <option key={f.key} value={f.key}>
-                    {f.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button type="button" className="aj-text-btn inline-flex items-center gap-1.5" style={{ height: 30, fontSize: 12.5 }} onClick={() => setDialog('upload')}>
-              <Paperclip size={13} strokeWidth={1.8} /> Attach brief or old JD
-            </button>
-          </div>
           {offer && (
             <div className="ej-offer" role="status">
               <span className="min-w-0 flex-1">This looks like a job description. Use it as one? I&apos;ll ask whether to keep only its headings or its wording too.</span>

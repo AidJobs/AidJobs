@@ -91,10 +91,6 @@ export type Org = {
    * a mark; the language the organisation writes in is `standard`.
    */
   fixedWording?: Partial<Record<JobLang, Record<string, string>>>;
-  /** The language the organisation writes its fixed texts in (defaults to English). */
-  primaryLang?: JobLang;
-  /** Grades that require senior approval when `approval === 'senior'` (defaults to UN P4/P5/D/NO-D + org's top band). */
-  seniorGrades?: string[];
 };
 
 /**
@@ -161,10 +157,6 @@ export type Facts = {
   availability: string;
   client: string;
   keyPersonnel: boolean;
-  /** Roster / rolling vacancy: open until filled instead of a fixed closing date. */
-  rolling?: boolean;
-  /** Internships / fellowships: transparent paid/stipend status. */
-  paidStipend?: 'paid' | 'stipend' | 'unpaid' | '';
 };
 
 /** Where an accepted text or fact came from (section 19, phase 5, A); the AI is told it with each, and the cards show it. */
@@ -464,10 +456,6 @@ export type DemoJob = {
   closedAt?: number;
   closeReason?: 'deadline' | 'early' | 'filled' | 'withdrawn';
   updatedAfterPublish?: boolean;
-  /** Section key last manually edited by the user, passed to AI context without spamming chat bubbles. */
-  lastEditedByUser?: string;
-  /** Tier-3 proposed suggestion keys dismissed by the user (e.g. 'salary', 'deadline'). */
-  dismissedProposals?: string[];
   /** When the live job was last changed; the public page says "Updated on" that day. */
   editedAt?: number;
   /** The job as it went live, to show what changed since publishing. */

@@ -27,7 +27,7 @@ export default function CreateFormatDialog({
   onClose: () => void;
   onSaved?: (key: string) => void;
   /** Headings to start from, for example a pattern found in the organisation's own job descriptions. */
-  initial?: { name: string; order: Format['order']; tone: Tone; groupOrder?: Format['groupOrder']; customGroups?: Format['customGroups'] };
+  initial?: { name: string; order: Format['order']; tone: Tone };
   /** Saves somewhere other than a new named format, for example as the base JD format. */
   onSave?: (name: string, order: Format['order'], tone: Tone) => void;
   title?: string;
@@ -38,16 +38,12 @@ export default function CreateFormatDialog({
   const [from, setFrom] = useState('');
   const [order, setOrder] = useState<Format['order']>(initial?.order ?? []);
   const [tone, setTone] = useState<Tone>(initial?.tone ?? 'warm');
-  const [groupOrder, setGroupOrder] = useState<Format['groupOrder']>(initial?.groupOrder);
-  const [customGroups, setCustomGroups] = useState<Format['customGroups']>(initial?.customGroups);
   const has = (k: string) => order.some((o) => o.key === k);
-  const toggle = (k: string) => setOrder(has(k) ? order.filter((o) => o.key !== k) : [...order, { key: k, heading: SECTION_BY_KEY[k]?.label ?? k }]);
+  const toggle = (k: string) => setOrder(has(k) ? order.filter((o) => o.key !== k) : [...order, { key: k, heading: SECTION_BY_KEY[k].label }]);
   const startFrom = (key: string) => {
     setFrom(key);
     const f = formats.find((x) => x.key === key);
     setOrder(f ? f.order.map((o) => ({ ...o })) : []);
-    setGroupOrder(f?.groupOrder ? [...f.groupOrder] : undefined);
-    setCustomGroups(f?.customGroups ? f.customGroups.map((g) => ({ ...g })) : undefined);
     if (f) setTone(f.tone);
   };
   const taken = !onSave && formats.some((f) => f.label.toLowerCase() === name.trim().toLowerCase());
@@ -55,7 +51,7 @@ export default function CreateFormatDialog({
   const save = () => {
     if (problem) return;
     if (onSave) onSave(name.trim(), order, tone);
-    else onSaved?.(createFormat(name.trim(), order, tone, groupOrder, customGroups));
+    else onSaved?.(createFormat(name.trim(), order, tone));
     onClose();
   };
 

@@ -213,48 +213,6 @@ function afterCheck(job: DemoJob, s: State): Step {
   return { kind: 'publish' };
 }
 
-export type Readiness = {
-  missingEssentials: AskKind[];
-  sectionsDone: number;
-  sectionsTotal: number;
-  unfinishedSections: string[];
-  nextAction: string;
-  readyToPublish: boolean;
-};
-
-/**
- * Pure declarative readiness for a job (Phase C): replaces rigid step-by-step walk tracking.
- * A section is done when it has text and no unresolved [placeholder] / {token}.
- */
-export function readinessOf(job: DemoJob, s: State): Readiness {
-  const missingEssentials = essentials(job, s.org);
-  const unfinishedSections: string[] = [];
-  let sectionsDone = 0;
-  for (const k of job.tags) {
-    const sec = job.sections.find((x) => x.key === k);
-    const hasText = Boolean(sec && sec.lines.some((l) => l.trim().length > 0));
-    const hasPlaceholder = Boolean(sec && sec.lines.some((l) => /\[[^\]]{2,40}\]|\{[^}]{1,40}\}/.test(l)));
-    if (hasText && !hasPlaceholder) sectionsDone += 1;
-    else unfinishedSections.push(k);
-  }
-  const sectionBlock = sectionPublishBlock(job);
-  const readyToPublish = missingEssentials.length === 0 && !sectionBlock;
-  const nextAction =
-    missingEssentials.length > 0
-      ? `Add ${ESSENTIAL_WORDS[missingEssentials[0]]}`
-      : unfinishedSections.length > 0
-        ? `Complete ${unfinishedSections[0]}`
-        : 'Run Checks';
-  return {
-    missingEssentials,
-    sectionsDone,
-    sectionsTotal: job.tags.length,
-    unfinishedSections,
-    nextAction,
-    readyToPublish,
-  };
-}
-
 /**
  * What a job cannot go out without (section 19, phase 6, A): the title, the duty station, the closing date, the contract, and a way to
  * apply that works. FW-1: with `org`, email apply accepts the jobs@domain fallback that applyLines prints.
@@ -264,7 +222,7 @@ export function essentials(job: DemoJob, org?: Pick<Org, 'domain'>): AskKind[] {
   const out: AskKind[] = [];
   if (!f.title) out.push('title');
   if (!f.location && f.arrangement !== 'remote') out.push('place');
-  if (!f.deadline && !f.rolling) out.push('deadline');
+  if (!f.deadline) out.push('deadline');
   if (!f.contract && f.engagement === 'job') out.push('contract');
   if (job.apply.method === 'email' && !(org ? emailAddress(job.apply, org) : job.apply.address.trim())) out.push('method');
   return out;

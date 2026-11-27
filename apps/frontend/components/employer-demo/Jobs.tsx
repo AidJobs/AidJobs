@@ -27,7 +27,7 @@ const DAY = 86_400_000;
 /** A closing date on a weekend or a public holiday at the duty station: candidates may expect the working day before. */
 function dateWarnings(job: DemoJob, date: string): string[] {
   const warn: string[] = [];
-  if (date && weekend(date, job.facts.iso)) warn.push(`${longDate(date)} is a weekend${job.facts.country ? ` in ${job.facts.country}` : ''}`);
+  if (date && weekend(date)) warn.push(`${longDate(date)} is a weekend`);
   if (date && holiday(date, job.facts.iso)) warn.push(`${longDate(date)} is a public holiday${job.facts.country ? ` in ${job.facts.country}` : ''}`);
   return warn;
 }
@@ -395,7 +395,7 @@ function Row({ job, s, open }: { job: DemoJob; s: State; open: Open }) {
         }}
         onTouchEnd={() => {
           if (dx > 90) extend(job.id, 7);
-          else if (dx < -90 && window.confirm(`Close "${job.facts.title || 'this job'}" now?`)) closeJob(job.id, 'early');
+          else if (dx < -90) closeJob(job.id, 'early');
           setDx(0);
           start.current = null;
         }}

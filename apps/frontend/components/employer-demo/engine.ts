@@ -495,7 +495,7 @@ export const PLACES: Place[] = [
   { city: 'Maputo', country: 'Mozambique', iso: 'MZ', tz: 'CAT', currency: 'MZN' },
 ];
 
-export const LANGUAGES = ['English', 'French', 'Spanish', 'Arabic', 'Portuguese', 'Swahili', 'Amharic', 'Somali', 'Hausa', 'Hindi', 'Bengali', 'Bangla', 'Dari', 'Nepali', 'Filipino'];
+export const LANGUAGES = ['English', 'French', 'Spanish', 'Arabic', 'Portuguese', 'Swahili', 'Amharic', 'Somali', 'Hausa', 'Hindi', 'Bengali'];
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 const HOLIDAYS: Record<string, string[]> = { KE: ['01-01', '05-01', '06-01', '10-10', '10-20', '12-12', '12-25', '12-26'], default: ['01-01', '12-25'] };
 
@@ -681,7 +681,7 @@ function payIn(t: string): string[] | null {
   return null;
 }
 
-export function extractFacts(text: string, today: number, base: Facts = emptyFacts(), orgGrades: string[] = []): { facts: Facts; role: RoleFamily | null; engagement: Engagement | null } {
+export function extractFacts(text: string, today: number, base: Facts = emptyFacts()): { facts: Facts; role: RoleFamily | null; engagement: Engagement | null } {
   const { role, engagement } = detectRole(text);
   const f: Facts = { ...base, languages: [...base.languages] };
   const t = text;
@@ -708,15 +708,7 @@ export function extractFacts(text: string, today: number, base: Facts = emptyFac
   if (/\bremote\b|home[- ]based|work from home/i.test(t)) f.arrangement = 'remote';
   else if (/\bhybrid\b/i.test(t)) f.arrangement = 'hybrid';
   const grade = t.match(/\b(P-?[1-5]|D-?[12]|G-?[1-7]|NO-?[A-D])\b/i);
-  if (grade) {
-    f.grade = grade[1].toUpperCase().replace('-', '');
-  } else if (orgGrades.length) {
-    const hit = orgGrades.find((g) => g.trim() && new RegExp(`\\b${g.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(t));
-    if (hit) f.grade = hit.trim();
-  } else {
-    const band = t.match(/\b((?:Band|Grade)\s*[A-Z0-9]{1,3})\b/i);
-    if (band) f.grade = band[1].replace(/\s+/g, ' ');
-  }
+  if (grade) f.grade = grade[1].toUpperCase().replace('-', '');
   const months = t.match(/\b(\d{1,2})[- ]?(?:month|months|mo)\b/i);
   const years = t.match(/\b(\d)[- ]?(?:year|years)\b(?!\s+(?:of\s+)?experience)/i);
   if (months) f.duration = `${Number(months[1])} months`;
@@ -941,7 +933,7 @@ export function starterCommitment(key: string, org: Org, f: Facts): string {
     case 'ct':
       return 'Any offer depends on counter-terrorism and sanctions screening, as some of our donors require.';
     case 'fraud':
-      return `${name} never charges a fee at any stage of recruitment and never asks for bank details.${org.domain ? ` Genuine messages come only from @${org.domain}.` : ''}`;
+      return `${name} never charges a fee at any stage of recruitment and never asks for bank details. Genuine messages come only from @${org.domain}.`;
     case 'equal':
       return `${name} is an equal opportunity employer. We welcome applications from everyone, and particularly from people from the communities we work with.`;
     case 'encourage':
@@ -976,13 +968,13 @@ export function buildSection(key: string, ctx: BuildContext): Section {
   const place = placeOf(f.location);
   switch (key) {
     case 'about':
-      return { key, title: heading, lines: org.about.trim() ? [org.about] : ['Add a short description of your organisation — who you are, where you work, and what you do.'] };
+      return { key, title: heading, lines: [org.about] };
     case 'team':
-      return { key, title: heading, lines: [`The ${role.sector.toLowerCase()} team ${lead(tone, 'delivers', 'works with communities to deliver', 'delivers')} ${org.short}'s ${role.sector.toLowerCase()} programmes${f.country ? ` in ${f.country}` : ''}.`] };
+      return { key, title: heading, lines: [`The ${role.sector.toLowerCase()} team ${lead(tone, 'delivers', 'works with communities to deliver', 'delivers')} ${org.short}'s ${role.sector.toLowerCase()} programmes${f.country ? ` in ${f.country}` : ''}, directly and with local partners.`] };
     case 'background':
       return { key, title: heading, lines: [`${org.short}'s ${role.sector.toLowerCase()} programme${f.country ? ` in ${f.country}` : ''} ${f.donor ? `is funded by ${f.donor} and ` : ''}works with communities and local authorities to improve services and resilience.`] };
     case 'setting':
-      return { key, title: heading, lines: [`This position is located in the ${org.short} ${f.location ? `${f.location.split(',')[0]} office` : 'country office'}.`] };
+      return { key, title: heading, lines: [`This position is located in the ${org.short} ${f.location ? `${f.location.split(',')[0]} office` : 'country office'} and reports to the Head of Programmes.`] };
     case 'purpose':
       return {
         key,
@@ -1000,21 +992,13 @@ export function buildSection(key: string, ctx: BuildContext): Section {
     case 'responsibilities':
       return { key, title: heading, lines: role.resp.map((r) => `- ${r}`) };
     case 'deliverables':
-      return { key, title: heading, lines: [...role.deliverables.map((d) => `- ${d}`), ...(f.duration ? [`Duration: ${f.duration}.`] : ['Duration and level of effort: [to confirm].'])] };
+      return { key, title: heading, lines: [...role.deliverables.map((d) => `- ${d}`), `Duration: ${f.duration || '40 working days over 3 months'}.`] };
     case 'relationships':
-      return {
-        key,
-        title: heading,
-        lines: [
-          'Reports to: [Reporting line].',
-          ...(f.directReports ? [`Direct reports: ${f.directReports}.`] : []),
-          'Works closely with programme, operations, and partner teams.',
-        ],
-      };
+      return { key, title: heading, lines: [`Reports to: Head of Programmes.`, `Direct reports: ${f.directReports || 'none'}.`, 'Works closely with the operations, MEAL, and partnerships teams, and with local partners.'] };
     case 'learning':
       return { key, title: heading, lines: role.learning.map((l) => `- ${l}`) };
     case 'deployment':
-      return { key, title: heading, lines: [`Availability: ${f.availability || '[confirm availability window]'}, with deployment at short notice.`, 'Being on the roster is unpaid; you are paid when you are deployed.'] };
+      return { key, title: heading, lines: [`Availability: ${f.availability || 'at least 6 months'}, with deployment at short notice.`, 'Being on the roster is unpaid; you are paid when you are deployed.'] };
     case 'firstweeks':
       return { key, title: heading, lines: ['- Meet the team and partners, and visit project sites', '- Agree your work plan and priorities with your manager', '- Complete induction, including safeguarding and security briefings'] };
     case 'requirements':
@@ -1033,37 +1017,20 @@ export function buildSection(key: string, ctx: BuildContext): Section {
       return { key, title: heading, lines: [`- Willingness to travel to project sites${place ? ` in ${place.country}` : ''}`, ...(f.eligibility === 'nationals' ? [`- Open to nationals of ${f.country || 'the country of the post'} only`] : [])] };
     case 'offer': {
       const pay = salaryText(f);
-      const stipendLine =
-        f.engagement === 'internship'
-          ? f.paidStipend === 'paid'
-            ? ['- Paid internship']
-            : f.paidStipend === 'stipend'
-              ? ['- Monthly stipend provided']
-              : f.paidStipend === 'unpaid'
-                ? ['- Unpaid internship']
-                : ['- Confirm whether this internship is paid, provides a stipend, or is unpaid']
-          : [];
       return {
         key,
         title: heading,
         lines: [
           ...(pay ? [`Salary: ${pay}.`] : []),
-          ...stipendLine,
-          ...(!pay && !stipendLine.length ? ['- Add your pay, leave, insurance, or other benefits for this role'] : []),
+          '- Annual leave, medical insurance, and a learning budget',
+          ...(place?.risky ? ['- Rest and recuperation in line with the duty station'] : []),
+          ...(f.engagement === 'internship' ? ['- A monthly stipend and a mentor for the whole internship'] : []),
           ...(f.subjectToFunding ? ['This post is subject to continued funding.'] : []),
         ],
       };
     }
     case 'conditions':
-      return {
-        key,
-        title: heading,
-        lines: [
-          place?.risky && f.eligibility !== 'nationals'
-            ? `Field duty station (${place.city}): confirm travel expectations, security protocols, and any rest and recuperation terms.`
-            : 'Confirm working hours, field travel expectations, and duty-station conditions for this role.',
-        ],
-      };
+      return { key, title: heading, lines: [place?.risky ? `${place.city} is a non-family duty station with security restrictions; rest and recuperation applies.` : 'Standard working conditions for the duty station.'] };
     case 'funding':
       return {
         key,
@@ -1094,8 +1061,8 @@ export function quality(sections: Section[], f: Facts, today: number, otherLiveT
   const items: QualityItem[] = [];
   if (!f.title) items.push({ key: 'title', level: 'issue', text: 'Add a job title' });
   if (!f.location && f.arrangement !== 'remote') items.push({ key: 'location', level: 'issue', text: 'Add a duty station, or mark the job remote' });
-  if (!f.deadline && !f.rolling) items.push({ key: 'deadline', level: 'issue', text: 'Add a closing date' });
-  else if (f.deadline) {
+  if (!f.deadline) items.push({ key: 'deadline', level: 'issue', text: 'Add a closing date' });
+  else {
     const left = daysUntil(today, f.deadline);
     if (left < 0) items.push({ key: 'deadline-past', level: 'issue', text: 'The closing date has passed' });
     if (weekend(f.deadline, f.iso)) items.push({ key: 'deadline-weekend', level: 'info', text: `${longDate(f.deadline)} is a weekend` });
@@ -1152,22 +1119,12 @@ export function findInclusive(text: string, formatKey: string): InclusiveHit[] {
 export type SalaryHint = { min: number; max: number; currency: string; period: Period; basis: string; sample: boolean };
 
 export function salarySuggestion(f: Facts, org: Org): SalaryHint | null {
-  const own = org.scale.find((r) => r.grade.toLowerCase() === f.grade.toLowerCase());
+  const own = org.scale.find((r) => r.grade === f.grade);
   if (own) return { min: own.min, max: own.max, currency: own.currency, period: own.period, basis: `Your ${org.short} salary scale, grade ${own.grade}`, sample: true };
-  // Never invent a flat UN salary band across P1–D2 or suggest staff salaries for internships/volunteers/consultancies.
-  if (f.engagement !== 'job') return null;
-  if (/^P-?[1-5]$|^D-?[12]$|^NO-?[A-D]$|^G-?[1-7]$/i.test(f.grade)) return null;
+  if (/^P[1-5]$|^D[12]$/.test(f.grade) && f.location) return { min: 6500, max: 8200, currency: 'USD', period: 'month', basis: `Indicative UN net pay for ${f.grade} at ${f.location.split(',')[0]} from the ICSC salary scale and post adjustment (sample figures in the demo)`, sample: true };
   const place = placeOf(f.location);
-  const senior = /\b(director|head|chief|lead|senior|manager|coordinator)\b/i.test(f.title);
-  const junior = /\b(assistant|associate|junior|trainee|intern)\b/i.test(f.title);
-  if (place?.iso === 'GB') {
-    const [min, max, label] = senior ? [3600, 4500, 'senior UK charity'] : junior ? [2100, 2500, 'entry-level UK charity'] : [2600, 3200, 'mid-level UK charity'];
-    return { min, max, currency: 'GBP', period: 'month', basis: `Middle range of 14 similar ${label} jobs on AidJobs that show pay (sample figures in the demo); the Real Living Wage is £14.10 an hour, £15.45 in London`, sample: true };
-  }
-  if (place?.iso === 'KE') {
-    const [min, max, label] = senior ? [260000, 360000, 'senior Kenya NGO'] : junior ? [95000, 140000, 'entry-level Kenya NGO'] : [180000, 250000, 'mid-level Kenya NGO'];
-    return { min, max, currency: 'KES', period: 'month', basis: `Middle range of 9 similar ${label} jobs on AidJobs that show pay (sample figures in the demo)`, sample: true };
-  }
+  if (place?.iso === 'GB') return { min: 2350, max: 2900, currency: 'GBP', period: 'month', basis: 'Middle range of 14 similar UK charity jobs on AidJobs that show pay (sample figures in the demo); the Real Living Wage is £14.10 an hour, £15.45 in London', sample: true };
+  if (place?.iso === 'KE') return { min: 180000, max: 260000, currency: 'KES', period: 'month', basis: 'Middle range of 9 similar jobs in Kenya on AidJobs that show pay (sample figures in the demo)', sample: true };
   return null;
 }
 

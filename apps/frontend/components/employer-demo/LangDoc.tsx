@@ -313,13 +313,7 @@ export function LangDoc({ job, s, lang, readOnly = false }: { job: DemoJob; s: S
           </>
         )}
         {!readOnly && !t.reviewed && (
-          <button
-            type="button"
-            className="aj-ink-btn"
-            disabled={totalLines(t) > 0 && left >= totalLines(t)}
-            title={totalLines(t) > 0 && left >= totalLines(t) ? `Translate at least one line into ${info.label} before marking as reviewed.` : undefined}
-            onClick={() => reviewTranslation(job.id, lang)}
-          >
+          <button type="button" className="aj-ink-btn" onClick={() => reviewTranslation(job.id, lang)}>
             Mark as reviewed
           </button>
         )}

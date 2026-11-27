@@ -21,7 +21,7 @@ import { currentPreset, go, resetDemo, update, useDemo, useMounted, useRoute } f
 import { setReviewer } from './Review';
 import MenuButton from './MenuButton';
 import Window from './Window';
-import { DemoMark, Dialog, HeaderSlotContext, LegalLine, NoticeBar, useCompactDesktop } from './ui';
+import { DemoMark, Dialog, HeaderSlotContext, LegalLine, NoticeBar } from './ui';
 
 const MENU_W_KEY = 'aidjobs.employerDemo.menuWidth';
 /** Same key as the public site / SiteRoot bootstrap, so a closed menu stays closed after refresh. */
@@ -179,14 +179,8 @@ export default function EmployerDemo() {
   const [menuDragging, setMenuDragging] = useState(false);
   const [dragW, setDragW] = useState<number | null>(null);
   const dragWRef = useRef<number | null>(null);
-  const compactDesktop = useCompactDesktop();
   useEffect(() => {
     void probeAi();
-  }, []);
-  useEffect(() => {
-    const openMenu = () => setDrawer(true);
-    window.addEventListener('ej-open-drawer', openMenu);
-    return () => window.removeEventListener('ej-open-drawer', openMenu);
   }, []);
   useEffect(() => {
     if (!menuDragging) return;
@@ -292,11 +286,9 @@ export default function EmployerDemo() {
       screen = <Create />;
   }
 
-  const autoRail = route.screen === 'job' && compactDesktop;
-  const effectiveCollapsed = autoRail ? true : collapsed;
   const width = clampMenuW(menuW);
-  const liveW = dragW ?? (effectiveCollapsed ? MENU_RAIL : width);
-  const liveCollapsed = dragW != null ? dragW < MENU_COLLAPSE_AT : effectiveCollapsed;
+  const liveW = dragW ?? (collapsed ? MENU_RAIL : width);
+  const liveCollapsed = dragW != null ? dragW < MENU_COLLAPSE_AT : collapsed;
   return (
     <div className="ej-app flex h-full" style={{ userSelect: menuDragging ? 'none' : undefined }}>
       <SideMenu
@@ -371,7 +363,7 @@ export default function EmployerDemo() {
         }}
       />
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className={`flex shrink-0 items-center gap-2 border-b px-3 py-2 aj-hair lg:px-6 ${route.screen === 'job' ? 'hidden' : workspace ? 'lg:hidden' : ''}`} style={{ background: 'var(--surface)' }}>
+        <header className={`flex shrink-0 items-center gap-2 border-b px-3 py-2 aj-hair lg:px-6 ${workspace ? 'lg:hidden' : ''}`} style={{ background: 'var(--surface)' }}>
           <span className="lg:hidden">
             <Tip label="Open menu" side="bottom">
               <button type="button" className="aj-icon-btn" onClick={() => setDrawer(true)} aria-label="Open menu">

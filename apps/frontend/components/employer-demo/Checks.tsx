@@ -83,11 +83,11 @@ function LanguageReview({ job, lang, onClose }: { job: DemoJob; lang: JobLang; o
           <button
             type="button"
             className="aj-ink-btn"
-            disabled={(t.reviewed && !isStale) || (!isStale && totalLines(t) > 0 && left >= totalLines(t))}
-            title={!isStale && totalLines(t) > 0 && left >= totalLines(t) ? `Translate at least one line into ${info.label} before marking as reviewed.` : undefined}
+            disabled={t.reviewed && !isStale}
             onClick={() => {
               if (isStale) return refreshTranslation(job.id, lang);
-              if (reviewTranslation(job.id, lang)) onClose();
+              reviewTranslation(job.id, lang);
+              onClose();
             }}
           >
             {isStale ? 'Update the changed lines' : t.reviewed ? 'Reviewed' : 'Mark as reviewed'}
@@ -328,14 +328,7 @@ export default function BeforePublish({
                             <button type="button" className="aj-pill" style={{ height: 30 }} onClick={() => setReview(l.key)}>
                               {t.reviewed && !stale(job, t) ? 'Open' : 'Review'}
                             </button>
-                            <button
-                              type="button"
-                              className="aj-text-btn"
-                              style={{ height: 30 }}
-                              onClick={() => {
-                                if (window.confirm(`Remove the ${l.label} version? This deletes that language draft from this job.`)) removeTranslation(job.id, l.key);
-                              }}
-                            >
+                            <button type="button" className="aj-text-btn" style={{ height: 30 }} onClick={() => removeTranslation(job.id, l.key)}>
                               Remove
                             </button>
                           </>

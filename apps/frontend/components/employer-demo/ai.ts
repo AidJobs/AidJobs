@@ -10,7 +10,7 @@ import { allowance, canAmplifyFree, canGoFree, LANGS_INCLUDED, LANGUAGE_PRICE, l
 import { ALL_LANGS, jobLang, langOf, stale, versionsOf } from './translate';
 import { applyAiTurn, type Applied, type OpenTarget } from './aiActions';
 import { COMMITMENTS, commitmentText, CONTRACTS, headingFor, isoDay, LANGUAGES, orderSections, recommendSections, SECTION_BY_KEY, SECTIONS } from './engine';
-import { afterApproval, FIXED_SECTIONS, nextStep, readinessOf, reviewDone, setAiWrites, type Step } from './flow';
+import { afterApproval, FIXED_SECTIONS, nextStep, reviewDone, setAiWrites, type Step } from './flow';
 import { contentOf, proposedStyle, recommendation, STYLES, TYPE_REASONS, usualTemplate, wordsFor } from './setup';
 import { surveyCard } from './context';
 import { getState } from './store';
@@ -288,8 +288,6 @@ export function contextFor(s: State, j: DemoJob, focus: string | undefined, firs
     ...(carry ? { carry: carryFor(j, s, carry) } : {}),
     publishing: publishingFor(s, j, version && j.translations?.[version] ? version : undefined),
     returning: returningFor(s, j),
-    readiness: readinessOf(j, s),
-    ...(j.lastEditedByUser ? { lastEditedByUser: j.lastEditedByUser } : {}),
     // Phase 7: short list for open / start / rename / delete; no fact bodies; total only when >20.
     profiles: profilesForContext(s.profiles),
     recommendation: {
@@ -340,34 +338,14 @@ function carryFor(j: DemoJob, s: State, c: Carrying) {
  * case the caller answers with the rules. `first`: the reply to the role typed on the Create a job page, which is already in the chat.
  * `silent`: the window asks the AI to go on by itself (to write the next section), named in the chat while it writes.
  */
-const aborts = new Map<string, AbortController>();
-const cancelled = new Set<string>();
-
-/** Cancels an in-flight AI request (e.g. "Stop tailoring & edit now") so its reply cannot overwrite manual edits. */
-export function cancelAi(id: string) {
-  cancelled.add(id);
-  const ctrl = aborts.get(id);
-  if (ctrl) {
-    ctrl.abort();
-    aborts.delete(id);
-  }
-  if (snap.pending[id]) {
-    const rest = { ...snap.pending };
-    delete rest[id];
-    set({ pending: rest });
-  }
-}
-
 export async function askAi(id: string, text: string, opts: { focus?: string; first?: boolean; silent?: string; version?: JobLang; page?: { kind: string; text: string }; carry?: Carrying; open: (t: OpenTarget) => void }): Promise<Applied | null> {
   const first = Boolean(opts.first);
   const silent = opts.silent;
   const s = getState();
   const j = s.jobs.find((x) => x.id === id);
   if (!j || snap.status !== 'on' || snap.pending[id]) return null;
-  cancelled.delete(id);
   set({ pending: { ...snap.pending, [id]: { text: silent ? '' : text, first, ...(silent ? { silent } : {}) } }, fallback: { ...snap.fallback, [id]: '' } });
   const stop = new AbortController();
-  aborts.set(id, stop);
   const timer = setTimeout(() => stop.abort(), TIMEOUT_MS);
   try {
     const res = await fetch(AI_ROUTE, {
@@ -377,29 +355,16 @@ export async function askAi(id: string, text: string, opts: { focus?: string; fi
       signal: stop.signal,
       cache: 'no-store',
     });
-    if (cancelled.has(id)) return null;
-    if (res.status === 404) {
-      set({ status: 'off' });
-    } else if (res.status === 503) {
-      const errBody = await res.json().catch(() => null) as { error?: unknown } | null;
-      // Only flip AI permanently off when the server explicitly reports unconfigured ('off'); transient 503s stay retryable.
-      if (errBody?.error === 'off') set({ status: 'off' });
-      throw new Error('transient 503');
-    }
+    if (res.status === 503 || res.status === 404) set({ status: 'off' });
     const data = res.ok ? ((await res.json()) as { reply?: unknown; actions?: unknown; model?: unknown }) : null;
-    if (cancelled.has(id)) return null;
     if (!data || typeof data.reply !== 'string' || !data.reply.trim()) throw new Error('no reply');
     const by = snap.models.find((m) => m.key === data.model)?.label;
-    return applyAiTurn(id, first ? null : silent ? '' : text, { reply: data.reply, actions: Array.isArray(data.actions) ? data.actions : [] }, opts.open, by, opts.version, Boolean(opts.page), Boolean(opts.carry), Boolean(silent || first));
+    return applyAiTurn(id, first ? null : silent ? '' : text, { reply: data.reply, actions: Array.isArray(data.actions) ? data.actions : [] }, opts.open, by, opts.version, Boolean(opts.page), Boolean(opts.carry));
   } catch {
-    if (!cancelled.has(id)) {
-      set({ fallback: { ...snap.fallback, [id]: !aiOn() ? "The AI is off here, so the demo's own rules answered." : "The AI had a brief hiccup — your draft is safe and you can try again." } });
-    }
+    set({ fallback: { ...snap.fallback, [id]: !aiOn() ? "The AI is off here, so the demo's own rules answered." : "The AI could not answer just now, so the demo's own rules did." } });
     return null;
   } finally {
     clearTimeout(timer);
-    aborts.delete(id);
-    cancelled.delete(id);
     const rest = { ...snap.pending };
     delete rest[id];
     set({ pending: rest });

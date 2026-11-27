@@ -25,7 +25,6 @@ import {
   scheduleBlock,
   type Paid,
 } from './actions';
-import { emailAddress } from './apply';
 import {
   allowanceText,
   BADGE,
@@ -215,23 +214,16 @@ export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: Stat
           <Flag iso={job.facts.iso || null} title={job.facts.country} />
           <span>{place}</span>
         </div>
-        {job.facts.rolling ? (
+        {job.facts.deadline && (
           <div className="flex items-center gap-2">
             <Clock size={14} strokeWidth={1.8} className="aj-faint" />
-            <span>Open until filled</span>
+            <span>{job.status === 'closed' && job.closedAt ? `Closed ${longDate(isoDay(job.closedAt))}` : `${say('Closes', 'closes')} ${localDate(job.facts.deadline, l)}`}</span>
+            {left !== null && left >= 0 && job.status !== 'closed' && (
+              <span className="aj-chip" data-tone={left <= 3 ? 'red' : left <= 7 ? 'amber' : undefined}>
+                {left === 0 ? say('Today', 'today') : say(`${left} days left`, 'daysLeft', { n: left })}
+              </span>
+            )}
           </div>
-        ) : (
-          job.facts.deadline && (
-            <div className="flex items-center gap-2">
-              <Clock size={14} strokeWidth={1.8} className="aj-faint" />
-              <span>{job.status === 'closed' && job.closedAt ? `Closed ${longDate(isoDay(job.closedAt))}` : `${say('Closes', 'closes')} ${localDate(job.facts.deadline, l)}`}</span>
-              {left !== null && left >= 0 && job.status !== 'closed' && (
-                <span className="aj-chip" data-tone={left <= 3 ? 'red' : left <= 7 ? 'amber' : undefined}>
-                  {left === 0 ? say('Today', 'today') : say(`${left} days left`, 'daysLeft', { n: left })}
-                </span>
-              )}
-            </div>
-          )
         )}
       </div>
       <div className="flex flex-wrap gap-1.5">
@@ -258,37 +250,13 @@ export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: Stat
           ))}
         </div>
       )}
-      {job.status !== 'closed' &&
-        (() => {
-          const email = job.apply.method === 'email' ? emailAddress(job.apply, s.org) : '';
-          const rawUrl = job.apply.method !== 'email' ? (job.apply.address.trim() || (s.org.careersUrl ? `${s.org.careersUrl.replace(/\/+$/, '')}/apply` : '')) : '';
-          const safeUrl = rawUrl && /^https?:\/\//i.test(rawUrl) ? rawUrl : rawUrl ? `https://${rawUrl}` : '';
-          if (email) {
-            return (
-              <div>
-                <a className="aj-ink-btn" href={`mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(job.facts.title || 'Job application')}`}>
-                  {l ? `${say('Apply by email', 'apply', { org: s.org.short })} (${email})` : `Apply by email (${email})`} <ExternalLink size={13} strokeWidth={2} />
-                </a>
-              </div>
-            );
-          }
-          if (safeUrl) {
-            return (
-              <div>
-                <a className="aj-ink-btn" href={safeUrl} target="_blank" rel="noopener noreferrer">
-                  {say(`Apply on ${s.org.short}`, 'apply', { org: s.org.short })} <ExternalLink size={13} strokeWidth={2} />
-                </a>
-              </div>
-            );
-          }
-          return (
-            <div>
-              <span className="aj-muted" style={{ fontSize: 13 }}>
-                Add an application email or URL in How to apply before publishing.
-              </span>
-            </div>
-          );
-        })()}
+      {job.status !== 'closed' && (
+        <div>
+          <a className="aj-ink-btn" href={`${s.org.careersUrl}/apply`} target="_blank" rel="noopener noreferrer">
+            {say(`Apply on ${s.org.short}`, 'apply', { org: s.org.short })} <ExternalLink size={13} strokeWidth={2} />
+          </a>
+        </div>
+      )}
       {sections.map((sec) => (
         <section key={sec.key}>
           <h3 lang={version && job.sections.find((x) => x.key === sec.key)?.title === sec.title ? own : undefined}>{sec.title}</h3>

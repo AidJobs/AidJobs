@@ -297,14 +297,7 @@ export function LangsPart({ job, s, open }: { job: DemoJob; s: State; open: Open
                 </button>
               )}
               {owner && t && (
-                <button
-                  type="button"
-                  className="aj-text-btn"
-                  style={{ height: 30 }}
-                  onClick={() => {
-                    if (window.confirm(`Remove the ${l.label} version? This deletes that language draft from this job.`)) removeTranslation(job.id, l.key);
-                  }}
-                >
+                <button type="button" className="aj-text-btn" style={{ height: 30 }} onClick={() => removeTranslation(job.id, l.key)}>
                   Remove
                 </button>
               )}
