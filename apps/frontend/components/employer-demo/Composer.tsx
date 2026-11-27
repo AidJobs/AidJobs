@@ -87,10 +87,6 @@ const Composer = forwardRef<
       el.scrollTop = ta.scrollTop;
     }
   });
-  const select = (m: FactMark) => {
-    ref.current?.focus();
-    ref.current?.setSelectionRange(m.start, m.end);
-  };
   const paste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
     const t = e.clipboardData.getData('text');
     if (onPasteLong && t.length > 400 && t.split('\n').filter((l) => l.trim()).length >= 4) onPasteLong(t);
@@ -133,8 +129,8 @@ const Composer = forwardRef<
             {shown.map((m, i) => (
               <span key={m.start}>
                 {value.slice(i ? shown[i - 1].end : 0, m.start)}
-                <Tip label={`${m.label} Click to retype it.`} className="ej-inline-tip">
-                  <span className="ej-fact-mark" onMouseDown={(e) => { e.preventDefault(); select(m); }}>
+                <Tip label={m.label} className="ej-inline-tip">
+                  <span className="ej-fact-mark">
                     {value.slice(m.start, m.end)}
                   </span>
                 </Tip>

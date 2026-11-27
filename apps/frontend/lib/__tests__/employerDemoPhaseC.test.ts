@@ -1,7 +1,7 @@
-import { dismissProposal, editSection, hireAgain, startGuidedWalk, startJob } from '@/components/employer-demo/actions';
+import { addTranslation, dismissProposal, editSection, hireAgain, removeTranslation, startGuidedWalk, startJob, writeSections } from '@/components/employer-demo/actions';
 import { applyAiTurn } from '@/components/employer-demo/aiActions';
 import { readinessOf } from '@/components/employer-demo/flow';
-import { getState, resetDemo, update } from '@/components/employer-demo/store';
+import { getState, resetDemo, undo, update } from '@/components/employer-demo/store';
 import { systemFor } from '@/lib/employerDemoAi/model';
 
 beforeEach(() => {
@@ -116,5 +116,33 @@ describe('Phase C — Instant Draft-First, Readiness, Calm Chat & Control Budget
     expect(copy.walk).toBeUndefined();
     expect(copy.chat.length).toBe(1);
     expect(copy.chat[0].text).toMatch(/Copied from/i);
+  });
+
+  test('Phase D review fix: background AI tailoring never overwrites manually edited sections', () => {
+    const id = startJob('WASH Officer in Nairobi, Kenya', undefined, [], true);
+    editSection(id, 'purpose', 'My carefully written custom purpose.', true);
+    writeSections(
+      id,
+      [
+        { key: 'purpose', lines: ['AI overwritten text'] },
+        { key: 'responsibilities', lines: ['- AI tailored duty'] },
+      ],
+      'AI tailored draft',
+      true,
+    );
+    const updated = getState().jobs.find((j) => j.id === id)!;
+    expect(updated.sections.find((s) => s.key === 'purpose')?.lines).toEqual(['My carefully written custom purpose.']);
+    expect(updated.sections.find((s) => s.key === 'responsibilities')?.lines).toEqual(['- AI tailored duty']);
+  });
+
+  test('Phase D review fix: removeTranslation offers Undo and restores the language version cleanly', () => {
+    const id = getState().jobs[0].id;
+    addTranslation(id, 'fr');
+    expect(getState().jobs.find((j) => j.id === id)?.translations?.fr).toBeDefined();
+    removeTranslation(id, 'fr');
+    expect(getState().jobs.find((j) => j.id === id)?.translations?.fr).toBeUndefined();
+    expect(getState().notice?.undo).toBeDefined();
+    undo();
+    expect(getState().jobs.find((j) => j.id === id)?.translations?.fr).toBeDefined();
   });
 });

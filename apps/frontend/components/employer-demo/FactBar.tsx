@@ -354,7 +354,7 @@ export function FactDialog({ which, job, s, onClose }: { which: FactKey; job: De
 }
 
 /** `actions`: the job's own actions, listed after the facts that do not fit; with any, the menu shows even when every fact fits. */
-export default function FactBar({ job, s, actions = [] }: { job: DemoJob; s: State; actions?: MenuAction[] }) {
+export default function FactBar({ job, s, actions = [], listenSlot = true }: { job: DemoJob; s: State; actions?: MenuAction[]; listenSlot?: boolean }) {
   const [open, setOpen] = useState<PillKey | null>(null);
   const [fit, setFit] = useState(6);
   const row = useRef<HTMLDivElement>(null);
@@ -379,12 +379,13 @@ export default function FactBar({ job, s, actions = [] }: { job: DemoJob; s: Sta
     return () => watch.disconnect();
   }, [withActions]);
   useEffect(() => {
+    if (!listenSlot) return;
     const fromSlot = (e: Event) => {
       if (!getState().reviewerAs) setOpen((e as CustomEvent<PillKey>).detail);
     };
     window.addEventListener('ej-open-fact', fromSlot);
     return () => window.removeEventListener('ej-open-fact', fromSlot);
-  }, []);
+  }, [listenSlot]);
   const f = job.facts;
   const type = typeLabel(f);
   const salary = salaryText(f) || 'Not shown';
@@ -392,15 +393,16 @@ export default function FactBar({ job, s, actions = [] }: { job: DemoJob; s: Sta
   const showGrade = Boolean(f.grade || s.org.scale.length > 0 || s.org.orgType === 'un');
   const eligLabel = f.eligibility === 'nationals' ? 'Nationals only' : f.eligibility === 'internal' ? 'Internal' : f.eligibility === 'righttowork' ? 'Right to work' : '';
   const stipendLabel = f.paidStipend === 'paid' ? 'Paid' : f.paidStipend === 'stipend' ? 'Stipend' : f.paidStipend === 'unpaid' ? 'Unpaid' : '';
-  const rawPills: Array<{ key: PillKey; icon: ReactNode; label: string; value: string; missing?: boolean; extra?: ReactNode }> = [
-    { key: 'place', icon: <MapPin size={13} strokeWidth={1.8} />, label: 'Place', value: f.location ? `${f.location.split(',')[0]} · ${arrangementLabel(f.arrangement)}` : f.arrangement === 'remote' ? 'Remote' : '', missing: !f.location && f.arrangement !== 'remote' },
-    { key: 'closes', icon: <CalendarClock size={13} strokeWidth={1.8} />, label: 'Closing date', value: f.rolling ? 'Open until filled' : f.deadline ? `Closes ${shortDate(f.deadline)}` : '', missing: !f.deadline && !f.rolling },
-    { key: 'type', icon: <Briefcase size={13} strokeWidth={1.8} />, label: 'Job type', value: type, missing: !f.contract && f.engagement === 'job' },
-    ...(showGrade ? [{ key: 'grade' as PillKey, icon: <Layers size={13} strokeWidth={1.8} />, label: 'Grade', value: f.grade }] : []),
+  const rawPills: Array<{ id: string; key: PillKey; icon: ReactNode; label: string; value: string; missing?: boolean; extra?: ReactNode }> = [
+    { id: 'place', key: 'place', icon: <MapPin size={13} strokeWidth={1.8} />, label: 'Place', value: f.location ? `${f.location.split(',')[0]} · ${arrangementLabel(f.arrangement)}` : f.arrangement === 'remote' ? 'Remote' : '', missing: !f.location && f.arrangement !== 'remote' },
+    { id: 'closes', key: 'closes', icon: <CalendarClock size={13} strokeWidth={1.8} />, label: 'Closing date', value: f.rolling ? 'Open until filled' : f.deadline ? `Closes ${shortDate(f.deadline)}` : '', missing: !f.deadline && !f.rolling },
+    { id: 'type', key: 'type', icon: <Briefcase size={13} strokeWidth={1.8} />, label: 'Job type', value: type, missing: !f.contract && f.engagement === 'job' },
+    ...(showGrade ? [{ id: 'grade', key: 'grade' as PillKey, icon: <Layers size={13} strokeWidth={1.8} />, label: 'Grade', value: f.grade }] : []),
     ...(f.engagement === 'internship'
-      ? [{ key: 'more' as PillKey, icon: <Banknote size={13} strokeWidth={1.8} />, label: 'Pay / stipend', value: stipendLabel, missing: !f.paidStipend }]
+      ? [{ id: 'stipend', key: 'more' as PillKey, icon: <Banknote size={13} strokeWidth={1.8} />, label: 'Pay / stipend', value: stipendLabel, missing: !f.paidStipend }]
       : [
           {
+            id: 'salary',
             key: 'salary' as PillKey,
             icon: <Banknote size={13} strokeWidth={1.8} />,
             label: f.engagement === 'consultancy' ? 'Rate' : 'Salary',
@@ -414,11 +416,11 @@ export default function FactBar({ job, s, actions = [] }: { job: DemoJob; s: Sta
             ),
           },
         ]),
-    ...(eligLabel ? [{ key: 'more' as PillKey, icon: <Info size={13} strokeWidth={1.8} />, label: 'Eligibility', value: eligLabel }] : []),
+    ...(eligLabel ? [{ id: 'eligibility', key: 'more' as PillKey, icon: <Info size={13} strokeWidth={1.8} />, label: 'Eligibility', value: eligLabel }] : []),
     ...(f.languages.length > 1 || (f.languages[0] && f.languages[0] !== 'English')
-      ? [{ key: 'more' as PillKey, icon: <Info size={13} strokeWidth={1.8} />, label: 'Languages', value: f.languages.join(', ') }]
+      ? [{ id: 'languages', key: 'more' as PillKey, icon: <Info size={13} strokeWidth={1.8} />, label: 'Languages', value: f.languages.join(', ') }]
       : []),
-    { key: 'more', icon: <MoreHorizontal size={13} strokeWidth={1.8} />, label: 'More details', value: 'More' },
+    { id: 'more', key: 'more', icon: <MoreHorizontal size={13} strokeWidth={1.8} />, label: 'More details', value: 'More' },
   ];
   // Always keep missing required facts first so they are never hidden behind "+N".
   const pills = [...rawPills.filter((p) => p.missing), ...rawPills.filter((p) => !p.missing)];
@@ -428,18 +430,18 @@ export default function FactBar({ job, s, actions = [] }: { job: DemoJob; s: Sta
       <div ref={row} className="relative flex min-w-0 items-center gap-1.5" aria-label="Job facts">
         <div ref={measure} className="ej-measure" aria-hidden inert>
           {pills.map((p) => (
-            <Pill key={p.key} icon={p.icon} label={p.label} value={p.value} missing={p.missing} extra={p.extra} onClick={() => undefined} />
+            <Pill key={p.id} icon={p.icon} label={p.label} value={p.value} missing={p.missing} extra={p.extra} onClick={() => undefined} />
           ))}
         </div>
         {pills.slice(0, fit).map((p) => (
-          <Pill key={p.key} disabled={ro} icon={p.icon} label={p.label} value={p.value} missing={p.missing} extra={p.extra} onClick={() => setOpen(p.key)} />
+          <Pill key={p.id} disabled={ro} icon={p.icon} label={p.label} value={p.value} missing={p.missing} extra={p.extra} onClick={() => setOpen(p.key)} />
         ))}
         {(hidden.length > 0 || withActions) && (
           <MenuButton
             label={hidden.length ? `${hidden.length} more job ${hidden.length === 1 ? 'fact' : 'facts'}${withActions ? ', and more actions for this job' : ''}` : 'More actions for this job'}
             trigger={hidden.length ? <span className="ej-more-facts">+{hidden.length}</span> : <MoreHorizontal size={15} strokeWidth={1.8} />}
             actions={[
-              ...hidden.map((p) => ({ label: `${p.label}: ${p.key === 'more' ? 'who can apply, start date, and more' : p.value || 'not set'}`, run: () => !ro && setOpen(p.key) })),
+              ...hidden.map((p) => ({ label: `${p.label}: ${p.id === 'more' ? 'who can apply, start date, and more' : p.value || 'not set'}`, run: () => !ro && setOpen(p.key) })),
               ...actions.map((a, i) => (i === 0 && hidden.length ? { ...a, separator: true } : a)),
             ]}
           />

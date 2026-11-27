@@ -305,7 +305,7 @@ function AddRemark({ job, on }: { job: DemoJob; on?: string }) {
  * Review in the workspace's right-hand panel (plan section 16, phase 4), for the author and the reviewer: the status, what changed since the
  * last round, every comment and suggestion with its section, and the decision.
  */
-export function ReviewPanel({ job, s, onSend, on, onSection }: { job: DemoJob; s: State; onSend: () => void; on?: string; onSection?: (key: string) => void }) {
+export function ReviewPanel({ job, s, onSend, on, onSection, onAskAi }: { job: DemoJob; s: State; onSend: () => void; on?: string; onSection?: (key: string) => void; onAskAi?: (prompt: string) => void }) {
   const [settledOpen, setSettledOpen] = useState(false);
   const goToSection = (k: string) => (onSection ? onSection(k) : scrollToSection(k));
   const reviewing = Boolean(s.reviewerAs);
@@ -377,6 +377,16 @@ export function ReviewPanel({ job, s, onSend, on, onSection }: { job: DemoJob; s
                 ) : (
                   <button type="button" className="aj-pill" style={{ height: 28 }} onClick={() => settleRemark(job.id, r.id, 'resolved')}>
                     Resolve
+                  </button>
+                )}
+                {onAskAi && (
+                  <button
+                    type="button"
+                    className="aj-text-btn"
+                    style={{ height: 28, fontSize: 12 }}
+                    onClick={() => onAskAi(`Address ${r.author}'s review remark on ${titleOf(job, r.section)}: "${r.text}"`)}
+                  >
+                    Ask AI to draft edit
                   </button>
                 )}
               </div>

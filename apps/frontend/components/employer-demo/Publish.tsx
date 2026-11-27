@@ -267,7 +267,7 @@ export function JobPage({ job, s, lang, share = false }: { job: DemoJob; s: Stat
             return (
               <div>
                 <a className="aj-ink-btn" href={`mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(job.facts.title || 'Job application')}`}>
-                  {say(`Apply by email (${email})`, 'apply', { org: s.org.short })} <ExternalLink size={13} strokeWidth={2} />
+                  {l ? `${say('Apply by email', 'apply', { org: s.org.short })} (${email})` : `Apply by email (${email})`} <ExternalLink size={13} strokeWidth={2} />
                 </a>
               </div>
             );

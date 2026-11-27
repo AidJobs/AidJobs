@@ -80,7 +80,18 @@ export function FlyerNotice({ job, s, url, lang }: { job: DemoJob; s: State; url
         <QrCode text={url} label={`QR code for ${url}`} />
         <div className="flex min-w-0 flex-col gap-1">
           <strong>{say('Scan to read the full job and apply', 'scan')}</strong>
-          <a href={url} target="_blank" rel="noopener noreferrer" style={{ wordBreak: 'break-all', fontSize: 12, color: 'inherit' }}>
+          <a
+            href={
+              job.apply.method === 'email' && applyTarget.includes('@')
+                ? `mailto:${encodeURIComponent(applyTarget)}`
+                : applyTarget && /^https?:\/\//i.test(applyTarget)
+                  ? applyTarget
+                  : url
+            }
+            target={job.apply.method === 'email' && applyTarget.includes('@') ? undefined : '_blank'}
+            rel={job.apply.method === 'email' && applyTarget.includes('@') ? undefined : 'noopener noreferrer'}
+            style={{ wordBreak: 'break-all', fontSize: 12, color: 'inherit' }}
+          >
             {applyTarget || url}
           </a>
         </div>

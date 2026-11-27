@@ -1299,7 +1299,7 @@ export function changeSub(id: string, key: string, op: { add: string } | { renam
  * Sections written by the AI chat: kept when the facts change, with a version, and shown as the last change with its undo. With no
  * draft yet, the other sections are written by the rules so the job description is whole.
  */
-export function writeSections(id: string, writes: Array<{ key: string; lines: string[] }>, note: string) {
+export function writeSections(id: string, writes: Array<{ key: string; lines: string[] }>, note: string, preserveEdited = false) {
   if (!ownerOnly()) return;
   update((s) => ({
     ...s,
@@ -1311,6 +1311,7 @@ export function writeSections(id: string, writes: Array<{ key: string; lines: st
       const sections = inOutlineOrder(
         [
           ...base.map((sec) => {
+            if (preserveEdited && sec.edited) return sec;
             const w = writes.find((v) => v.key === sec.key);
             return w ? { ...sec, lines: w.lines, ai: true, edited: undefined } : sec;
           }),
@@ -3333,13 +3334,18 @@ export function keepTranslation(id: string, lang: JobLang) {
 
 export function removeTranslation(id: string, lang: JobLang) {
   if (!ownerOnly()) return;
-  updateJob(id, (j) => {
-    if (!j.translations?.[lang]) return j;
-    const rest = { ...j.translations };
-    delete rest[lang];
-    const linked = (j.linked ?? []).filter((l) => l !== lang);
-    return { ...touched(j), ...liveEdit(j), translations: Object.keys(rest).length ? rest : undefined, linked: linked.length ? linked : undefined };
-  });
+  const current = getState().jobs.find((j) => j.id === id);
+  if (!current?.translations?.[lang]) return;
+  changeWithUndo(`Removed the ${langOf(lang).label} version.`, (s) => ({
+    ...s,
+    jobs: s.jobs.map((j) => {
+      if (j.id !== id || !j.translations?.[lang]) return j;
+      const rest = { ...j.translations };
+      delete rest[lang];
+      const linked = (j.linked ?? []).filter((l) => l !== lang);
+      return { ...touched(j), ...liveEdit(j), translations: Object.keys(rest).length ? rest : undefined, linked: linked.length ? linked : undefined };
+    }),
+  }));
 }
 
 export function restoreTranslation(id: string, lang: JobLang, snapshot: Translation) {

@@ -531,7 +531,7 @@ export type Applied = { refused: string[]; opened: OpenTarget[] };
  * null for the reply to the first message, and empty when the window asked the AI to go on by itself (to write the next section). `open`
  * brings a part, a panel, or a dialog into view in the window.
  */
-export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open: (t: OpenTarget) => void, by?: string, inVersionTab?: JobLang, fromPage?: boolean, carrying?: boolean): Applied {
+export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open: (t: OpenTarget) => void, by?: string, inVersionTab?: JobLang, fromPage?: boolean, carrying?: boolean, preserveEdited = false): Applied {
   const inVersion = inVersionTab && getState().jobs.find((j) => j.id === id)?.translations?.[inVersionTab] ? inVersionTab : undefined;
   const refused: string[] = [];
   const opened: OpenTarget[] = [];
@@ -554,7 +554,7 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
       continue;
     }
     // The text is written before anything that follows it in the order, so a section written and approved in one answer is approved as written.
-    if (writes.length && ORDER.indexOf(String(a.type)) > ORDER.indexOf('write_section')) writeSections(id, writes.splice(0), note);
+    if (writes.length && ORDER.indexOf(String(a.type)) > ORDER.indexOf('write_section')) writeSections(id, writes.splice(0), note, preserveEdited);
     const s = getState();
     const j = job();
     if (!j) break;
@@ -1061,7 +1061,7 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
     }
   }
   const wroteNow = writes.length > 0 || wrote.length > 0;
-  if (writes.length) writeSections(id, writes, note);
+  if (writes.length) writeSections(id, writes, note, preserveEdited);
   // The AI's changes in the language in view follow into the languages linked to it (section 19, phase 6, F); a carry is the following.
   if (!carrying) followLinks(id, start, inVersion ?? jobLang(start));
   const now = job();

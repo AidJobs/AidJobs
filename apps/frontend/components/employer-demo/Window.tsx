@@ -17,7 +17,7 @@ import { conflictQuestion, KEEP_PROFILE_ABOUT, keepProfileAbout, openConflicts, 
 import { planCount } from './invites';
 import { ReviewForm, ReviewPanel } from './Review';
 import type { ChatMsg } from './types';
-import { aiOn, askAi, carryMessage, GO_ON, probeAi, useAi, whenAnswered, writeVersion } from './ai';
+import { aiOn, askAi, cancelAi, carryMessage, GO_ON, probeAi, useAi, whenAnswered, writeVersion } from './ai';
 import { amplifying, checkPoints, FIXED_SECTIONS, flyerStale, nextStep, outlineEditOpen, partOfStep, reachOpen, stepKey, walkAutoOpen } from './flow';
 import { canGoFree } from './plans';
 import { readJobFile } from './readFile';
@@ -739,7 +739,7 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus, open,
             <div key={m.id} className="ej-bubble" data-from={m.from}>
               {m.from === 'user' && <span className="sr-only">You said: </span>}
               <Reveal id={m.id} text={m.text} active={isLatestAi && !born.has(m.id)} render={rich} />
-              {isLatestAi && !reviewing && job.lastChange && (
+              {isLatestAi && !reviewing && job.lastChange && !m.ask && !m.card && !(m.quick && m.quick.length) && (
                 <div className="mt-1.5 flex items-center gap-2">
                   <button
                     type="button"
@@ -1179,7 +1179,6 @@ function JobWindow({ id }: { id: string }) {
       setPreview(false);
       setTab('doc');
     }
-    notify(`Removed the ${name} version.`);
   };
   const active = tabs.some((t) => t.key === tab) ? tab : 'doc';
   const card = !reviewing && !job.setup && hasFields(current) && hidden !== current;
@@ -1523,7 +1522,7 @@ function JobWindow({ id }: { id: string }) {
   const isTailoring = reading || Boolean(ai.pending[job.id]?.silent);
   const dismissed = job.dismissedProposals ?? [];
   const salaryProp =
-    !reviewing && job.facts.salaryMode === 'hidden' && !dismissed.includes('salary')
+    !reviewing && !job.facts.salaryMin && !job.facts.salaryMax && !dismissed.includes('salary')
       ? salarySuggestion(job.facts, s.org)
       : null;
   const deadlineProp =
@@ -1538,7 +1537,15 @@ function JobWindow({ id }: { id: string }) {
       {isTailoring && !reviewing && (
         <div className="aj-card flex flex-wrap items-center justify-between gap-2 px-3 py-2" role="status" aria-live="polite">
           <span className="ej-shimmer">Tailoring draft… sections you edit manually are never overwritten.</span>
-          <button type="button" className="aj-text-btn" style={{ height: 24, fontSize: 12 }} onClick={() => setReading(false)}>
+          <button
+            type="button"
+            className="aj-text-btn"
+            style={{ height: 24, fontSize: 12 }}
+            onClick={() => {
+              setReading(false);
+              cancelAi(job.id);
+            }}
+          >
             Stop tailoring &amp; edit now
           </button>
         </div>
@@ -1684,7 +1691,7 @@ function JobWindow({ id }: { id: string }) {
       </div>
       {!job.setup && (
         <div className="ej-fact-strip">
-          <FactBar job={job} s={s} />
+          <FactBar job={job} s={s} listenSlot={false} />
         </div>
       )}
       {!job.setup && (salaryProp || deadlineProp) && (
@@ -1843,9 +1850,24 @@ function JobWindow({ id }: { id: string }) {
         onOpenApply={() => setApplyOpen(true)}
         onFocusTitle={focusTitle}
         sub={publishSub}
-        setSub={setPublishSub}
+        setSub={(v) => {
+          setPublishSub(v);
+          if (v === 'share' && shareKind === 'flyer' && reachOpen(job, s)) markFlyerMade(job.id);
+        }}
         shareKind={shareKind}
-        setShareKind={setShareKind}
+        setShareKind={(v) => {
+          setShareKind(v);
+          if (publishSub === 'share' && v === 'flyer' && reachOpen(job, s)) markFlyerMade(job.id);
+        }}
+        onPrintFlyer={() => {
+          markFlyerMade(job.id);
+          if (phone) {
+            setPhonePane('doc');
+            requestAnimationFrame(() => setTimeout(() => window.print(), 80));
+          } else {
+            window.print();
+          }
+        }}
       />
     ) : (
       <div className="flex h-full min-h-0 flex-col">
@@ -2082,6 +2104,18 @@ function JobWindow({ id }: { id: string }) {
     <div className="flex h-full min-h-0 flex-col">
       {/* Unified full-width 48px Header */}
       <div className="ej-w-head">
+        <span className="lg:hidden">
+          <Tip label="Open menu" side="bottom">
+            <button
+              type="button"
+              className="aj-icon-btn"
+              aria-label="Open menu"
+              onClick={() => window.dispatchEvent(new CustomEvent('ej-open-drawer'))}
+            >
+              <Menu size={16} strokeWidth={1.8} />
+            </button>
+          </Tip>
+        </span>
         {back}
         {titleBox}
         <nav className="ej-stages" aria-label="Job stages">

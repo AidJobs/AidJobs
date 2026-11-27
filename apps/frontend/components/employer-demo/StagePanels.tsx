@@ -328,7 +328,6 @@ export function ReviewStagePanel({
   }
   const required = approvalRequired(s, job);
   const approved = approvedFor(s, job);
-  const openRemarks = job.review.remarks.filter((r) => r.state === 'open');
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -361,39 +360,8 @@ export function ReviewStagePanel({
           </div>
         ) : (
           <div className="aj-card">
-            <ReviewPanel job={job} s={s} onSend={() => setSending(true)} />
+            <ReviewPanel job={job} s={s} on={on} onSection={onSection} onAskAi={onAskAi} onSend={() => setSending(true)} />
           </div>
-        )}
-
-        {openRemarks.length > 0 && (
-          <section className="aj-card flex flex-col gap-2 p-3">
-            <span className="ej-panel-label">Open remarks ({openRemarks.length})</span>
-            <ul className="ej-divide flex flex-col" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-              {openRemarks.map((r) => {
-                const secTitle = job.sections.find((x) => x.key === r.section)?.title ?? r.section;
-                return (
-                  <li key={r.id} className="flex flex-col gap-1 py-2">
-                    <div style={{ fontSize: 12.5 }}>
-                      <strong>{r.author}</strong> on <strong>{secTitle}</strong>: {r.text}
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      <button
-                        type="button"
-                        className="aj-pill"
-                        style={{ height: 26, fontSize: 12 }}
-                        onClick={() => onAskAi(`Address ${r.author}'s review remark on ${secTitle}: "${r.text}"`)}
-                      >
-                        <Sparkles size={12} strokeWidth={1.8} /> Ask AI to draft edit
-                      </button>
-                      <button type="button" className="aj-text-btn" style={{ height: 26, fontSize: 12 }} onClick={() => onSection(r.section)}>
-                        Jump to section
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
         )}
       </div>
 
@@ -421,6 +389,7 @@ export function PublishStagePanel({
   setSub,
   shareKind,
   setShareKind,
+  onPrintFlyer,
 }: {
   job: DemoJob;
   s: State;
@@ -432,6 +401,7 @@ export function PublishStagePanel({
   setSub: (v: PublishSubTab) => void;
   shareKind: ShareKind;
   setShareKind: (v: ShareKind) => void;
+  onPrintFlyer: () => void;
 }) {
   const missing = essentials(job, s.org);
   const unlocked = reachOpen(job, s);
@@ -515,7 +485,7 @@ export function PublishStagePanel({
                   Previewed live on the right. Print it directly or choose &ldquo;Save as PDF&rdquo; in your browser&apos;s print window for community boards and field offices.
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" className="aj-ink-btn" onClick={() => window.print()}>
+                  <button type="button" className="aj-ink-btn" onClick={onPrintFlyer}>
                     <Printer size={14} strokeWidth={1.8} /> Print / Save PDF
                   </button>
                 </div>

@@ -152,9 +152,21 @@ describe('the AI chat: written text is checked', () => {
 });
 
 describe('the AI chat: the demo carries out the actions', () => {
+  /** Helper for legacy guided-walk tests: opt into the setup walk explicitly since Phase C defaults to instant draft-first entry. */
+  const startWalked = (prompt: string) => {
+    const id = startJob(prompt, undefined, [], true);
+    update((s) => ({
+      ...s,
+      jobs: s.jobs.map((j) =>
+        j.id === id ? { ...j, setup: 'template', sections: [], walk: { approved: [], settled: [] } } : j,
+      ),
+    }));
+    return id;
+  };
+
   it('chooses the template, then About/project, then the style and the pace; nothing is written before them; the AI replies take the place of the rules\' own', () => {
     resetAi('on');
-    const id = startJob("We're hiring a Nutrition Officer in Juba", undefined, [], true);
+    const id = startWalked("We're hiring a Nutrition Officer in Juba");
     applyAiTurn(id, 'Yes', { reply: 'Done. Warm and plain, as usual?', actions: [{ type: 'use_template', template: job(id).format }] }, open);
     expect(job(id).setup).toBe('about');
     expect(job(id).chat.slice(-2)).toEqual([
@@ -176,7 +188,7 @@ describe('the AI chat: the demo carries out the actions', () => {
   });
 
   it('a template applied without a question: About us first, then style after About/project', () => {
-    const id = startJob("We're hiring a Nutrition Officer in Juba", undefined, [], true);
+    const id = startWalked("We're hiring a Nutrition Officer in Juba");
     applyAiTurn(id, 'Yes', { reply: "I'll use your format.", actions: [{ type: 'use_template', template: job(id).format }] }, open);
     expect(job(id).chat.at(-1)).toMatchObject({ step: 'setup:about', text: expect.stringContaining('About us') });
     pastContext(id);
@@ -187,7 +199,7 @@ describe('the AI chat: the demo carries out the actions', () => {
 
   it('answers each question, approves a section, and writes the next in the same answer; text it wrote keeps its words when facts change', () => {
     resetAi('on');
-    const id = startJob("We're hiring a Nutrition Officer in Juba", undefined, [], true);
+    const id = startWalked("We're hiring a Nutrition Officer in Juba");
     applyAiTurn(id, 'Yes', { reply: 'Done.', actions: [{ type: 'use_template', template: job(id).format }] }, open);
     pastContext(id);
     applyAiTurn(id, 'warm', { reply: 'Done.', actions: [{ type: 'set_style', style: ['Warm'] }, { type: 'set_pace', pace: 'step' }] }, open);
@@ -212,11 +224,11 @@ describe('the AI chat: the demo carries out the actions', () => {
 
   it("uses the organisation's goals only on a job whose role has none, and only when asked", () => {
     resetAi('on');
-    const intern = startJob("We're hiring a Communications Intern in Kampala", undefined, [], true);
+    const intern = startWalked("We're hiring a Communications Intern in Kampala");
     applyAiTurn(intern, 'yes, use ours', { reply: 'Done.', actions: [{ type: 'use_org_sdgs' }] }, open);
     expect(job(intern)).toMatchObject({ sdgs: [3, 6, 16], sdgsFrom: 'org' });
     expect(job(intern).walk?.settled).toContain('sdgs');
-    const wash = startJob("We're hiring a WASH Officer in Kampala", undefined, [], true);
+    const wash = startWalked("We're hiring a WASH Officer in Kampala");
     applyAiTurn(wash, 'use ours', { reply: 'Done.', actions: [{ type: 'use_org_sdgs' }] }, open);
     expect(job(wash).sdgs).toBeUndefined();
     expect(lastAi(wash)?.text).toContain("Not done: the organisation's goals: the job already has goals");
@@ -224,7 +236,7 @@ describe('the AI chat: the demo carries out the actions', () => {
 
   it('refuses settling a fact that needs a value, an address nobody gave, and wording kept without a reason', () => {
     resetAi('on');
-    const id = startJob("We're hiring a Nutrition Officer in Juba", undefined, [], true);
+    const id = startWalked("We're hiring a Nutrition Officer in Juba");
     applyAiTurn(id, 'Yes', { reply: 'Done.', actions: [{ type: 'use_template', template: job(id).format }, { type: 'set_style', style: ['Warm'] }, { type: 'set_pace', pace: 'all' }] }, open);
     applyAiTurn(id, 'x', { reply: 'Hm.', actions: [{ type: 'settle', fact: 'deadline' }, { type: 'set_apply', method: 'email', address: 'hr@invented.example' }, { type: 'accept_point', point: 'nope', reason: 'ok' }, { type: 'set_pace', pace: 'sometimes' }] }, open);
     expect(job(id).walk?.settled).toEqual([]);
@@ -364,6 +376,7 @@ describe('the AI chat, steps 8 to 10 (section 19): checked actions, and nothing 
   });
 
   it('a language version is never the job’s Languages section; with a version’s tab open, section actions are carried out on the version', () => {
+    setFacts('job-comms', { deadline: addDays(getState().today, 21) });
     turn('job-comms', 'amplify, and French', [{ type: 'choose_plan', plan: 'amplify' }, { type: 'add_language', language: 'fr' }]);
     update((s) => ({ ...s, org: { ...s.org, keepOffered: ['fixed', 'apply'] }, jobs: s.jobs.map((j) => (j.id === 'job-comms' ? { ...j, walk: { pace: 'step', approved: [...j.tags], settled: ['title', 'place', 'contract', 'grade', 'eligibility', 'languages', 'safeguarding', 'salary', 'deadline', 'method', 'details', 'sdgs', 'fixed', 'suggest', 'plan', 'market', 'full'], skipped: [] } } : j)) }));
     const skipped = checkPoints(job('job-comms'), getState())
@@ -450,7 +463,7 @@ describe('the AI chat: one message through the route, and the fallback', () => {
       expect(aiOn()).toBe(true);
       expect(job('job-comms')).toBe(before);
     }
-    expect(aiState().fallback['job-comms']).toBe("The AI could not answer just now, so the demo's own rules did.");
+    expect(aiState().fallback['job-comms']).toBe('The AI had a brief hiccup — your draft is safe and you can try again.');
     expect(aiState().pending).toEqual({});
   });
 

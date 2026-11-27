@@ -552,12 +552,16 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
               <Plus size={12} strokeWidth={2} aria-hidden /> Add a heading inside this section
             </button>
           )}
-          {/* Approval / live-job confirm banner distinguishing minor typo fixes from material edits (INGO #21). */}
-          {(job.review.state === 'approved' || job.status === 'live') && (
+          {/* Approval / live-job confirm banner matching the save buttons below (INGO #21). */}
+          {job.review.state === 'approved' && !pageKind ? (
             <div className="rounded-xl px-3 py-2" style={{ background: 'var(--amber-bg)', fontSize: 12 }}>
-              <strong>{job.status === 'live' ? 'This job is live.' : 'This job is approved.'}</strong> Minor typo fixes keep approval intact; material changes mark the job for re-review.
+              <strong>{job.status === 'live' ? 'This job is live and approved.' : 'This job is approved.'}</strong> Minor typo fixes keep approval intact; material changes mark the job for re-review.
             </div>
-          )}
+          ) : job.status === 'live' ? (
+            <div className="rounded-xl px-3 py-2" style={{ background: 'var(--amber-bg)', fontSize: 12 }}>
+              <strong>This job is live.</strong> Saving updates the published listing and records the edit in the job&apos;s history.
+            </div>
+          ) : null}
           {/* R2-P1-10: sticky on phone so Save/Cancel stay above the keyboard while editing. */}
           <div className="ej-edit-actions flex flex-wrap gap-1.5">
             {job.review.state === 'approved' && !pageKind ? (

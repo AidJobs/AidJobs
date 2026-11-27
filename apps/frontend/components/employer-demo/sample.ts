@@ -259,7 +259,7 @@ function sampleList(today: number): DemoJob[] {
         { at: today - DAY, who: 'Amina Yusuf', what: 'Approved version 1' },
       ],
     }),
-    job(today, 'job-comms', 'comms', 'house', { title: 'Communications Intern', location: 'Nairobi, Kenya', country: 'Kenya', iso: 'KE', timezone: 'EAT', engagement: 'internship', contract: 'Internship', duration: '6 months' }, { status: 'draft' }),
+    job(today, 'job-comms', 'comms', 'house', { title: 'Communications Intern', location: 'Nairobi, Kenya', country: 'Kenya', iso: 'KE', timezone: 'EAT', engagement: 'internship', contract: 'Internship', duration: '6 months', paidStipend: 'stipend' }, { status: 'draft' }),
     // Closed early 4 days ago: still in "Closed", where it can be reopened (plan section 17, decisions 4 and 5).
     job(today, 'job-health', 'health', 'house', { title: 'Health Officer', location: 'Goma, DR Congo', country: 'DR Congo', iso: 'CD', timezone: 'CAT', contract: 'Fixed-term', duration: '12 months', deadline: addDays(today, 10), salaryMode: 'scale' }, {
       status: 'closed',
