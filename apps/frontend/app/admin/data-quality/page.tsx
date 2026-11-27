@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { RefreshCw, AlertTriangle, CheckCircle, XCircle, Database, TrendingDown, TrendingUp, Info } from 'lucide-react';
+import { RefreshCw, AlertTriangle, CheckCircle, XCircle, Database, TrendingDown, TrendingUp, Info, FileSearch } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   COUNT_LABELS,
@@ -10,6 +10,12 @@ import {
   type SourceQuality,
   type SourceRow,
 } from '@/lib/admin/status';
+import CrawlReviewModal from '@/components/admin/CrawlReviewModal';
+import {
+  completenessBadge,
+  foundVsExpectedLabel,
+  type CrawlLogLifecycle,
+} from '@/lib/admin/crawlReview';
 
 type GlobalQuality = {
   total_jobs: number;
@@ -31,6 +37,8 @@ export default function DataQualityPage() {
   const [sourceRows, setSourceRows] = useState<SourceRow[] | null>(null);
   const [sourcesError, setSourcesError] = useState<string | null>(null);
   const [reports, setReports] = useState<Record<string, ReportResult | undefined>>({});
+  const [latestLogs, setLatestLogs] = useState<Record<string, CrawlLogLifecycle>>({});
+  const [reviewLogId, setReviewLogId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
 
@@ -116,13 +124,36 @@ export default function DataQualityPage() {
     await Promise.all(rows.filter((s) => s.status !== 'deleted').map((s) => fetchReport(s.id)));
   }, [fetchReport]);
 
+  const fetchLatestLogs = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/crawl/logs?limit=100', {
+        credentials: 'include',
+        cache: 'no-store',
+      });
+      if (!response.ok) return;
+      const data = await response.json().catch(() => null);
+      if (data?.status === 'ok' && Array.isArray(data.data)) {
+        const bySource: Record<string, CrawlLogLifecycle> = {};
+        for (const item of data.data as CrawlLogLifecycle[]) {
+          if (item.source_id && !bySource[item.source_id]) {
+            bySource[item.source_id] = item;
+          }
+        }
+        setLatestLogs(bySource);
+      }
+    } catch {
+      // Latest crawl summary is supplemental; source quality still loads.
+    }
+  }, []);
+
   const loadAll = useCallback(async () => {
     setLoading(true);
     const sourcesDone = loadSources();
+    const logsDone = fetchLatestLogs();
     await fetchGlobalQuality();
     setLoading(false);
-    await sourcesDone;
-  }, [fetchGlobalQuality, loadSources]);
+    await Promise.all([sourcesDone, logsDone]);
+  }, [fetchGlobalQuality, fetchLatestLogs, loadSources]);
 
       
   useEffect(() => {
@@ -464,6 +495,8 @@ export default function DataQualityPage() {
                     </div>
                   );
                 }
+                const latestLog = latestLogs[row.id];
+                const latestBadge = latestLog ? completenessBadge(latestLog.listing_complete) : null;
                 return (
                 <div
                   key={row.id}
@@ -472,9 +505,9 @@ export default function DataQualityPage() {
                     selectedSource === row.id ? 'bg-[#F5F5F7]' : ''
                   }`}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
+                      <div className="flex flex-wrap items-center gap-3 mb-2">
                         <h3 className="font-semibold text-[#1D1D1F]">
                           {source.source_name || row.org_name || 'Unnamed Source'}
                         </h3>
@@ -484,15 +517,33 @@ export default function DataQualityPage() {
                         <span className={`px-2 py-1 rounded text-xs font-medium ${issues ? 'bg-yellow-50 text-yellow-700' : 'bg-green-50 text-green-700'}`}>
                           {issues ? 'Has issues' : 'No issues found'}
                         </span>
+                        {latestBadge && (
+                          <span
+                            className={`px-2 py-1 rounded text-xs font-medium ${
+                              latestBadge.tone === 'ok'
+                                ? 'bg-green-50 text-green-700'
+                                : latestBadge.tone === 'warn'
+                                  ? 'bg-yellow-50 text-yellow-700'
+                                  : 'bg-[#F5F5F7] text-[#86868B]'
+                            }`}
+                          >
+                            Latest crawl: {latestBadge.text}
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm text-[#86868B] mb-3">{source.source_url || row.careers_url}</p>
-                      <div className="flex items-center gap-6 text-sm">
+                      <div className="flex flex-wrap items-center gap-6 text-sm">
                         <span className="text-[#86868B]" title={COUNT_LABELS.notDeleted}>
-                          <span className="font-medium text-[#1D1D1F]">{source.total_jobs}</span> jobs (not deleted, any status)
+                          <span className="font-medium text-[#1D1D1F]">{source.total_jobs}</span> jobs (not deleted, including expired)
                         </span>
                         <span className="text-[#86868B]">
                           <span className="font-medium text-[#1D1D1F]">{source.unique_urls}</span> unique URLs
                         </span>
+                        {latestLog && (
+                          <span className="text-[#86868B]">
+                            Latest: <span className="font-medium text-[#1D1D1F]">{foundVsExpectedLabel(latestLog.found, latestLog.listing_expected)}</span>
+                          </span>
+                        )}
                         {source.null_urls > 0 && (
                           <span className="text-red-600">
                             <span className="font-medium">{source.null_urls}</span> null URLs
@@ -510,6 +561,19 @@ export default function DataQualityPage() {
                         )}
                       </div>
                     </div>
+                    {latestLog && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setReviewLogId(latestLog.id);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-[#D2D2D7] bg-white text-[#1D1D1F] hover:bg-[#F5F5F7] flex-shrink-0 transition-colors"
+                      >
+                        <FileSearch className="w-3.5 h-3.5 text-[#0071E3]" />
+                        Review latest crawl
+                      </button>
+                    )}
                   </div>
                 </div>
                 );
@@ -560,7 +624,7 @@ export default function DataQualityPage() {
                   <div>
                     <h3 className="font-semibold text-[#1D1D1F] mb-1">Field fill rates</h3>
                     <p className="text-sm text-[#86868B] mb-3">
-                      Share of admitted jobs (not deleted) with each capture field filled. Quality only — never gates counting or expiry.
+                      Share of admitted jobs (not deleted, including expired jobs) with each capture field filled. Quality only — never gates counting or expiry.
                     </p>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                       {Object.entries(sourceDetails.fill_rates).map(([field, info]) => (
@@ -606,6 +670,8 @@ export default function DataQualityPage() {
           </div>
         )}
       </div>
+
+      <CrawlReviewModal logId={reviewLogId} onClose={() => setReviewLogId(null)} />
     </div>
   );
 }

@@ -6,7 +6,8 @@ import os
 import logging
 import json
 from typing import Annotated, Optional, List
-from datetime import datetime
+from datetime import datetime, timedelta
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query  # pyright: ignore[reportMissingImports]
 from pydantic import BaseModel, Field, StringConstraints  # type: ignore
 import psycopg2  # type: ignore
@@ -306,11 +307,163 @@ async def get_logs(
             'ran_at': log['ran_at'].isoformat() if log.get('ran_at') else None,
             'duration_ms': log.get('duration_ms'),
             'actual_job_count': actual_counts.get(str(log['source_id']), 0),  # Real count from jobs table
+            # W-06 / W-40 lifecycle columns (None on older rows)
+            'active_at_start': log.get('active_at_start'),
+            'listing_complete': log.get('listing_complete'),
+            'listing_expected': log.get('listing_expected'),
+            'listing_stop': log.get('listing_stop'),
+            'valid_count': log.get('valid_count'),
+            'failed_saves': log.get('failed_saves'),
+            'unrecorded': log.get('unrecorded'),
+            'matched_active': log.get('matched_active'),
+            'observed': log.get('observed'),
+            'counted': log.get('counted'),
+            'expired': log.get('expired'),
+            'returned': log.get('returned'),
         })
     
     return {
         "status": "ok",
         "data": logs_list
+    }
+
+
+_REJECTION_REASON_MAX = 200
+_FAILED_INSERT_ATTRIBUTION_NOTE = (
+    "failed_inserts carries no crawl run ID; rejections are attributed by time window around this run."
+)
+_FILL_RATES_CAVEAT_NOTE = (
+    "Source-quality fill rates count all non-deleted jobs for this source, including expired jobs."
+)
+
+
+def _cap_reason(text: Optional[str]) -> str:
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return "Unknown reason"
+    if len(cleaned) > _REJECTION_REASON_MAX:
+        return cleaned[:_REJECTION_REASON_MAX] + "…"
+    return cleaned
+
+
+@router.get("/review/{log_id}")
+async def get_crawl_review(log_id: str, admin=Depends(admin_required)):
+    """Read-only crawl review for one crawl log (W-40 PR 2)."""
+    try:
+        uuid.UUID(log_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Crawl log not found")
+
+    conn = get_db_conn()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT l.*, s.org_name, s.careers_url, s.status AS source_status
+                FROM crawl_logs l
+                JOIN sources s ON s.id = l.source_id
+                WHERE l.id = %s
+            """, (log_id,))
+            log = cur.fetchone()
+            if not log:
+                raise HTTPException(status_code=404, detail="Crawl log not found")
+
+            ran_at = log.get("ran_at")
+            duration_ms = log.get("duration_ms")
+            window_start = None
+            window_end = None
+            by_reason = []
+            total_in_window = 0
+
+            if ran_at is not None:
+                duration_sec = (
+                    min(float(duration_ms) / 1000.0, 3600.0)
+                    if duration_ms is not None and duration_ms > 0
+                    else 300.0
+                )
+                window_start = ran_at - timedelta(seconds=duration_sec + 60.0)
+                window_end = ran_at + timedelta(seconds=60.0)
+                try:
+                    cur.execute("""
+                        SELECT operation, error
+                        FROM failed_inserts
+                        WHERE source_id::text = %s
+                          AND attempt_at >= %s
+                          AND attempt_at <= %s
+                        ORDER BY attempt_at DESC
+                        LIMIT 500
+                    """, (str(log["source_id"]), window_start, window_end))
+                    rows = cur.fetchall()
+                except psycopg2_errors.UndefinedTable:
+                    conn.rollback()
+                    rows = []
+
+                counts: dict[tuple[str, str], int] = {}
+                for row in rows:
+                    op = (row.get("operation") or "unknown").strip() or "unknown"
+                    reason = _cap_reason(row.get("error"))
+                    key = (op, reason)
+                    counts[key] = counts.get(key, 0) + 1
+                total_in_window = len(rows)
+                by_reason = [
+                    {"operation": op, "reason": reason, "count": count}
+                    for (op, reason), count in sorted(
+                        counts.items(), key=lambda item: (-item[1], item[0][0], item[0][1])
+                    )
+                ]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise _item_error("Failed to load crawl review", "crawl_log", log_id, e)
+    finally:
+        conn.close()
+
+    from app.data_quality import DataQualityValidator
+
+    try:
+        quality = DataQualityValidator(get_db_url()).get_source_quality_report(str(log["source_id"]))
+    except Exception as e:
+        raise _item_error("Failed to load source fill rates for crawl review", "crawl_log", log_id, e)
+
+    return {
+        "status": "ok",
+        "data": {
+            "id": str(log["id"]),
+            "source_id": str(log["source_id"]),
+            "org_name": log.get("org_name"),
+            "careers_url": log.get("careers_url"),
+            "source_status": log.get("source_status"),
+            "ran_at": ran_at.isoformat() if ran_at else None,
+            "duration_ms": duration_ms,
+            "status": log.get("status", "unknown"),
+            "message": log.get("message"),
+            "found": log.get("found", 0),
+            "listing_expected": log.get("listing_expected"),
+            "listing_complete": log.get("listing_complete"),
+            "listing_stop": log.get("listing_stop"),
+            "valid_count": log.get("valid_count"),
+            "inserted": log.get("inserted", 0),
+            "updated": log.get("updated", 0),
+            "skipped": log.get("skipped", 0),
+            "failed_saves": log.get("failed_saves"),
+            "unrecorded": log.get("unrecorded"),
+            "active_at_start": log.get("active_at_start"),
+            "matched_active": log.get("matched_active"),
+            "observed": log.get("observed"),
+            "counted": log.get("counted"),
+            "expired": log.get("expired"),
+            "returned": log.get("returned"),
+            "rejections": {
+                "total_in_window": total_in_window,
+                "by_reason": by_reason,
+                "window_start": window_start.isoformat() if window_start else None,
+                "window_end": window_end.isoformat() if window_end else None,
+                "attribution_note": _FAILED_INSERT_ATTRIBUTION_NOTE,
+            },
+            "fill_rates": quality.get("fill_rates", {}),
+            "fill_rates_total_jobs": quality.get("total_jobs", 0),
+            "quality_score": quality.get("quality_score", 0.0),
+            "fill_rates_note": _FILL_RATES_CAVEAT_NOTE,
+        },
     }
 
 
