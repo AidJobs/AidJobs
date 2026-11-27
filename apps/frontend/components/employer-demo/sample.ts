@@ -156,7 +156,7 @@ function noReview(): Review {
 }
 
 export function allFormats(preset: DemoPreset = 'riverstone'): Format[] {
-  return preset === 'tumaini' ? [...FORMATS] : [HOUSE_FORMAT, ...FORMATS];
+  return preset === 'riverstone' ? [HOUSE_FORMAT, ...FORMATS] : [...FORMATS];
 }
 
 /** A sample job; `add` puts extra sections in, so that the recent jobs share a pattern the base JD format lacks (the base prompt, plan section 15). */

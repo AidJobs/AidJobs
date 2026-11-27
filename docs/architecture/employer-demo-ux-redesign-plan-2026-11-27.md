@@ -2,7 +2,7 @@
 
 **Branch / Worktree:** `demo/employer` (`AidJobsGit-employer-demo`, never merge)  
 **Recorded:** 27 November 2026 (from tip `5f3c583`)  
-**Status:** **APPROVED (27 November 2026) — IN PROGRESS (Phase A)**  
+**Status:** **COMPLETED (Phases A–D, 27 November 2026)** — deployed to `demo/employer` preview (`ce07ab5` Phase A, `d344a9d` Phase B, `1a0ad98` Phase C, `22847be` + Phase D live verification polish). Never merge to `main`.  
 **Purpose:** Survive chat loss or usage-limit pauses. Captures the complete critical review (live walkthrough + 6 independent reviews + Round 1/2 cross-check) and the unified 4-phase plan so every fix fits one cohesive end-to-end JD creation flow.
 
 ---

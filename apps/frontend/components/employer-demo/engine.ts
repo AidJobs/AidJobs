@@ -941,7 +941,7 @@ export function starterCommitment(key: string, org: Org, f: Facts): string {
     case 'ct':
       return 'Any offer depends on counter-terrorism and sanctions screening, as some of our donors require.';
     case 'fraud':
-      return `${name} never charges a fee at any stage of recruitment and never asks for bank details. Genuine messages come only from @${org.domain}.`;
+      return `${name} never charges a fee at any stage of recruitment and never asks for bank details.${org.domain ? ` Genuine messages come only from @${org.domain}.` : ''}`;
     case 'equal':
       return `${name} is an equal opportunity employer. We welcome applications from everyone, and particularly from people from the communities we work with.`;
     case 'encourage':
