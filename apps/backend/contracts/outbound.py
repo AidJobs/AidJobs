@@ -29,7 +29,7 @@ import zlib
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import asynccontextmanager, contextmanager, nullcontext
 from dataclasses import dataclass
 from functools import cache
 from urllib.parse import urljoin, urlsplit
@@ -442,47 +442,68 @@ class _Net:
     dns_timeout: float
 
 
-async def _fetch_robots(origin, identity: str, net: _Net) -> _RobotsAnswer:
+async def _fetch_robots(
+    origin, identity: str, net: _Net, budget: CrawlBudget | None,
+) -> _RobotsAnswer | None:
+    """Read robots.txt, every redirect hop included. Inside a crawl (`budget` set) each hop is
+    charged to that crawl and the fetch ends with the crawl's time. A fetch the budget ends is
+    not an answer: it returns None, is not kept, and the next asker reads it again."""
+    # The crawl's own deadline, on the same clock as CrawlBudget, so "timer expired" and
+    # "budget stopped" agree exactly.
+    timer = asyncio.timeout_at(budget.deadline) if budget is not None else None
     try:
         # Its hops' own time is limited by ROBOTS_TOTAL_TIMEOUT_SECONDS; this bounds the whole
         # fetch, the waits for the host included.
         async with asyncio.timeout(ROBOTS_OVERALL_SECONDS):
-            result = await _follow(
-                _robots_url(origin), "GET", {"Accept": "text/plain,*/*;q=0.8"}, identity,
-                ROBOTS_STEP_TIMEOUT_SECONDS, ROBOTS_TOTAL_TIMEOUT_SECONDS, ROBOTS_MAX_BYTES,
-                ROBOTS_MAX_REDIRECTS, net, None, check_robots=False,
-            )
+            async with timer if timer is not None else nullcontext():
+                result = await _follow(
+                    _robots_url(origin), "GET", {"Accept": "text/plain,*/*;q=0.8"}, identity,
+                    ROBOTS_STEP_TIMEOUT_SECONDS, ROBOTS_TOTAL_TIMEOUT_SECONDS, ROBOTS_MAX_BYTES,
+                    ROBOTS_MAX_REDIRECTS, net, budget, check_robots=False,
+                )
     except Exception:  # noqa: BLE001  any failure to read it, the address policy's included
+        if budget is not None and (timer.expired() or budget.stopped()):
+            return None
         return _remember_robots(origin, None, "")
     return _remember_robots(origin, result.status_code, result.text)
 
 
 async def _robots_answer(origin, identity: str, budget: CrawlBudget | None, net: _Net):
     """One fetch per origin at a time; others wait for it. It runs outside the asking crawl's
-    context, so cancelling that crawl does not cancel the fetch the others wait for."""
+    context, so cancelling that crawl does not cancel the fetch the others wait for. A fetch
+    charged to another crawl's budget and cut by it gives no answer: the asker starts its own,
+    unless its own budget is spent too."""
     loop = asyncio.get_running_loop()
     flights = _robots_flights.setdefault(loop, {})
-    task = flights.get(origin)
-    if task is None:
+    while True:
+        task = flights.get(origin)
+        if task is None:
+            task = loop.create_task(
+                _fetch_robots(origin, identity, net, budget), context=contextvars.Context(),
+            )
+            flights[origin] = task
+
+            def landed(done, origin=origin, flights=flights):
+                if flights.get(origin) is done:
+                    del flights[origin]
+
+            task.add_done_callback(landed)
+        if budget is None:
+            answer = await asyncio.shield(task)
+        else:
+            try:
+                async with asyncio.timeout(max(budget.seconds_left(), 0.0)) as limit:
+                    answer = await asyncio.shield(task)
+            except TimeoutError as exc:
+                if limit.expired():
+                    raise FetchError("time budget used up") from exc
+                raise
+        if answer is not None:
+            return answer
         if budget is not None:
-            budget.take()
-        task = loop.create_task(_fetch_robots(origin, identity, net), context=contextvars.Context())
-        flights[origin] = task
-
-        def landed(done, origin=origin, flights=flights):
-            if flights.get(origin) is done:
-                del flights[origin]
-
-        task.add_done_callback(landed)
-    if budget is None:
-        return await asyncio.shield(task)
-    try:
-        async with asyncio.timeout(max(budget.seconds_left(), 0.0)) as limit:
-            return await asyncio.shield(task)
-    except TimeoutError as exc:
-        if limit.expired():
-            raise FetchError("time budget used up") from exc
-        raise
+            budget.check()  # raises the crawl's own fixed message when it has stopped
+        if flights.get(origin) is task:
+            del flights[origin]
 
 
 async def _robots_gate(

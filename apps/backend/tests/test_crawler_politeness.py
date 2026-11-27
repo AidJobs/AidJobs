@@ -522,6 +522,102 @@ def test_waiting_for_robots_txt_is_bounded_by_the_crawls_time():
     asyncio.run(run())
 
 
+def test_robots_txt_redirect_hops_spend_the_crawls_budget(slept):
+    # W-40 review: a probe's six-request budget must cover robots.txt redirects too.
+    outbound._robots.clear()
+    events, world = _world([_redirect("https://jobs.example/r1.txt"),
+                            _redirect("https://jobs.example/r2.txt"),
+                            _robots(), _response(200, b"page")])
+
+    async def crawl():
+        with crawl_budget(requests=2):
+            with pytest.raises(FetchError, match="^request budget used up$"):
+                await fetch_url("https://jobs.example/a", **world)
+
+    asyncio.run(crawl())
+    assert _sent(events) == ["GET jobs.example/robots.txt", "GET jobs.example/r1.txt"]
+    assert ("https", "jobs.example", 443) not in outbound._robots
+
+
+def test_a_robots_txt_fetch_cut_by_a_crawl_is_not_kept(slept):
+    outbound._robots.clear()
+    events, world = _world([_redirect("https://jobs.example/r1.txt"), _robots()])
+
+    async def crawl():
+        with crawl_budget(requests=1):
+            with pytest.raises(FetchError, match="^request budget used up$"):
+                await fetch_url("https://jobs.example/a", **world)
+
+    asyncio.run(crawl())
+    assert ("https", "jobs.example", 443) not in outbound._robots
+
+    # The next crawl reads robots.txt again rather than trusting the cut fetch.
+    events, world = _world([_robots(), _response(200, b"page")])
+    assert _fetch("https://jobs.example/a", world).body == b"page"
+    assert _sent(events) == ["GET jobs.example/robots.txt", "GET jobs.example/a"]
+
+
+@pytest.mark.parametrize("waiter_seconds", [5, None])
+def test_an_asker_waiting_for_a_cut_robots_txt_fetch_reads_it_again(waiter_seconds, slept):
+    outbound._robots.clear()
+
+    async def run():
+        never = asyncio.Event()
+        events, world = _world([_robots(), _response(200, b"page")], gates={0: never})
+
+        async def starter():
+            with crawl_budget(seconds=0.1):
+                return await fetch_url("https://jobs.example/1", **world)
+
+        async def waiter():
+            await asyncio.sleep(0.02)
+            if waiter_seconds is None:
+                return await fetch_url("https://jobs.example/2", **world)
+            with crawl_budget(seconds=waiter_seconds):
+                return await fetch_url("https://jobs.example/2", **world)
+
+        first = asyncio.create_task(starter())
+        second = asyncio.create_task(waiter())
+        with pytest.raises(FetchError, match="^time budget used up$"):
+            await first
+        return events, (await second).body
+
+    events, body = asyncio.run(run())
+    assert body == b"page"
+    assert _sent(events) == ["GET jobs.example/robots.txt", "GET jobs.example/2"]
+
+
+def test_askers_waiting_for_a_cut_robots_txt_fetch_share_one_new_fetch(slept):
+    outbound._robots.clear()
+
+    async def run():
+        never = asyncio.Event()
+        events, world = _world(
+            [_robots(), _response(200, b"2"), _response(200, b"3")], gates={0: never},
+        )
+
+        async def starter():
+            with crawl_budget(seconds=0.1):
+                return await fetch_url("https://jobs.example/1", **world)
+
+        async def waiter(path):
+            await asyncio.sleep(0.02)
+            with crawl_budget(seconds=5):
+                return await fetch_url(f"https://jobs.example/{path}", **world)
+
+        first = asyncio.create_task(starter())
+        second = asyncio.create_task(waiter(2))
+        third = asyncio.create_task(waiter(3))
+        with pytest.raises(FetchError, match="^time budget used up$"):
+            await first
+        return events, (await second).body, (await third).body
+
+    events, body2, body3 = asyncio.run(run())
+    # Which page connects first is not fixed; both got a body, and only one robots.txt was read.
+    assert sorted([body2, body3]) == [b"2", b"3"]
+    assert _sent(events).count("GET jobs.example/robots.txt") == 1
+
+
 def test_one_request_at_a_time_per_host():
     async def run():
         gate = asyncio.Event()
