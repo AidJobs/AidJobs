@@ -327,6 +327,42 @@ def test_a_pending_source_is_not_crawled_by_hand_until_it_is_activated(monkeypat
     assert started == []
 
 
+@pytest.mark.parametrize("status_after, code, body", [
+    ("pending_validation", 409, {"detail": PENDING_CRAWL}),
+    ("active", 200, None),
+])
+def test_a_start_refused_by_the_lock_says_why_by_the_status_now(
+        monkeypatch, status_after, code, body):
+    """W-40: a source that turns pending while the start is refused is not called 'locked'."""
+    class RefusingOrchestrator(_Orchestrator):
+        async def start_manual_run(self, source):
+            self.started.append(source["id"])
+            return None, False
+
+    statuses = iter(["active", status_after])
+    def row_now():
+        return {"id": SID, "org_name": "Example", "careers_url": "https://example.org/jobs",
+                "source_type": "html", "status": next(statuses)}
+
+    orchestrator = RefusingOrchestrator()
+    monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://probe@127.0.0.1:1/postgres")
+    monkeypatch.setattr(crawler_admin.psycopg2, "connect",
+                        lambda *a, **k: Recorder({"FROM sources": [row_now()]}))
+    monkeypatch.setattr(crawler_admin, "get_orchestrator", lambda url: orchestrator)
+    app = FastAPI()
+    app.include_router(crawler_admin.router)
+    app.add_exception_handler(InternalError, internal_error_handler)
+    app.dependency_overrides[crawler_admin.admin_required] = lambda: "test-admin"
+    response = TestClient(app, raise_server_exceptions=False).post(
+        "/api/admin/crawl/run", json={"source_id": SID})
+    assert response.status_code == code
+    if body is None:
+        assert response.json()["message"] == "Source already locked"
+    else:
+        assert response.json() == body
+    assert orchestrator.started == [SID]
+
+
 # W-40: a pending source -------------------------------------------------------------------
 
 def test_an_edit_cannot_move_a_pending_source_to_active_or_paused(database):

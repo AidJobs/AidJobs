@@ -351,7 +351,8 @@ class SimpleCrawler:
     and the general reader. No AI service is called.
     """
     
-    def __init__(self, db_url: str, shadow_mode: bool = False):
+    def __init__(self, db_url: str, shadow_mode: bool = False, store_html: bool = True):
+        # store_html=False (the admin probe): no HTML storage folder is created or written.
         self.db_url = db_url
         self.timeout = httpx.Timeout(30.0)
         self.shadow_mode = shadow_mode
@@ -389,12 +390,13 @@ class SimpleCrawler:
         
         # Initialize HTML storage (Phase 2)
         self.html_storage = None
-        try:
-            from core.html_storage import get_html_storage
-            self.html_storage = get_html_storage()
-            logger.info("HTML storage initialized")
-        except Exception as e:
-            logger.warning(f"HTML storage not available: {e}")
+        if store_html:
+            try:
+                from core.html_storage import get_html_storage
+                self.html_storage = get_html_storage()
+                logger.info("HTML storage initialized")
+            except Exception as e:
+                logger.warning(f"HTML storage not available: {e}")
         
         # Initialize extraction logger (Phase 2)
         self.extraction_logger = None

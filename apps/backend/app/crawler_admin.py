@@ -112,6 +112,17 @@ async def run_source(request: RunSourceRequest, admin=Depends(admin_required)):
     
     run_id, started = await orchestrator.start_manual_run(dict(source))
     if run_id is None:
+        # The source may have turned pending after the check above; a pending source is not
+        # crawled, so say so rather than "already locked" (W-40).
+        conn = get_db_conn()
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT status FROM sources WHERE id::text = %s", (request.source_id,))
+                current = cur.fetchone()
+        finally:
+            conn.close()
+        if current and current["status"] == PENDING:
+            raise HTTPException(status_code=409, detail=PENDING_CRAWL)
         return {
             "status": "warn",
             "message": "Source already locked",
