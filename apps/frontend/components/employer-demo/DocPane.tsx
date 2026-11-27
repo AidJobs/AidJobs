@@ -270,7 +270,7 @@ export function ApplyFields({ job }: { job: DemoJob }) {
   );
 }
 
-type SectionProps = { job: DemoJob; sec: Sec; s: State; notes: QualityItem[]; onFlag: (f: Flag) => void; onSeeChat?: () => void; current?: boolean; noteEdits?: boolean; since?: number; draft?: DraftTools };
+type SectionProps = { job: DemoJob; sec: Sec; s: State; notes: QualityItem[]; onFlag: (f: Flag) => void; onSeeChat?: () => void; current?: boolean; noteEdits?: boolean; since?: number; draft?: DraftTools; tailoring?: boolean };
 
 /** What the window's draft gives each section (section 19, phase 6, C): its grip's moves and the + panel opened from it. */
 type DraftTools = { grip: (sec: Sec) => GripAction[]; onKey: (key: string, by: -1 | 1) => void; onDrag: (key: string, y: number | null, done: boolean) => void; dropAfter: string | null | undefined };
@@ -356,7 +356,7 @@ function sectionStartsEmpty(sec: Sec, pageKind: 'about' | 'project' | null): boo
   return sec.lines.length === 0;
 }
 
-function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits, since, draft }: SectionProps) {
+function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits, since, draft, tailoring }: SectionProps) {
   const reviewing = Boolean(s.reviewerAs);
   const pageKind = sec.key === 'about' ? 'about' : sec.key === PROJECT_SECTION ? 'project' : null;
   const [editing, setEditing] = useState(() => !reviewing && sectionStartsEmpty(sec, pageKind));
@@ -388,6 +388,11 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
         {sinceLastRound && (
           <span className="aj-chip" data-tone="amber">
             Changed since round {job.review.round - 1}
+          </span>
+        )}
+        {tailoring && !editing && !sec.edited && (
+          <span className="ej-shimmer" aria-live="polite">
+            <Sparkles size={11} strokeWidth={2} /> Tailoring…
           </span>
         )}
         {!draft && sec.edited && <span className="aj-chip">Your text</span>}
@@ -547,30 +552,61 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
               <Plus size={12} strokeWidth={2} aria-hidden /> Add a heading inside this section
             </button>
           )}
+          {/* Approval / live-job confirm banner distinguishing minor typo fixes from material edits (INGO #21). */}
+          {(job.review.state === 'approved' || job.status === 'live') && (
+            <div className="rounded-xl px-3 py-2" style={{ background: 'var(--amber-bg)', fontSize: 12 }}>
+              <strong>{job.status === 'live' ? 'This job is live.' : 'This job is approved.'}</strong> Minor typo fixes keep approval intact; material changes mark the job for re-review.
+            </div>
+          )}
           {/* R2-P1-10: sticky on phone so Save/Cancel stay above the keyboard while editing. */}
-          <div className="ej-edit-actions flex gap-1.5">
-            <button
-              type="button"
-              className="aj-ink-btn"
-              onClick={() => {
-                if (pageKind === 'project') {
-                  if (text.trim()) savePageFieldText(job.id, 'project', text);
-                  const next = title.trim();
-                  if (next && next !== sec.title) renameSection(job.id, sec.key, next);
+          <div className="ej-edit-actions flex flex-wrap gap-1.5">
+            {job.review.state === 'approved' && !pageKind ? (
+              <>
+                <button
+                  type="button"
+                  className="aj-ink-btn"
+                  onClick={() => {
+                    editSection(job.id, sec.key, text, noteEdits, { title, subs: subs.map((x) => ({ id: x.id, title: x.title, text: x.text })), minor: true });
+                    setEditing(false);
+                  }}
+                >
+                  Save minor fix (keep approval)
+                </button>
+                <button
+                  type="button"
+                  className="aj-pill"
+                  onClick={() => {
+                    editSection(job.id, sec.key, text, noteEdits, { title, subs: subs.map((x) => ({ id: x.id, title: x.title, text: x.text })) });
+                    setEditing(false);
+                  }}
+                >
+                  Material edit (re-open review)
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="aj-ink-btn"
+                onClick={() => {
+                  if (pageKind === 'project') {
+                    if (text.trim()) savePageFieldText(job.id, 'project', text);
+                    const next = title.trim();
+                    if (next && next !== sec.title) renameSection(job.id, sec.key, next);
+                    setEditing(false);
+                    return;
+                  }
+                  if (pageKind === 'about') {
+                    editSection(job.id, sec.key, text, noteEdits, { title });
+                    setEditing(false);
+                    return;
+                  }
+                  editSection(job.id, sec.key, text, noteEdits, { title, subs: subs.map((x) => ({ id: x.id, title: x.title, text: x.text })) });
                   setEditing(false);
-                  return;
-                }
-                if (pageKind === 'about') {
-                  editSection(job.id, sec.key, text, noteEdits, { title });
-                  setEditing(false);
-                  return;
-                }
-                editSection(job.id, sec.key, text, noteEdits, { title, subs: subs.map((x) => ({ id: x.id, title: x.title, text: x.text })) });
-                setEditing(false);
-              }}
-            >
-              Save
-            </button>
+                }}
+              >
+                Save
+              </button>
+            )}
             <button type="button" className="aj-pill" onClick={() => setEditing(false)}>
               Cancel
             </button>
@@ -982,7 +1018,7 @@ function RemovedNote({ job }: { job: DemoJob }) {
 }
 
 /** `current`: the section in view in the window, marked; `noteEdits`: the window's chat notices hand edits; `draft`: the window's icons. */
-export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inWindow }: { job: DemoJob; s: State; onSeeChat?: () => void; current?: string | null; noteEdits?: boolean; draft?: boolean; open?: (t: OpenTarget) => void }) {
+export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inWindow, tailoring }: { job: DemoJob; s: State; onSeeChat?: () => void; current?: string | null; noteEdits?: boolean; draft?: boolean; tailoring?: boolean; open?: (t: OpenTarget) => void }) {
   const [flag, setFlag] = useState<Flag | null>(null);
   const [since] = useState(() => Date.now());
   const [adding, setAdding] = useState<{ after: string | null; anchor: HTMLElement; end: boolean } | null>(null);
@@ -1105,7 +1141,7 @@ export function DocumentView({ job, s, onSeeChat, current, noteEdits, draft: inW
                 </div>
               )}
               {sec ? (
-                <SectionView job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === k)} onFlag={setFlag} onSeeChat={onSeeChat} current={current === k} noteEdits={noteEdits} since={since} draft={tools} />
+                <SectionView job={job} sec={sec} s={s} notes={checks.filter((c) => c.section === k)} onFlag={setFlag} onSeeChat={onSeeChat} current={current === k} noteEdits={noteEdits} since={since} draft={tools} tailoring={tailoring} />
               ) : (
                 <section id={`ej-sec-${k}`} className="rounded-2xl px-3 py-2" data-drop-key={icons ? k : undefined} data-drop-group={icons ? groupOfKey(g, k) : undefined} data-drop={dropAfter === k ? 'after' : undefined} aria-label={`${heading(k)}, not written yet`} style={{ scrollMarginTop: 12 }}>
                   <h3 className="aj-faint">{heading(k)}</h3>

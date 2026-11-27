@@ -10,7 +10,7 @@ import { allowance, canAmplifyFree, canGoFree, LANGS_INCLUDED, LANGUAGE_PRICE, l
 import { ALL_LANGS, jobLang, langOf, stale, versionsOf } from './translate';
 import { applyAiTurn, type Applied, type OpenTarget } from './aiActions';
 import { COMMITMENTS, commitmentText, CONTRACTS, headingFor, isoDay, LANGUAGES, orderSections, recommendSections, SECTION_BY_KEY, SECTIONS } from './engine';
-import { afterApproval, FIXED_SECTIONS, nextStep, reviewDone, setAiWrites, type Step } from './flow';
+import { afterApproval, FIXED_SECTIONS, nextStep, readinessOf, reviewDone, setAiWrites, type Step } from './flow';
 import { contentOf, proposedStyle, recommendation, STYLES, TYPE_REASONS, usualTemplate, wordsFor } from './setup';
 import { surveyCard } from './context';
 import { getState } from './store';
@@ -288,6 +288,8 @@ export function contextFor(s: State, j: DemoJob, focus: string | undefined, firs
     ...(carry ? { carry: carryFor(j, s, carry) } : {}),
     publishing: publishingFor(s, j, version && j.translations?.[version] ? version : undefined),
     returning: returningFor(s, j),
+    readiness: readinessOf(j, s),
+    ...(j.lastEditedByUser ? { lastEditedByUser: j.lastEditedByUser } : {}),
     // Phase 7: short list for open / start / rename / delete; no fact bodies; total only when >20.
     profiles: profilesForContext(s.profiles),
     recommendation: {
@@ -355,13 +357,20 @@ export async function askAi(id: string, text: string, opts: { focus?: string; fi
       signal: stop.signal,
       cache: 'no-store',
     });
-    if (res.status === 503 || res.status === 404) set({ status: 'off' });
+    if (res.status === 404) {
+      set({ status: 'off' });
+    } else if (res.status === 503) {
+      const errBody = await res.json().catch(() => null) as { error?: unknown } | null;
+      // Only flip AI permanently off when the server explicitly reports unconfigured ('off'); transient 503s stay retryable.
+      if (errBody?.error === 'off') set({ status: 'off' });
+      throw new Error('transient 503');
+    }
     const data = res.ok ? ((await res.json()) as { reply?: unknown; actions?: unknown; model?: unknown }) : null;
     if (!data || typeof data.reply !== 'string' || !data.reply.trim()) throw new Error('no reply');
     const by = snap.models.find((m) => m.key === data.model)?.label;
     return applyAiTurn(id, first ? null : silent ? '' : text, { reply: data.reply, actions: Array.isArray(data.actions) ? data.actions : [] }, opts.open, by, opts.version, Boolean(opts.page), Boolean(opts.carry));
   } catch {
-    set({ fallback: { ...snap.fallback, [id]: !aiOn() ? "The AI is off here, so the demo's own rules answered." : "The AI could not answer just now, so the demo's own rules did." } });
+    set({ fallback: { ...snap.fallback, [id]: !aiOn() ? "The AI is off here, so the demo's own rules answered." : "The AI had a brief hiccup — your draft is safe and you can try again." } });
     return null;
   } finally {
     clearTimeout(timer);

@@ -588,7 +588,7 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
       }
       case 'use_profile': {
         const p = profileFor(s, j);
-        if (j.setup !== 'template' || !p || a.profile !== p.id) refused.push('a saved job profile that is not offered for this job');
+        if (!p || a.profile !== p.id) refused.push('a saved job profile that is not offered for this job');
         else startFromProfile(id, p.id);
         break;
       }
@@ -1053,13 +1053,14 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
         break;
       case 'ask': {
         const fact = oneOf(a.fact, ASKS);
-        const quick = Array.isArray(a.quick) ? a.quick.filter((q): q is string => typeof q === 'string' && q.trim().length > 0 && q.length <= 60 && !/[\n\r]/.test(q)).slice(0, 6) : [];
+        const quick = Array.isArray(a.quick) ? a.quick.filter((q): q is string => typeof q === 'string' && q.trim().length > 0 && q.length <= 60 && !/[\n\r]/.test(q)).slice(0, 2) : [];
         const unanswered = (k: AskKind) => (j.walk ? !isSettled(k, j) : (missingFacts(j.facts) as AskKind[]).includes(k));
         ask = { fact: fact && unanswered(fact) ? fact : undefined, quick: quick.length ? quick : undefined };
         break;
       }
     }
   }
+  const wroteNow = writes.length > 0 || wrote.length > 0;
   if (writes.length) writeSections(id, writes, note);
   // The AI's changes in the language in view follow into the languages linked to it (section 19, phase 6, F); a carry is the following.
   if (!carrying) followLinks(id, start, inVersion ?? jobLang(start));
@@ -1068,12 +1069,15 @@ export function applyAiTurn(id: string, said: string | null, turn: AiTurn, open:
   const before = said === null ? now.chat.slice(0, firstUser + 1) : start.chat;
   const notDone = refused.length ? `\n\nNot done: ${refused.slice(0, 3).join('; ')}.` : '';
   const asks = /\?/.test(turn.reply) || actions.some((a) => a.type === 'ask') || Boolean(card);
+  // Deterministic control budget (Phase C): routine edits -> 0 buttons (inline Undo shown on bubble); real decisions -> max 2 controls.
+  const isRoutineEdit = wroteNow && !ask.fact && !card && !/\?/.test(turn.reply);
+  const budgetedQuick = isRoutineEdit ? undefined : ask.quick?.slice(0, 2);
   // A reply that asks a question, or shows a card, stands for the step the job is now at, so the rules do not ask it again.
   // Phase 6 review revision: never stack a second bubble when the AI asked ahead — fold into one reply only (askNext false).
   const want = now.walk ? nextStep(now, getState()) : null;
   const ahead = asks && !card && want ? asksAhead(turn.reply, ask.fact, want, want.kind === 'approve' ? headingOf(getState(), now, want.section) : '', wrote) : false;
   const step = asks && now.walk && !ahead ? stepKey(want) : undefined;
-  aiExchange(id, before, said, { text: `${turn.reply.trim() || 'Done.'}${notDone}`, quick: ahead ? undefined : ask.quick, ask: ahead ? undefined : ask.fact, by, step, card }, !asks && !ahead);
+  aiExchange(id, before, said, { text: `${turn.reply.trim() || 'Done.'}${notDone}`, quick: ahead ? undefined : budgetedQuick, ask: ahead ? undefined : ask.fact, by, step, card }, !asks && !ahead);
   for (const t of opened) open(t);
   return { refused, opened };
 }

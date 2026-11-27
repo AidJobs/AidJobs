@@ -127,14 +127,19 @@ Writing the job description (every write_section):
 
 export type ChatTurn = { reply: string; actions: Array<Record<string, unknown>> };
 
-/** The instructions with the writing guide of the job's template. */
-export function systemFor(context: Record<string, unknown>): string {
-  const job = context.job as { template?: { key?: unknown } } | undefined;
+/** The instructions with the writing guide of the job's template; attaches worked example only on first draft to keep follow-up turns lean. */
+export function systemFor(context: Record<string, unknown>, first = false): string {
+  const job = context.job as { template?: { key?: unknown }; status?: unknown; sections?: unknown[] } | undefined;
   const org = context.org as { orgType?: unknown } | undefined;
   const key = typeof job?.template?.key === 'string' ? job.template.key : '';
   const guide = guideFor(key, typeof org?.orgType === 'string' ? org.orgType : '');
-  const example = guide.example ? `\n\nA worked example in this template, for another role, to show the depth and voice expected. Follow its standard, never its facts or wording:\n${guide.example}` : '';
-  return `${SYSTEM}\n\nThe template's writing guide (about ${guide.words[0]} to ${guide.words[1]} words for the sections you write):\n${guide.text}${example}`;
+  const emptyDraft = !Array.isArray(job?.sections) || job.sections.length === 0;
+  const example = (first || emptyDraft) && guide.example ? `\n\nA worked example in this template, for another role, to show the depth and voice expected. Follow its standard, never its facts or wording:\n${guide.example}` : '';
+  const modeNote =
+    job?.status === 'live' || job?.status === 'scheduled' || job?.status === 'closed'
+      ? '\n\nMode: publishing/live management — focus on state actions, Reach, language updates, and concise edits. Keep quick answers to at most 2.'
+      : '\n\nMode: drafting — focus on accurate, honest JD sections without inventing facts, benefits, pay, or reporting lines. Keep quick answers to at most 2, and omit buttons on routine edits.';
+  return `${SYSTEM}${modeNote}\n\nThe template's writing guide (about ${guide.words[0]} to ${guide.words[1]} words for the sections you write):\n${guide.text}${example}`;
 }
 
 export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
@@ -143,7 +148,7 @@ export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: stri
 export function messagesFor(context: Record<string, unknown>, message: string, first: boolean, silent = false): ChatMessage[] {
   const lead = first ? "This is the user's first message, typed on the Create a job page; the window has just opened on it." : silent ? 'The window says (the user wrote nothing new):' : 'The user says:';
   return [
-    { role: 'system', content: systemFor(context) },
+    { role: 'system', content: systemFor(context, first) },
     { role: 'user', content: `Context (JSON):\n${JSON.stringify(context)}\n\n${lead}\n${message}` },
   ];
 }

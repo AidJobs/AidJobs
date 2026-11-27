@@ -819,9 +819,23 @@ export function startJob(text: string, formatKey?: string, extra: string[] = [],
   if (extra.length) job.tags = orderSections([...job.tags, ...extra.filter((k) => !job.tags.includes(k))], formatOf(s, job.format));
   if (inWindow) {
     const lang = detectLang(text);
-    const waiting: DemoJob = { ...job, setup: 'template', walk: { approved: [], settled: [] }, ...(lang !== 'en' ? { lang } : {}) };
-    waiting.chat = [msg('user', text), ...firstQuestion(s, waiting, Boolean(engagement) || Boolean(facts.contract))];
-    update((st) => ({ ...st, jobs: [waiting, ...st.jobs] }));
+    const live = withLiveDraft(s, { ...job, ...(lang !== 'en' ? { lang } : {}) });
+    const prof = profileFor(s, live);
+    const missing = essentials(live, s.org);
+    const fmt = formatOf(s, live.format);
+    const missingNote = missing.length ? ` Still needed before publishing: ${missing.map((k) => ESSENTIAL_WORDS[k]).join(', ')}.` : '';
+    const welcome = prof
+      ? msg(
+          'ai',
+          `Drafted in **${fmt.label}** on the right. You also have a saved profile (**${profileName(prof)}**) — use that instead, or keep this fresh draft?`,
+          [`Use ${profileName(prof)}`, 'Keep fresh draft'],
+        )
+      : msg(
+          'ai',
+          `Drafted in **${fmt.label}** on the right.${missingNote} Edit any section directly, click a missing detail above the draft, or tell me what to change.`,
+        );
+    live.chat = [msg('user', text), welcome];
+    update((st) => ({ ...st, jobs: [live, ...st.jobs] }));
     return id;
   }
   const live = withLiveDraft(s, job);
@@ -2871,7 +2885,31 @@ const linesOf = (text: string) => text.split('\n').map((l) => l.replace(/^[•*]
  * titles, applied only when saved) and the headings inside it (phase 6, B: added, renamed, and removed only here). `subs`, when given,
  * is the whole list: each heading's text, and its title when it is new or renamed.
  */
-export function editSection(id: string, key: string, text: string, note = false, extra: { title?: string; subs?: Array<{ id: string; title?: string; text: string }> } = {}) {
+/** Opt-in guided section-by-section walk (Phase C): only started when the user clicks "Walk through section by section". */
+export function startGuidedWalk(id: string) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => {
+    if (j.walk) return j;
+    const firstKey = j.tags[0];
+    const firstTitle = j.sections.find((x) => x.key === firstKey)?.title ?? firstKey;
+    return {
+      ...j,
+      walk: { pace: 'all', approved: [], settled: [] },
+      chat: [...j.chat, msg('ai', `Let's walk through section by section. First up is **${firstTitle}** — tell me if it looks right or what you'd like changed.`, ['Good, next'])],
+    };
+  });
+}
+
+/** Dismiss a Tier-3 proposed suggestion chip (e.g. 'salary', 'deadline') so it stays hidden on this job. */
+export function dismissProposal(id: string, key: string) {
+  if (!ownerOnly()) return;
+  updateJob(id, (j) => ({
+    ...j,
+    dismissedProposals: j.dismissedProposals?.includes(key) ? j.dismissedProposals : [...(j.dismissedProposals ?? []), key],
+  }));
+}
+
+export function editSection(id: string, key: string, text: string, note = false, extra: { title?: string; subs?: Array<{ id: string; title?: string; text: string }>; minor?: boolean } = {}) {
   if (!ownerOnly()) return;
   const heading = extra.title?.trim();
   const start = getState().jobs.find((j) => j.id === id);
@@ -2900,18 +2938,25 @@ export function editSection(id: string, key: string, text: string, note = false,
     const nextSec = { ...old, title, lines, edited: true as const, subs: subs?.length ? subs : undefined };
     const sections = inOutlineOrder(existing ? j.sections.map((x) => (x.key === key ? nextSec : x)) : [...j.sections, nextSec], tags);
     const marks = Object.fromEntries(Object.entries(j.toUpdate ?? {}).filter(([k]) => k !== key));
-    const base = { ...touched(j), tags, renamed, toUpdate: Object.keys(marks).length ? marks : undefined, sections, versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `Edited ${title}`, sections }], ...liveEdit(j) };
+    // Minor typo fixes on an approved job preserve approval; material edits call touched(j) to re-open review.
+    const afterApprovalChange = extra.minor ? j : touched(j);
+    const base = {
+      ...afterApprovalChange,
+      lastEditedByUser: key,
+      tags,
+      renamed,
+      toUpdate: Object.keys(marks).length ? marks : undefined,
+      sections,
+      versions: [...j.versions, { n: j.versions.length + 1, at: Date.now(), note: `${extra.minor ? 'Minor fix in' : 'Edited'} ${title}`, sections }],
+      ...liveEdit(j),
+    };
     const next: DemoJob = withoutWalkApproval(stepped(start ?? j, base, `Edited ${title}`, 'doc', { keys: [key] }), key);
-    // Window pencil passes note=true so the chat can say so. Do not open a fields card (How to apply) on Save — R1-28.
-    // note=false (earlier workspace): leave part alone.
+    // Phase C: silence routine manual-edit chat spam; lastEditedByUser feeds AI context cleanly.
     if (!note) return next;
     const pinned = sectionPart(key);
-    const chat = [...j.chat, msg('ai', `You changed **${title}** by hand. I'll keep your wording; ask me if another section should change to match.`)];
-    // Sections with their own fields card (How to apply): keep the current part so Save does not open that card at the top.
-    if (hasFields(pinned)) return { ...next, chat };
-    return { ...next, part: pinned, chat };
+    if (hasFields(pinned)) return next;
+    return { ...next, part: pinned };
   });
-  if (note) ensureAsk(id);
 }
 
 export function restoreVersion(id: string, n: number) {
@@ -4413,8 +4458,13 @@ export function hireAgain(id: string, place?: string): string | null {
     plan: null,
     review: { state: 'none', reviewers: [], due: '', round: 0, rule: s.org.approvalRule, remarks: [] },
     reach: null,
-    chat: [],
-    walk: { pace: 'all', approved: [], settled: [...ASKS, 'details', 'sdgs', 'fixed', 'suggest'], again: from },
+    chat: [
+      msg(
+        'ai',
+        `Copied from **${from}** with a fresh working-day closing date (${longDate(facts.deadline)}).${translations ? ' Previous reviewed translations were kept as drafts for a quick check.' : ''} Edit any detail directly or tell me what changed.`,
+      ),
+    ],
+    walk: undefined,
     choice: undefined,
     publishOn: undefined,
     payWith: undefined,

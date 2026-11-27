@@ -3,7 +3,7 @@
 import { ArrowLeft, ArrowRight, ChevronDown, Eye, FileText, History, LayoutList, Link2, Menu, MessageSquare, MoreHorizontal, Plus, X } from 'lucide-react';
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import Tip from '@/components/site/Tip';
-import { addTranslation, applyFormat, applyOrgSdgs, applyOutline, applyTemplate, bringDocument, canDelete, chatNote, closeJob, createFormat, downloadBlock, downloadCopy, formatOf, goOn, greetState, headingOf, hireAgain, isReviewable, LINK_REPLY, carried, carryByRules, markFlyerMade, parkingReply, remindReviewers, removeTranslation, saveJobProfile, setLinked, sendChat, setChoice, setJobLang, setPart, setSdgs, settleAsk, unparkPart, windowSays, writeNow } from './actions';
+import { addTranslation, applyFormat, applyOrgSdgs, applyOutline, applyTemplate, bringDocument, canDelete, chatNote, closeJob, createFormat, dismissProposal, downloadBlock, downloadCopy, formatOf, goOn, greetState, headingOf, hireAgain, isReviewable, LINK_REPLY, carried, carryByRules, markFlyerMade, parkingReply, remindReviewers, removeTranslation, saveJobProfile, setApply, setFacts, setLinked, sendChat, setChoice, setJobLang, setPart, setSdgs, settleAsk, startFromProfile, startGuidedWalk, undoLastChange, unparkPart, windowSays, writeNow } from './actions';
 import { FlyerPanel } from './Flyer';
 import { isPublished, STATE_LABEL, stateActionsOf, type StateAction } from './lifecycle';
 import { JobDialog, type Kind } from './Jobs';
@@ -27,13 +27,15 @@ import { changesSince, changeSummary } from './changes';
 import { openPoints } from './Checks';
 import Composer, { type ComposerHandle } from './Composer';
 import { ApplyDialog, ApplyFields, AskAnswer, DocumentView, rich, TitleEditor } from './DocPane';
-import { arrangementLabel, completeText, headingFor, longDate, PLACES, salaryText } from './engine';
+import { addDays, arrangementLabel, completeText, headingFor, longDate, PLACES, salarySuggestion, salaryText } from './engine';
 import FactBar, { FactDialog, typeLabel, type FactKey } from './FactBar';
 import { statusLine } from './Home';
 import { DeleteDialog } from './JobActions';
 import { LangDoc } from './LangDoc';
+import { workingDay } from './market';
 import MenuButton, { placeFor } from './MenuButton';
 import { currentPart, hasFields, lineFit, onLine, partsOf, sectionOf, type Part } from './parts';
+import { profileFor, profileName } from './profiles';
 import { GooglePreview, JobPageLangs, ShareCards } from './Publish';
 import { VersionsDialog } from './Review';
 import { inferSdgs, proposedStyle, SDG_NAMES, sdgsOf, toneOf, wordsFor } from './setup';
@@ -718,53 +720,74 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus, open,
         Skip to the job description
       </button>
       <div className="ej-wchat aj-scroll flex min-h-0 flex-1 flex-col gap-2 px-4 py-3" role="log" aria-label="Conversation with AidJobs" aria-live="polite">
-        {shown.length === 0 && !reviewing && <p className="aj-faint m-0">Ask AidJobs for any change to the job description, or open a part of it.</p>}
-        {shown.map((m, i) => (
-          <div key={m.id} className="ej-bubble" data-from={m.from}>
-            {m.from === 'user' && <span className="sr-only">You said: </span>}
-            <Reveal id={m.id} text={m.text} active={m.from === 'ai' && m === last && !born.has(m.id)} render={rich} />
-            {m.ai && m.by && (
-              <span className="ej-ai-by">
-                <span className="sr-only">Written by </span>
-                {m.by}
-              </span>
-            )}
-            {m.from === 'ai' && m.quick && m.quick.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {m.quick.map((q) => (
-                  <button
-                    key={q}
-                    type="button"
-                    className="aj-pill ej-answer"
-                    aria-pressed={(shown[i + 1]?.from === 'user' ? shown[i + 1].text : tapped?.id === m.id ? tapped.q : null) === q}
-                    disabled={i < lastUser || reviewing || busy || tapped?.id === m.id}
-                    onClick={() => {
-                      setTapped({ id: m.id, q });
-                      onSend(q);
-                    }}
-                  >
-                    {q}
-                  </button>
-                ))}
-              </div>
-            )}
-            {m.from === 'ai' && m === last && m.ask && !reviewing && !busy && <AskAnswer job={job} s={s} kind={m.ask} onAnswered={() => setTimeout(() => input.current?.focus(), 0)} />}
-            {m.from === 'ai' &&
-              m.card &&
-              !reviewing &&
-              (m.card !== 'state' || !m.state || m.state === job.status) &&
-              (() => {
-                // R2-P0-3: while setup is still about/project, keep the matching card live even after an intervening AI bubble hid lastCard.
-                const setupLive =
-                  (m.card === 'website' && job.setup === 'about') || (m.card === 'project' && job.setup === 'project');
-                if (setupLive) {
-                  const lastMatch = shown.reduce((acc, x, idx) => (x.card === m.card ? idx : acc), -1);
-                  return i === lastMatch;
-                }
-                return i === lastCard && i > lastUser;
-              })() && <ChatCardView kind={m.card} job={job} s={s} open={open} act={act} />}
+        {shown.length === 0 && !reviewing && <p className="aj-faint m-0">Ask AidJobs for any change to the job description, or edit directly on the right.</p>}
+        {!reviewing && !job.walk && !isPublished(job) && job.sections.length > 0 && (
+          <div className="flex items-center justify-end">
+            <button
+              type="button"
+              className="aj-text-btn"
+              style={{ height: 24, fontSize: 11.5, padding: 0 }}
+              onClick={() => startGuidedWalk(job.id)}
+            >
+              Walk through section by section
+            </button>
           </div>
-        ))}
+        )}
+        {shown.map((m, i) => {
+          const isLatestAi = m.from === 'ai' && i === shown.length - 1;
+          return (
+            <div key={m.id} className="ej-bubble" data-from={m.from}>
+              {m.from === 'user' && <span className="sr-only">You said: </span>}
+              <Reveal id={m.id} text={m.text} active={isLatestAi && !born.has(m.id)} render={rich} />
+              {isLatestAi && !reviewing && job.lastChange && (
+                <div className="mt-1.5 flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="aj-text-btn"
+                    style={{ height: 24, fontSize: 12, padding: 0 }}
+                    onClick={() => undoLastChange(job.id)}
+                  >
+                    Undo last change
+                  </button>
+                </div>
+              )}
+              {/* Phase C deterministic control budget: render quick buttons ONLY on the latest AI bubble (max 2). */}
+              {isLatestAi && m.quick && m.quick.length > 0 && !reviewing && !busy && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {m.quick.slice(0, 2).map((q) => (
+                    <button
+                      key={q}
+                      type="button"
+                      className="aj-pill ej-answer"
+                      aria-pressed={tapped?.id === m.id && tapped.q === q}
+                      disabled={tapped?.id === m.id}
+                      onClick={() => {
+                        setTapped({ id: m.id, q });
+                        onSend(q);
+                      }}
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {isLatestAi && m.ask && !reviewing && !busy && <AskAnswer job={job} s={s} kind={m.ask} onAnswered={() => setTimeout(() => input.current?.focus(), 0)} />}
+              {m.from === 'ai' &&
+                m.card &&
+                !reviewing &&
+                (m.card !== 'state' || !m.state || m.state === job.status) &&
+                (() => {
+                  const setupLive =
+                    (m.card === 'website' && job.setup === 'about') || (m.card === 'project' && job.setup === 'project');
+                  if (setupLive) {
+                    const lastMatch = shown.reduce((acc, x, idx) => (x.card === m.card ? idx : acc), -1);
+                    return i === lastMatch;
+                  }
+                  return i === lastCard && i > lastUser;
+                })() && <ChatCardView kind={m.card} job={job} s={s} open={open} act={act} />}
+            </div>
+          );
+        })}
         {reading && (
           <div className="ej-bubble ej-reading" data-from="ai" role="status">
             Reading your role…
@@ -800,9 +823,6 @@ function WindowChat({ job, s, reading, subject, onSend, onSkip, autoFocus, open,
                 save(BOX_KEY, h);
               }}
             />
-            <div className="ej-subject" aria-live="polite">
-              About: <strong>{subject}</strong>
-            </div>
             {ai.fallback[job.id] && (
               <p className="ej-ai-note m-0" role="status">
                 {ai.fallback[job.id]}
@@ -1359,6 +1379,24 @@ function JobWindow({ id }: { id: string }) {
     if (text === SHOW_FLYER && reachOpen(job, s)) openTab('flyer');
     if (text === INVITE && reachOpen(job, s)) openTab('reach');
     if (text === SKIP_APPROVAL) return setSkipOpen(true);
+    // Saved job profile calm 1-choice offer (Phase C)
+    if (text === 'Keep fresh draft') return chatNote(job.id, text, 'Kept your fresh draft. Edit any section or tell me what to adjust.');
+    const offeredProf = profileFor(s, job);
+    if (offeredProf && text === `Use ${profileName(offeredProf)}`) {
+      startFromProfile(job.id, offeredProf.id);
+      return chatNote(job.id, text, `Applied saved profile **${profileName(offeredProf)}**. Update the closing date or any role-specific details.`);
+    }
+    // Route "apply via https://..." or "apply at jobs@..." directly to ApplySettings (not LINK_REPLY).
+    const applyUrl = text.match(/\bapply\b[^.\n]*?\b(https?:\/\/\S+)/i);
+    if (applyUrl) {
+      setApply(job.id, { method: 'form', address: applyUrl[1].replace(/[.,;)]+$/, '') });
+      return chatNote(job.id, text, `Updated How to apply to use ${applyUrl[1].replace(/[.,;)]+$/, '')}.`);
+    }
+    const applyMail = text.match(/\bapply\b[^.\n]*?\b([^\s@,;]+@[^\s@,;]+\.[^\s@,;]+)/i);
+    if (applyMail) {
+      setApply(job.id, { method: 'email', address: applyMail[1].replace(/[.,;)]+$/, '') });
+      return chatNote(job.id, text, `Updated How to apply to send applications to ${applyMail[1].replace(/[.,;)]+$/, '')}.`);
+    }
     if (LINK.test(t)) return chatNote(job.id, text, LINK_REPLY);
     if (PREVIEW.test(t) && !job.setup) {
       openPreview();
@@ -1482,10 +1520,29 @@ function JobWindow({ id }: { id: string }) {
     requestAnimationFrame(() => scrollToId(inVersion ? `ej-ver-${secKey}` : `ej-sec-${secKey}`));
   };
 
+  const isTailoring = reading || Boolean(ai.pending[job.id]?.silent);
+  const dismissed = job.dismissedProposals ?? [];
+  const salaryProp =
+    !reviewing && job.facts.salaryMode === 'hidden' && !dismissed.includes('salary')
+      ? salarySuggestion(job.facts, s.org)
+      : null;
+  const deadlineProp =
+    !reviewing && !job.facts.deadline && !job.facts.rolling && !dismissed.includes('deadline')
+      ? workingDay(addDays(s.today, 21), job.facts.iso)
+      : null;
+
   const doc = previewing ? (
     headings
   ) : (
     <div className="flex flex-col gap-3">
+      {isTailoring && !reviewing && (
+        <div className="aj-card flex flex-wrap items-center justify-between gap-2 px-3 py-2" role="status" aria-live="polite">
+          <span className="ej-shimmer">Tailoring draft… sections you edit manually are never overwritten.</span>
+          <button type="button" className="aj-text-btn" style={{ height: 24, fontSize: 12 }} onClick={() => setReading(false)}>
+            Stop tailoring &amp; edit now
+          </button>
+        </div>
+      )}
       {job.status === 'live' && changesSince(job).length > 0 && (
         <div className="aj-card px-3 py-2" role="status" aria-label="Changed since publishing">
           <strong>Changed since publishing:</strong> <span className="aj-muted">{changeSummary(changesSince(job))}</span>
@@ -1498,6 +1555,7 @@ function JobWindow({ id }: { id: string }) {
           current={focus}
           noteEdits
           draft
+          tailoring={isTailoring}
           onSeeChat={phone ? () => setChatSheet('half') : undefined}
           open={(t) => goPart(t.startsWith('section:') ? `s:${t.slice(8)}` : t)}
         />
@@ -1627,6 +1685,62 @@ function JobWindow({ id }: { id: string }) {
       {!job.setup && (
         <div className="ej-fact-strip">
           <FactBar job={job} s={s} />
+        </div>
+      )}
+      {!job.setup && (salaryProp || deadlineProp) && (
+        <div className="ej-proposed-bar" aria-label="Proposed details">
+          <span className="aj-faint" style={{ fontSize: 11.5 }}>
+            Proposed:
+          </span>
+          {deadlineProp && (
+            <span className="ej-proposed-chip">
+              <span>
+                Close <strong>{longDate(deadlineProp)}</strong> <span className="aj-faint">(21-day working day)</span>
+              </span>
+              <button type="button" className="aj-text-btn" style={{ height: 22, padding: '0 4px', fontSize: 11.5, fontWeight: 650 }} onClick={() => setFacts(job.id, { deadline: deadlineProp })}>
+                Accept
+              </button>
+              <button type="button" className="aj-text-btn" style={{ height: 22, padding: '0 4px', fontSize: 11.5 }} onClick={() => setFact('closes')}>
+                Edit
+              </button>
+              <button type="button" className="aj-text-btn" style={{ height: 22, padding: '0 4px', fontSize: 11.5 }} onClick={() => dismissProposal(job.id, 'deadline')} aria-label="Dismiss closing date proposal">
+                ×
+              </button>
+            </span>
+          )}
+          {salaryProp && (
+            <span className="ej-proposed-chip" title={`Basis: ${salaryProp.basis}`}>
+              <span>
+                Pay{' '}
+                <strong>
+                  {salaryProp.currency} {salaryProp.min.toLocaleString('en-GB')}–{salaryProp.max.toLocaleString('en-GB')}/{salaryProp.period}
+                </strong>{' '}
+                <span className="aj-faint">({salaryProp.basis.split(';')[0]})</span>
+              </span>
+              <button
+                type="button"
+                className="aj-text-btn"
+                style={{ height: 22, padding: '0 4px', fontSize: 11.5, fontWeight: 650 }}
+                onClick={() =>
+                  setFacts(job.id, {
+                    salaryMode: 'range',
+                    currency: salaryProp.currency,
+                    salaryMin: salaryProp.min.toLocaleString('en-GB'),
+                    salaryMax: salaryProp.max.toLocaleString('en-GB'),
+                    period: salaryProp.period,
+                  })
+                }
+              >
+                Accept
+              </button>
+              <button type="button" className="aj-text-btn" style={{ height: 22, padding: '0 4px', fontSize: 11.5 }} onClick={() => setFact('salary')}>
+                Edit
+              </button>
+              <button type="button" className="aj-text-btn" style={{ height: 22, padding: '0 4px', fontSize: 11.5 }} onClick={() => dismissProposal(job.id, 'salary')} aria-label="Dismiss salary proposal">
+                ×
+              </button>
+            </span>
+          )}
         </div>
       )}
     </>
