@@ -37,7 +37,9 @@ const NOTE = `note=${PLANTED}`;
 const CASES: Case[] = [
   { module: 'sources', method: 'GET', query: `?page=1&size=20&${NOTE}`, backendPath: `/api/admin/sources?page=1&size=20&${NOTE}` },
   { module: 'sources', method: 'POST', body: { name: 'Org', careers_url: `https://${PLANTED}.org` }, backendPath: '/api/admin/sources' },
+  { module: 'sources/probe', method: 'POST', body: { careers_url: `https://${PLANTED}.org`, note: PLANTED }, backendPath: '/api/admin/sources/probe' },
   { module: 'sources/[id]', method: 'GET', params: { id: 'src-1' }, query: `?${NOTE}`, backendPath: '/api/admin/sources/src-1' },
+  { module: 'sources/[id]/activate', method: 'POST', params: { id: 'src-11' }, backendPath: '/api/admin/sources/src-11/activate' },
   { module: 'sources/[id]', method: 'PATCH', params: { id: 'src-1' }, body: { status: 'paused', notes: PLANTED }, backendPath: '/api/admin/sources/src-1' },
   { module: 'sources/[id]', method: 'DELETE', params: { id: 'src-1' }, query: `?${NOTE}`, backendPath: '/api/admin/sources/src-1' },
   { module: 'sources/[id]/export', method: 'GET', params: { id: 'src-2' }, backendPath: '/api/admin/sources/src-2/export' },
@@ -150,8 +152,8 @@ describe('the table', () => {
       }
     }
     expect(found.sort()).toEqual(CASES.map((c) => `${c.method} ${c.module}`).sort());
-    expect(new Set(found.map((f) => f.split(' ')[1])).size).toBe(37);
-    expect(found).toHaveLength(41);
+    expect(new Set(found.map((f) => f.split(' ')[1])).size).toBe(39);
+    expect(found).toHaveLength(43);
   });
 });
 

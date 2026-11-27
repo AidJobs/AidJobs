@@ -69,12 +69,48 @@ async def simulate_api(
     return summarise(result, "api")
 
 
+# Capture fields reported as fill rates on a probe (ledger W-40; names as data_quality's
+# CAPTURE_FILL_FIELDS). Each entry reads the reader's own keys on a listing row. Country and city
+# are set only when a job is saved (place_job), so a listing read cannot fill them:
+# they report None.
+PROBE_FILL_FIELDS = (
+    ("description", ("description",)),
+    ("posted_on", ("posted_on",)),
+    ("locations", ("locations", "location_raw")),
+    ("contract_type", ("employment_type",)),
+    ("salary_range_text", ("salary_raw", "salary_range_text")),
+    ("advert_language", ("advert_language",)),
+    ("deadline", ("deadline",)),
+    ("location_raw", ("location_raw",)),
+    ("country", None),
+    ("city", None),
+)
+
+
+def listing_fill_rates(jobs: List[Dict]) -> Dict[str, Dict[str, Any]]:
+    """Filled, total and rate per capture field, over the admitted rows of one listing read."""
+    total = len(jobs)
+    rates: Dict[str, Dict[str, Any]] = {}
+    for name, keys in PROBE_FILL_FIELDS:
+        if keys is None:
+            rates[name] = {"filled": None, "total": total, "rate": None}
+            continue
+        filled = sum(1 for job in jobs if any(job.get(key) not in (None, "", []) for key in keys))
+        rates[name] = {
+            "filled": filled,
+            "total": total,
+            "rate": round(filled / total * 100.0, 1) if total else None,
+        }
+    return rates
+
+
 def summarise(result: ListingResult, record_class: str) -> Dict[str, Any]:
     """Counts, reader, and a row list with admission's verdict on each."""
     jobs = list(result.jobs)
     verdicts = _verdicts(jobs, record_class)
     rows = [_row(job, verdict) for job, verdict in zip(jobs, verdicts)]
     rejected_reasons = [v for v in verdicts if v != "admitted"]
+    admitted_jobs = [job for job, verdict in zip(jobs, verdicts) if verdict == "admitted"]
     report = result.report()
     if not isinstance(report, dict):
         report = {}
@@ -87,11 +123,12 @@ def summarise(result: ListingResult, record_class: str) -> Dict[str, Any]:
         "pages": report.get("pages", result.pages),
         "complete": report.get("complete", result.complete),
         "stop": report.get("stop", result.stop),
-        "admitted": sum(1 for v in verdicts if v == "admitted"),
+        "admitted": len(admitted_jobs),
         "rejected": len(rejected_reasons),
         "rejected_by_reason": dict(Counter(rejected_reasons)),
         "rows": rows,
         "sample": rows[:3],
+        "fill_rates": listing_fill_rates(admitted_jobs),
     }
 
 

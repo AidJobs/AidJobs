@@ -18,6 +18,12 @@ from app.errors import InternalError, internal_error_handler
 
 SID = "00000000-0000-0000-0000-000000000000"
 DELETED = "This source is deleted. Add it again with the same careers URL to restore it."
+PENDING_EDIT = sources.PENDING_EDIT
+PENDING_CRAWL = sources.PENDING_CRAWL
+PENDING_ADDED = sources.PENDING_ADDED
+PENDING_RESTORED = sources.PENDING_RESTORED
+ACTIVATE_REFUSED = sources.ACTIVATE_REFUSED
+ACTIVATED = sources.ACTIVATED
 WRITES = ("UPDATE", "DELETE", "INSERT")
 
 
@@ -130,7 +136,7 @@ def test_an_edit_never_updates_a_deleted_source(database):
 
 
 def test_an_edit_of_a_deleted_source_is_409_and_commits_nothing(database):
-    log = database({"SELECT 1 FROM sources": [{"?column?": 1}]})
+    log = database({"SELECT status FROM sources": [{"status": "deleted"}]})
     response = _sources_app().patch(f"/api/admin/sources/{SID}", json={"status": "active"})
     assert (response.status_code, response.json()) == (409, {"detail": DELETED})
     assert "COMMIT" not in log
@@ -308,10 +314,103 @@ def test_a_deleted_source_is_not_crawled_by_hand(monkeypatch):
     assert started == []
 
 
-@pytest.mark.parametrize("status", ["active", "paused", "pending_validation"])
+@pytest.mark.parametrize("status", ["active", "paused"])
 def test_any_other_source_may_be_crawled_by_hand(monkeypatch, status):
     response, started = _run(monkeypatch, status)
     assert response.status_code == 200 and started == [SID]
+
+
+def test_a_pending_source_is_not_crawled_by_hand_until_it_is_activated(monkeypatch):
+    """W-40: a source added by the probe flow is crawled only after its Activate action."""
+    response, started = _run(monkeypatch, "pending_validation")
+    assert (response.status_code, response.json()) == (409, {"detail": PENDING_CRAWL})
+    assert started == []
+
+
+# W-40: a pending source -------------------------------------------------------------------
+
+def test_an_edit_cannot_move_a_pending_source_to_active_or_paused(database):
+    log = database(
+        {"UPDATE sources": [], "SELECT status FROM sources": [{"status": "pending_validation"}]}
+    )
+    for status in ("active", "paused"):
+        response = _sources_app().patch(f"/api/admin/sources/{SID}", json={"status": status})
+        assert (response.status_code, response.json()) == (409, {"detail": PENDING_EDIT})
+    assert "COMMIT" not in log
+    update = next(s for s in log if s.startswith("UPDATE sources"))
+    assert "AND status IS DISTINCT FROM 'pending_validation'" in update
+
+
+def test_an_edit_of_a_pending_source_without_a_status_goes_through(database):
+    row = {"id": SID, "status": "pending_validation", "org_name": "Renamed"}
+    log = database({"UPDATE sources": [row]})
+    response = _sources_app().patch(f"/api/admin/sources/{SID}", json={"org_name": "Renamed"})
+    assert response.status_code == 200 and response.json()["data"] == row
+    update = next(s for s in log if s.startswith("UPDATE sources"))
+    assert "pending_validation" not in update
+
+
+def test_a_new_source_is_added_pending_with_no_crawl_queued(database):
+    log = database({"INSERT INTO sources": [{"id": SID, "status": "pending_validation"}]})
+    response = _sources_app().post("/api/admin/sources", json={
+        "careers_url": "https://jobs.example.org/", "source_type": "html"})
+    assert response.status_code == 200
+    assert response.json()["message"] == PENDING_ADDED
+    insert = next(s for s in log if s.startswith("INSERT INTO sources"))
+    assert "'pending_validation', NULL" in insert
+    assert "'active'" not in insert and "NOW()" not in insert
+
+
+def test_a_restored_source_is_pending_with_no_crawl_queued(database):
+    log = database({
+        "SELECT id::text, status FROM sources": [{"id": SID, "status": "deleted"}],
+        "UPDATE sources": [{"id": SID, "status": "pending_validation"}],
+    })
+    response = _sources_app().post("/api/admin/sources", json={
+        "careers_url": "https://jobs.example.org/", "source_type": "html"})
+    assert response.status_code == 200
+    assert response.json()["message"] == PENDING_RESTORED
+    update = next(s for s in log if s.startswith("UPDATE sources"))
+    assert "status = 'pending_validation'" in update and "next_run_at = NULL" in update
+    assert "next_run_at = NOW()" not in update
+
+
+def test_a_restore_that_finds_the_source_changed_is_refused_and_commits_nothing(database):
+    # The guarded UPDATE matches no row when another request changed the source first (W-40).
+    log = database({
+        "SELECT id::text, status FROM sources": [{"id": SID, "status": "deleted"}],
+        "UPDATE sources": [],
+    })
+    response = _sources_app().post("/api/admin/sources", json={
+        "careers_url": "https://jobs.example.org/", "source_type": "html"})
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Source changed while it was being added. Try again."
+    update = next(s for s in log if s.startswith("UPDATE sources"))
+    assert "AND status = 'deleted'" in update
+    assert "COMMIT" not in log
+
+
+def test_activate_moves_only_a_pending_source_and_queues_its_crawl(database):
+    log = database({"UPDATE sources": [{"id": SID, "status": "active"}]})
+    response = _sources_app().post(f"/api/admin/sources/{SID}/activate")
+    assert response.status_code == 200 and response.json()["message"] == ACTIVATED
+    update = next(s for s in log if s.startswith("UPDATE sources"))
+    assert "SET status = 'active', next_run_at = NOW()" in update
+    assert "AND status = %s" in update
+    assert log[-1] == "COMMIT"
+
+
+@pytest.mark.parametrize("found, detail, code", [
+    ([{"status": "active"}], ACTIVATE_REFUSED, 409),
+    ([{"status": "paused"}], ACTIVATE_REFUSED, 409),
+    ([{"status": "deleted"}], DELETED, 409),
+    ([], "Source not found", 404),
+])
+def test_activate_refuses_any_source_that_is_not_pending(database, found, detail, code):
+    log = database({"SELECT status FROM sources": found})
+    response = _sources_app().post(f"/api/admin/sources/{SID}/activate")
+    assert (response.status_code, response.json()) == (code, {"detail": detail})
+    assert "COMMIT" not in log
 
 
 # A job restore -----------------------------------------------------------------------------

@@ -27,7 +27,7 @@ const routes = walk(API_ROOT).map((file) => ({
 
 describe('proxy route files', () => {
   it('are the 44 known files, so a new route cannot skip these checks unnoticed', () => {
-    expect(routes).toHaveLength(44);
+    expect(routes).toHaveLength(46);
   });
 
   it('name each exception, and each exception exists', () => {

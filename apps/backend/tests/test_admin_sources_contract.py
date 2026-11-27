@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app import sources
+from crawler_v2.probe import ADDRESS_REFUSED
 
 SID = "00000000-0000-0000-0000-000000000000"
 ROUTES = [
@@ -25,6 +26,8 @@ ROUTES = [
     ("POST", "/api/admin/sources/import", {"careers_url": "https://example.org/jobs"}),
     ("POST", f"/api/admin/sources/{SID}/test", None),
     ("POST", f"/api/admin/sources/{SID}/simulate_extract", None),
+    ("POST", "/api/admin/sources/probe", {"careers_url": "https://example.org/jobs"}),
+    ("POST", f"/api/admin/sources/{SID}/activate", None),
 ]
 
 
@@ -146,6 +149,19 @@ def test_import_rejects_an_unknown_source_type(database):
         "careers_url": "https://example.org/x", "source_type": "xml"})
     assert response.status_code == 400
     assert response.json() == {"detail": "source_type must be html, rss or api"}
+
+
+def test_a_probe_of_a_refused_address_answers_without_reading_anything():
+    # The address is refused before any request or database use (W-40 probe, pull request 1).
+    response = _app().post(
+        "/api/admin/sources/probe", json={"careers_url": "ftp://example.org/jobs"}
+    )
+    assert response.status_code == 200
+    assert response.json() == {
+        "ok": False,
+        "error": ADDRESS_REFUSED,
+        "error_category": "validation",
+    }
 
 
 def test_presets_routes_are_gone():

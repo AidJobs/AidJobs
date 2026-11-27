@@ -459,13 +459,24 @@ def test_a_save_lock_does_not_hold_back_a_finish_or_a_takeover(routes):
         holder.close()
 
 
-@pytest.mark.parametrize("start, to", [("active", "paused"), ("paused", "active"),
-                                       ("pending_validation", "active")])
+@pytest.mark.parametrize("start, to", [("active", "paused"), ("paused", "active")])
 def test_an_edit_pauses_and_resumes(routes, start, to):
     sources, _jm = routes
     source = _add_source("Example", status=start)
     sources.update_source(None, source["id"], sources.SourceUpdate(status=to), admin="test-admin")
     assert _sql("SELECT status FROM sources WHERE id = %s", (source["id"],))[0][0] == to
+
+
+def test_an_edit_cannot_activate_a_pending_source(routes):
+    """W-40: only the Activate action leaves pending_validation."""
+    sources, _jm = routes
+    source = _add_source("Example", status="pending_validation")
+    with pytest.raises(Exception) as refused:
+        sources.update_source(None, source["id"], sources.SourceUpdate(status="active"),
+                              admin="test-admin")
+    assert getattr(refused.value, "status_code", None) == 409
+    rows = _sql("SELECT status FROM sources WHERE id = %s", (source["id"],))
+    assert rows[0][0] == "pending_validation"
 
 
 # The migrations ----------------------------------------------------------------------------

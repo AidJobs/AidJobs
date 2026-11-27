@@ -27,6 +27,7 @@ class LockStore:
         self.lock_expired = False
         self.running_id = None
         self.due = True
+        self.status = "active"
         self.commits = 0
         self.rollbacks = 0
 
@@ -59,6 +60,9 @@ class FlowCursor:
             return
         if "SELECT STATUS = 'ACTIVE'" in upper:
             self._row = (self.store.due,)
+            return
+        if upper.startswith("SELECT STATUS FROM SOURCES"):
+            self._row = (self.store.status,)
             return
         if "INSERT INTO CRAWL_LOGS" in upper:
             self.store.running_id = "run-1"
@@ -177,6 +181,18 @@ def _run_statements(statements):
     return [sql for sql in statements if not sql.upper().startswith("SET ")]
 
 
+def test_a_manual_start_of_a_pending_source_opens_no_run():
+    # W-40: a pending source is not crawled by hand, even if it was added after the admin's check.
+    store = LockStore()
+    store.status = "pending_validation"
+    statements = []
+    orch = _orchestrator(store, statements)
+    run_id, started = asyncio.run(orch.begin_run(_source()))
+    assert (run_id, started) == (None, False)
+    assert store.commits == 0 and store.rollbacks == 1
+    assert not any("INSERT INTO crawl_logs" in sql for sql in statements)
+
+
 def test_first_begin_inserts_lock_then_running_row():
     store = LockStore()
     statements = []
@@ -188,9 +204,11 @@ def test_first_begin_inserts_lock_then_running_row():
     steps = _run_statements(statements)
     assert "INSERT INTO crawl_locks" in steps[0]
     assert "ON CONFLICT (source_id) DO NOTHING RETURNING" in steps[0]
-    assert "INSERT INTO crawl_logs" in steps[1]
-    assert "running" in steps[1]
-    assert len(steps) == 2
+    # A manual start refuses a pending source before its run row is opened (W-40).
+    assert "SELECT status FROM sources" in steps[1]
+    assert "INSERT INTO crawl_logs" in steps[2]
+    assert "running" in steps[2]
+    assert len(steps) == 3
 
 
 def test_every_run_step_sets_its_timeouts_first():

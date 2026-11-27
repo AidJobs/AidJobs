@@ -36,9 +36,17 @@ DB_NOT_CONFIGURED = "Database not configured"
 DB_SETTINGS_UNREADABLE = "Database settings could not be read"
 # The whole check of one source URL, every redirect included
 SOURCE_CHECK_TOTAL_SECONDS = 20.0
-# What an edit may set. "deleted" is the delete route's, which also hides the source's jobs;
-# "pending_validation", production's default for a new row, is set by no admin action.
+# What an edit may set. "deleted" is the delete route's, which also hides the source's jobs.
+# A new or restored source is "pending_validation" (W-40): it is not crawled until the Activate
+# action, which is the only way out of that status.
 EDITABLE_STATUSES = ("active", "paused")
+PENDING = "pending_validation"
+PENDING_ADDED = "Source added as pending. It is not crawled until you activate it."
+PENDING_RESTORED = "Source restored from deleted status as pending. It is not crawled until you activate it."
+PENDING_EDIT = "This source is pending. Activate it first; the Activate action queues its first crawl."
+PENDING_CRAWL = "This source is pending. Activate it before it can be crawled."
+ACTIVATE_REFUSED = "Only a pending source can be activated."
+ACTIVATED = "Source activated. Its first crawl is queued."
 DELETED_SOURCE = "This source is deleted. Add it again with the same careers URL to restore it."
 RUN_IN_PROGRESS = "A crawl of this source is still running. Try again after it ends."
 SOURCE_BUSY = ("This source or its jobs are being changed (a crawl may be saving jobs). "
@@ -299,7 +307,7 @@ def create_source(
     source: SourceCreate,
     admin: str = Depends(admin_required)
 ):
-    """Create a new source with auto-queue (next_run_at=now())."""
+    """Create a new source as pending (W-40): not crawled until it is activated."""
     check_source_type(source.source_type)
     if not psycopg2:
         raise HTTPException(status_code=503, detail="Database driver not available")
@@ -324,20 +332,20 @@ def create_source(
         
         if existing:
             if existing['status'] == 'deleted':
-                # Restore the deleted source
+# Restore the deleted source, pending until it is activated (W-40)
                 logger.info(f"[sources] Restoring deleted source {existing['id']}")
                 cursor.execute("""
                     UPDATE sources
-                    SET status = 'active',
+                    SET status = 'pending_validation',
                         org_name = COALESCE(%s, org_name),
                         source_type = COALESCE(%s, source_type),
                         org_type = COALESCE(%s, org_type),
                         crawl_frequency_days = COALESCE(%s, crawl_frequency_days),
                         parser_hint = COALESCE(%s, parser_hint),
                         time_window = COALESCE(%s, time_window),
-                        next_run_at = NOW(),
+                        next_run_at = NULL,
                         updated_at = NOW()
-                    WHERE id::text = %s
+                    WHERE id::text = %s AND status = 'deleted'
                     RETURNING id::text, org_name, careers_url, source_type, org_type, status,
                               crawl_frequency_days, next_run_at, last_crawled_at, last_crawl_status,
                               parser_hint, time_window, created_at, updated_at
@@ -352,15 +360,22 @@ def create_source(
                 ))
                 
                 restored = cursor.fetchone()
+                if restored is None:
+                    # Changed since it was read (restored or deleted again): nothing is written.
+                    conn.rollback()
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Source changed while it was being added. Try again.",
+                    )
                 conn.commit()
                 
-                logger.info(f"[sources] Restored source {restored['id']} with auto-queue (next_run_at=now())")
+                logger.info(f"[sources] Restored source {restored['id']} as pending (W-40)")
                 
                 return {
                     "status": "ok",
                     "data": dict(restored),
                     "error": None,
-                    "message": "Source restored from deleted status"
+                    "message": PENDING_RESTORED
                 }
             else:
                 # Active source exists
@@ -368,14 +383,14 @@ def create_source(
                 logger.error(f"Duplicate careers_url: {source.careers_url}")
                 raise HTTPException(status_code=409, detail="Source with this URL already exists")
         
-        # Auto-queue: set next_run_at=now() to trigger immediate crawl
+        # Added as pending (W-40): not crawled until the Activate action queues its first crawl
         cursor.execute("""
             INSERT INTO sources (
                 org_name, careers_url, source_type, org_type,
                 crawl_frequency_days, parser_hint, time_window,
                 status, next_run_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, 'active', NOW())
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 'pending_validation', NULL)
             RETURNING id::text, org_name, careers_url, source_type, org_type, status,
                       crawl_frequency_days, next_run_at, last_crawled_at, last_crawl_status,
                       parser_hint, time_window, created_at, updated_at
@@ -392,12 +407,13 @@ def create_source(
         created = cursor.fetchone()
         conn.commit()
         
-        logger.info(f"[sources] Created source {created['id']} with auto-queue (next_run_at=now())")
+        logger.info(f"[sources] Created source {created['id']} as pending (W-40)")
         
         return {
             "status": "ok",
             "data": dict(created),
-            "error": None
+            "error": None,
+            "message": PENDING_ADDED
         }
         
     except HTTPException:
@@ -484,11 +500,15 @@ def update_source(
         
         updates.append("updated_at = NOW()")
         params.append(source_id)
+        # A pending source leaves pending only through Activate (W-40); other fields may change.
+        pending_guard = (
+            f" AND status IS DISTINCT FROM '{PENDING}'" if update.status is not None else ""
+        )
         
         sql_query = f"""
             UPDATE sources
             SET {', '.join(updates)}
-            WHERE id::text = %s AND status IS DISTINCT FROM 'deleted'
+            WHERE id::text = %s AND status IS DISTINCT FROM 'deleted'{pending_guard}
             RETURNING id::text, org_name, careers_url, source_type, org_type, status,
                       crawl_frequency_days, next_run_at, last_crawled_at, last_crawl_status,
                       parser_hint, time_window, created_at, updated_at
@@ -498,10 +518,14 @@ def update_source(
         updated = cursor.fetchone()
         
         if not updated:
-            cursor.execute("SELECT 1 FROM sources WHERE id::text = %s", (source_id,))
-            if cursor.fetchone():
+            cursor.execute("SELECT status FROM sources WHERE id::text = %s", (source_id,))
+            found = cursor.fetchone()
+            if found is None:
+                raise HTTPException(status_code=404, detail="Source not found")
+            if found["status"] == "deleted":
                 raise HTTPException(status_code=409, detail=DELETED_SOURCE)
-            raise HTTPException(status_code=404, detail="Source not found")
+            # Only a status change of a pending source gets here (W-40)
+            raise HTTPException(status_code=409, detail=PENDING_EDIT)
         
         conn.commit()
         
@@ -861,6 +885,77 @@ def export_source(
             conn.close()
 
 
+class SourceProbe(BaseModel):
+    careers_url: str = Field(max_length=2048)
+
+
+@router.post("/api/admin/sources/probe")
+async def probe_source(
+    request: Request,
+    body: SourceProbe,
+    admin: str = Depends(admin_required)
+):
+    """Read a careers address once and report what it holds (W-40). Writes nothing: no source,
+    no crawl run, no saved page. The address is checked by the fetch policy, as Test is."""
+    from crawler_v2.probe import probe_address
+    # No database URL: the probe's readers open no connection, so none is handed to them.
+    return await probe_address(body.careers_url)
+
+
+@router.post("/api/admin/sources/{source_id}/activate")
+def activate_source(
+    request: Request,
+    source_id: str,
+    admin: str = Depends(admin_required)
+):
+    """Activate a pending source and queue its first crawl (W-40). Only a pending source moves."""
+    if not psycopg2:
+        raise HTTPException(status_code=503, detail="Database driver not available")
+    conn_params = _connection_params()
+    conn = None
+    cursor = None
+    try:
+        conn = psycopg2.connect(**conn_params, connect_timeout=5)
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("""
+            UPDATE sources
+            SET status = 'active', next_run_at = NOW(), updated_at = NOW()
+            WHERE id::text = %s AND status = %s
+            RETURNING id::text, org_name, careers_url, source_type, org_type, status,
+                      crawl_frequency_days, next_run_at, last_crawled_at, last_crawl_status,
+                      parser_hint, time_window, created_at, updated_at
+        """, (source_id, PENDING))
+        activated = cursor.fetchone()
+        if not activated:
+            cursor.execute("SELECT status FROM sources WHERE id::text = %s", (source_id,))
+            found = cursor.fetchone()
+            conn.rollback()
+            if found is None:
+                raise HTTPException(status_code=404, detail="Source not found")
+            if found["status"] == "deleted":
+                raise HTTPException(status_code=409, detail=DELETED_SOURCE)
+            raise HTTPException(status_code=409, detail=ACTIVATE_REFUSED)
+        conn.commit()
+        logger.info(f"[sources] Activated source {activated['id']}; first crawl queued (W-40)")
+        return {
+            "status": "ok",
+            "data": dict(activated),
+            "error": None,
+            "message": ACTIVATED,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        raise _source_error("Failed to activate source", source_id, e)
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
 @router.post("/api/admin/sources/import")
 def import_source(
     request: Request,
@@ -896,7 +991,7 @@ def import_source(
                 crawl_frequency_days, parser_hint, time_window,
                 status, next_run_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, 'active', NOW())
+            VALUES (%s, %s, %s, %s, %s, %s, %s, 'pending_validation', NULL)
             RETURNING id::text, org_name, careers_url, source_type, org_type, status,
                       crawl_frequency_days, next_run_at, last_crawled_at, last_crawl_status,
                       parser_hint, time_window, created_at, updated_at
@@ -913,12 +1008,13 @@ def import_source(
         created = cursor.fetchone()
         conn.commit()
         
-        logger.info(f"[sources] Imported source {created['id']} from config")
+        logger.info(f"[sources] Imported source {created['id']} as pending (W-40)")
         
         return {
             "status": "ok",
             "data": dict(created),
-            "error": None
+            "error": None,
+            "message": PENDING_ADDED
         }
         
     except psycopg2.IntegrityError:

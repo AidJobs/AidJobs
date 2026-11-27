@@ -30,6 +30,7 @@ const CASES: {
   { module: 'sources/[id]', method: 'DELETE', params: { id: 'src-7' }, backendPath: '/api/admin/sources/src-7' },
   { module: 'sources/[id]/simulate_extract', method: 'POST', params: { id: 'src-8' }, backendPath: '/api/admin/sources/src-8/simulate_extract' },
   { module: 'sources/[id]/test', method: 'POST', params: { id: 'src-9' }, backendPath: '/api/admin/sources/src-9/test' },
+  { module: 'sources/[id]/activate', method: 'POST', params: { id: 'src-10' }, backendPath: '/api/admin/sources/src-10/activate' },
 ];
 
 const fetchMock = jest.fn();
@@ -52,7 +53,7 @@ beforeEach(() => {
 
 describe('admin proxy routes with params', () => {
   it('covers every route the async-params change touched', () => {
-    expect(new Set(CASES.map((c) => c.module)).size).toBe(10);
+    expect(new Set(CASES.map((c) => c.module)).size).toBe(11);
   });
 
   it.each(CASES)('$method $module calls $backendPath', async ({ module, method, params, backendPath, body }) => {
