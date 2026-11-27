@@ -1639,11 +1639,15 @@ function JobWindow({ id }: { id: string }) {
           {!reviewing && availableLangs.length > 0 && (
             <MenuButton
               label="Add a language version"
-              className="aj-pill"
+              className={phone ? 'aj-icon-btn' : 'aj-pill'}
               trigger={
-                <span className="inline-flex items-center gap-1" style={{ fontSize: 12 }}>
-                  <Plus size={12} strokeWidth={2} /> {phone ? 'Lang' : 'Add language'}
-                </span>
+                phone ? (
+                  <Plus size={15} strokeWidth={2} />
+                ) : (
+                  <span className="inline-flex items-center gap-1" style={{ fontSize: 12 }}>
+                    <Plus size={12} strokeWidth={2} /> Add language
+                  </span>
+                )
               }
               actions={availableLangs.map((l) => ({
                 label: `${l.native} (${l.label})`,
