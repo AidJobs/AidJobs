@@ -389,7 +389,14 @@ def test_saved_icrc_listing_goes_straight_to_the_general_reader(monkeypatch):
     _no_network(crawler, monkeypatch)
     before = crawler.extract_jobs_from_html(html, _ICRC_LISTING)
     after, report = asyncio.run(crawler._listing_jobs(html, _ICRC_LISTING))
-    assert report is not None and report["complete"] is False
+    # The page's stated total and its vacancy links agree, so the listing reads complete
+    # (ICRC, 28 November 2026; before, every extracted row was compared and it never could).
+    assert report == {
+        "pages": 1,
+        "expected": 12,
+        "complete": True,
+        "stop": "showing range complete",
+    }
     assert after == before
     first = admit_batch([dict(job) for job in before], "html")
     second = admit_batch([dict(job) for job in after], "html")

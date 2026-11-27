@@ -5,6 +5,7 @@ import asyncio
 import json
 from pathlib import Path
 
+from contracts.admission import page_verdicts
 from contracts.reader import Response
 from crawler_v2.ats_feeds import jobs_from_greenhouse
 from crawler_v2.feed_fields import json_listing_report, stated_total
@@ -43,19 +44,80 @@ def _record(system: str) -> dict:
     return json.loads((_FIXTURES / system / "sample.jobs.json").read_text(encoding="utf-8"))
 
 
-def test_icrc_excerpt_with_noisy_extract_stays_incomplete():
+def _label_page(total: int) -> str:
+    """A listing with 'Showing 1 to N of N Jobs' and N job tiles, as ICRC's page shows."""
+    tiles = "".join(
+        f'<li class="job-tile"><a href="/job/Geneva-Role-{n}/{1000 + n}">Role {n}</a></li>'
+        for n in range(total)
+    )
+    return (
+        f'<p id="tile-search-results-label">Showing 1 to {total} of {total} Jobs</p>'
+        f'<ul id="job-tile-list">{tiles}</ul>'
+    )
+
+
+def _vacancy_rows(total: int) -> list:
+    base = "https://careers.icrc.org/job/Geneva-Role-"
+    return [{"title": f"Role {n}", "apply_url": f"{base}{n}/{1000 + n}"} for n in range(total)]
+
+
+def _navigation_rows(count: int) -> list:
+    return [
+        {"title": f"Category {n}", "apply_url": f"https://careers.icrc.org/go/Category-{n}/{n}"}
+        for n in range(count)
+    ]
+
+
+def test_icrc_excerpt_reads_complete_with_its_twelve_vacancies():
     html = _html("icrc-listing.html")
     assert showing_range(html) == (1, 12, 12)
     assert result_row_count(html) == 12
     jobs = json.loads((_FIXTURES / "general_reader" / "icrc-listing.json").read_text())["jobs"]
-    report = general_html_report(html, jobs)
-    # 32 extracted rows vs 12 tiles/total — must not invent complete (W-39 review).
+    assert len(jobs) == 32
+    # 32 extracted candidates, of which 12 are vacancy links. Only the vacancies are compared
+    # with the stated total (ICRC, 28 November 2026).
+    vacancies = len(page_verdicts(jobs, "html"))
+    assert vacancies == 12
+    assert general_html_report(html, jobs, vacancies=vacancies, page_cap=40) == {
+        "pages": 1,
+        "expected": 12,
+        "complete": True,
+        "stop": "showing range complete",
+    }
+
+
+def test_navigation_rows_do_not_count_against_a_complete_listing():
+    html = _label_page(11)
+    jobs = _vacancy_rows(11) + _navigation_rows(12)
+    vacancies = len(page_verdicts(jobs, "html"))
+    assert vacancies == 11
+    report = general_html_report(html, jobs, vacancies=vacancies, page_cap=40)
+    assert report["complete"] is True
+    assert report["stop"] == "showing range complete"
+
+
+def test_fewer_vacancies_than_the_stated_total_stay_incomplete():
+    html = _label_page(11)
+    jobs = _vacancy_rows(10) + _navigation_rows(12)
+    vacancies = len(page_verdicts(jobs, "html"))
+    report = general_html_report(html, jobs, vacancies=vacancies, page_cap=40)
     assert report["complete"] is False
-    assert report["expected"] == 12
-    assert "read 32 rows" in report["stop"]
+    assert report["expected"] == 11
+    assert "read 10 vacancies" in report["stop"]
 
 
-def test_showing_range_complete_when_candidates_and_tiles_match():
+def test_vacancies_above_the_page_cap_stay_incomplete():
+    html = _label_page(41)
+    jobs = _vacancy_rows(41)
+    vacancies = len(page_verdicts(jobs, "html"))
+    assert vacancies == 41
+    report = general_html_report(html, jobs, vacancies=vacancies, page_cap=40)
+    assert report["complete"] is False
+    assert report["expected"] == 41
+    assert "more than the 40 job pages" in report["stop"]
+
+
+def test_showing_range_complete_when_vacancies_and_tiles_match():
     html = _html("icrc-complete-showing.html")
     assert showing_range(html) == (1, 2, 2)
     assert result_row_count(html) == 2
@@ -65,20 +127,21 @@ def test_showing_range_complete_when_candidates_and_tiles_match():
         {"title": "Role A", "apply_url": "https://careers.icrc.org/job/Geneva-Role-A/1"},
         {"title": "Role B", "apply_url": "https://careers.icrc.org/job/Geneva-Role-B/2"},
     ]
-    assert general_html_report(html, jobs) == {
+    assert general_html_report(html, jobs, vacancies=2, page_cap=40) == {
         "pages": 1,
         "expected": 2,
         "complete": True,
         "stop": "showing range complete",
     }
-    # Tile count alone must not complete when the reader under-reads.
-    assert general_html_report(html, jobs[:1])["complete"] is False
+    # Fewer vacancies than the total: the reader under-reads, so it cannot complete.
+    assert general_html_report(html, jobs[:1], vacancies=1, page_cap=40)["complete"] is False
 
 
 def test_icrc_showing_1_to_12_of_40_is_incomplete():
     html = _html("icrc-partial-showing.html")
     assert showing_range(html) == (1, 12, 40)
-    report = general_html_report(html, [{"title": "A"}, {"title": "B"}])
+    jobs = [{"title": "A"}, {"title": "B"}]
+    report = general_html_report(html, jobs, vacancies=2, page_cap=40)
     assert report["complete"] is False
     assert report["expected"] == 40
     assert "pager not followed" in report["stop"]
@@ -87,7 +150,8 @@ def test_icrc_showing_1_to_12_of_40_is_incomplete():
 def test_oxfam_teaser_with_no_total_is_incomplete():
     html = _html("oxfam-listing.html")
     jobs = json.loads((_FIXTURES / "general_reader" / "oxfam-listing.json").read_text())["jobs"]
-    report = general_html_report(html, jobs)
+    vacancies = len(page_verdicts(jobs, "html"))
+    report = general_html_report(html, jobs, vacancies=vacancies, page_cap=40)
     assert report == {
         "pages": 1,
         "expected": 6,

@@ -28,6 +28,7 @@ from typing import Dict, List, Optional, Tuple
 
 import feedparser
 
+from contracts.admission import page_verdicts
 from contracts.reader import Fetch, ListingResult, Reader, Request, Response
 from crawler_v2.ats_feeds import (
     greenhouse_job_url,
@@ -58,6 +59,7 @@ from crawler_v2.feed_fields import (
     jobs_array,
     json_listing_report,
 )
+from crawler_v2.job_pages import NEW_PAGE_CAP
 from crawler_v2.listing_completeness import (
     closed_catalogue_report,
     general_html_report,
@@ -265,7 +267,12 @@ class GeneralReader(Reader):
             self._crawler._extract_jobs_sync, first.body, source["careers_url"]
         )
         LISTING_STRATEGY.set(strategy)
-        report = general_html_report(first.body, jobs)
+        # Vacancies are the rows admission reads as job links (admitted, or thin and opened on
+        # their job page); navigation and category links are not counted (ICRC, 28 Nov 2026).
+        vacancies = len(page_verdicts(jobs, "html"))
+        report = general_html_report(
+            first.body, jobs, vacancies=vacancies, page_cap=NEW_PAGE_CAP
+        )
         return ListingResult.from_report(self.name, jobs, report, strategy=strategy)
 
 
