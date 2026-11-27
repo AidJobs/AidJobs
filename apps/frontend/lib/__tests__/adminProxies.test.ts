@@ -55,6 +55,7 @@ const CASES: Case[] = [
   { module: 'crawl/run_due', method: 'POST', backendPath: '/api/admin/crawl/run_due' },
   { module: 'crawl/status', method: 'GET', backendPath: '/api/admin/crawl/status' },
   { module: 'crawl/logs', method: 'GET', query: `?source_id=src-7&limit=10&${NOTE}`, backendPath: `/api/admin/crawl/logs?source_id=src-7&limit=10&${NOTE}` },
+  { module: 'crawl/review/[logId]', method: 'GET', params: { logId: 'log-1' }, backendPath: '/api/admin/crawl/review/log-1' },
   { module: 'crawl/cleanup_expired', method: 'POST', backendPath: '/api/admin/crawl/cleanup_expired' },
   { module: 'crawl/delete-jobs-by-org', method: 'POST', query: `?org_name=Org%20${PLANTED}`, backendPath: `/api/admin/crawl/delete-jobs-by-org?org_name=Org%20${PLANTED}` },
   { module: 'crawl/run-migration', method: 'POST', backendPath: '/api/admin/crawl/run-migration' },
@@ -152,8 +153,8 @@ describe('the table', () => {
       }
     }
     expect(found.sort()).toEqual(CASES.map((c) => `${c.method} ${c.module}`).sort());
-    expect(new Set(found.map((f) => f.split(' ')[1])).size).toBe(39);
-    expect(found).toHaveLength(43);
+    expect(new Set(found.map((f) => f.split(' ')[1])).size).toBe(40);
+    expect(found).toHaveLength(44);
   });
 });
 

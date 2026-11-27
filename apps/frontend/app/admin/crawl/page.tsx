@@ -4,7 +4,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { adminDateTime, relativeTime } from '@/lib/dates';
-import { RefreshCw, Play, Activity, Clock, CheckCircle, XCircle, AlertCircle, TrendingUp, Zap } from 'lucide-react';
+import { RefreshCw, Play, Activity, Clock, CheckCircle, XCircle, AlertCircle, TrendingUp, Zap, FileSearch } from 'lucide-react';
+import CrawlReviewModal from '@/components/admin/CrawlReviewModal';
+import {
+  completenessBadge,
+  foundVsExpectedLabel,
+  type CrawlLogLifecycle,
+} from '@/lib/admin/crawlReview';
 
 type CrawlStatus = {
   running: boolean;
@@ -17,21 +23,7 @@ type CrawlStatus = {
   in_flight: number;
 };
 
-type CrawlLog = {
-  id: string;
-  source_id: string;
-  org_name: string;
-  careers_url: string;
-  found: number;
-  inserted: number;
-  updated: number;
-  skipped: number;
-  duration_ms: number | null;
-  status: string;
-  message: string | null;
-  ran_at: string;
-  actual_job_count?: number; // Real count from jobs table
-};
+type CrawlLog = CrawlLogLifecycle;
 
 export default function AdminCrawlPage() {
   const router = useRouter();
@@ -40,6 +32,7 @@ export default function AdminCrawlPage() {
   const [loading, setLoading] = useState(true);
   const [logsLoading, setLogsLoading] = useState(false);
   const [runningDue, setRunningDue] = useState(false);
+  const [reviewLogId, setReviewLogId] = useState<string | null>(null);
 
   const fetchCrawlStatus = useCallback(async () => {
     try {
@@ -326,7 +319,7 @@ export default function AdminCrawlPage() {
                         </span>
                       </div>
                       
-                      <div className="flex items-center gap-4 mt-2">
+                      <div className="flex flex-wrap items-center gap-4 mt-2">
                         {log.actual_job_count !== undefined && (
                           <div className="flex items-center gap-1.5">
                             <span className="text-caption-sm text-[#86868B]">Jobs (not deleted):</span>
@@ -335,8 +328,24 @@ export default function AdminCrawlPage() {
                         )}
                         <div className="flex items-center gap-1.5">
                           <span className="text-caption-sm text-[#86868B]">Found:</span>
-                          <span className="text-body-sm font-semibold text-[#1D1D1F]">{log.found}</span>
+                          <span className="text-body-sm font-semibold text-[#1D1D1F]">
+                            {foundVsExpectedLabel(log.found, log.listing_expected)}
+                          </span>
                         </div>
+                        {(() => {
+                          const badge = completenessBadge(log.listing_complete);
+                          const cls =
+                            badge.tone === 'ok'
+                              ? 'bg-green-50 text-green-700 border-green-200'
+                              : badge.tone === 'warn'
+                                ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                : 'bg-white text-[#86868B] border-[#D2D2D7]';
+                          return (
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded border ${cls}`}>
+                              {badge.text}
+                            </span>
+                          );
+                        })()}
                         {log.inserted > 0 && (
                           <div className="flex items-center gap-1.5">
                             <span className="text-caption-sm text-[#86868B]">+</span>
@@ -349,12 +358,33 @@ export default function AdminCrawlPage() {
                             <span className="text-body-sm font-semibold text-[#0071E3]">{log.updated}</span>
                           </div>
                         )}
-                        {log.duration_ms !== null && log.duration_ms !== undefined && (
-                          <div className="flex items-center gap-1.5 ml-auto">
-                            <Clock className="w-3 h-3 text-[#86868B]" />
-                            <span className="text-caption-sm text-[#86868B]">{formatDuration(log.duration_ms)}</span>
+                        {log.expired !== null && log.expired !== undefined && log.expired > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-caption-sm text-[#86868B]">Expired:</span>
+                            <span className="text-body-sm font-semibold text-[#86868B]">{log.expired}</span>
                           </div>
                         )}
+                        {log.counted !== null && log.counted !== undefined && (
+                          <span className="text-caption-sm text-[#86868B]">
+                            {log.counted ? 'Counted' : 'Not counted'}
+                          </span>
+                        )}
+                        <div className="flex items-center gap-3 ml-auto">
+                          {log.duration_ms !== null && log.duration_ms !== undefined && (
+                            <div className="flex items-center gap-1.5">
+                              <Clock className="w-3 h-3 text-[#86868B]" />
+                              <span className="text-caption-sm text-[#86868B]">{formatDuration(log.duration_ms)}</span>
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setReviewLogId(log.id)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border border-[#D2D2D7] bg-white text-[#1D1D1F] hover:bg-[#F5F5F7] transition-colors"
+                          >
+                            <FileSearch className="w-3.5 h-3.5 text-[#0071E3]" />
+                            Review
+                          </button>
+                        </div>
                       </div>
 
                       {log.message && (
@@ -370,6 +400,8 @@ export default function AdminCrawlPage() {
           )}
         </div>
       </div>
+
+      <CrawlReviewModal logId={reviewLogId} onClose={() => setReviewLogId(null)} />
     </div>
   );
 }
