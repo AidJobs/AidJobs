@@ -1739,25 +1739,158 @@ button.ej-step:hover {
   background: transparent;
 }
 
-/* One header row: back, title/status, Preview / Earlier versions. Progress stays in the job panel (phase 3 / U-1). */
+/* Unified 48px workspace header: Back + Title + status · Draft/Check/Review/Publish · Preview + More. */
 .ej-w-head {
   display: flex;
   flex-shrink: 0;
   align-items: center;
   gap: 10px;
-  padding: 6px 14px 2px;
+  min-height: 48px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--hair);
+  background: var(--surface);
 }
 
 .ej-w-titlebox {
   display: flex;
   min-width: 0;
-  max-width: 34%;
-  flex-shrink: 1;
-  align-items: baseline;
+  flex: 1 1 0;
+  align-items: center;
   gap: 8px;
 }
 
-@media (max-width: 1023px) {
+.ej-stages {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--hair);
+}
+
+.ej-stage-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 11px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 550;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.ej-stage-btn:hover {
+  color: var(--text);
+}
+
+.ej-stage-btn[aria-current='step'] {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 650;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.ej-stage-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+.ej-stage-count[data-tone='amber'] {
+  color: var(--amber);
+}
+
+.ej-doc-bar {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 4px 14px;
+  border-bottom: 1px solid var(--hair);
+  background: var(--surface);
+}
+
+.ej-fact-strip {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  min-height: 36px;
+  padding: 3px 14px;
+  border-bottom: 1px solid var(--hair);
+  background: color-mix(in srgb, var(--surface-2) 55%, var(--surface));
+}
+
+.ej-preview-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid var(--hair-strong, var(--hair));
+  background: var(--surface);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ej-preview-toggle[aria-pressed='true'] {
+  background: var(--sage-2);
+  border-color: var(--sage-5);
+  color: var(--sage-8);
+}
+
+.ej-preview-label {
+  display: inline;
+}
+
+@media (max-width: 1199px) {
+  .ej-preview-label {
+    display: none;
+  }
+  .ej-preview-toggle {
+    padding: 0 9px;
+  }
+}
+
+.ej-phone-chat-bar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--hair);
+  background: var(--surface);
+}
+
+.ej-phone-sheet {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--hair-strong, var(--hair));
+  border-radius: 18px 18px 0 0;
+  background: var(--surface);
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.16);
+}
+
+@media (max-width: 767px) {
   .ej-w-titlebox {
     max-width: none;
     flex: 1;
@@ -2856,8 +2989,8 @@ button.ej-step:hover {
   }
 }
 
-/* R2-P1-10: phone/tablet writing chrome — 44px targets, full-opacity tools, parts row does not cover Eye. */
-@media (max-width: 1023px) {
+/* Phone writing chrome (<=767px): 44px touch targets; tablets 768-1023px stay compact. */
+@media (max-width: 767px) {
   .aj-root:has(.ej-app) {
     --ej-touch: 44px;
   }
@@ -2935,7 +3068,7 @@ button.ej-step:hover {
   }
 }
 
-/* Full opacity on narrow screens (phones and narrow tablets); desktop hover fade stays ≥1024. */
+/* Full opacity on phones and narrow tablets; desktop hover fade stays >=1024. */
 @media (max-width: 1023px) {
   .aj-root:has(.ej-app) .ej-sec-tools {
     opacity: 1;

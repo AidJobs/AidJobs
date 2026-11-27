@@ -309,6 +309,16 @@ function MoreDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
             <option value="high">High: frequent or intensive contact</option>
           </select>
         </Field>
+        {f.engagement === 'internship' && (
+          <Field label="Internship pay or stipend">
+            <select style={inputStyle} value={f.paidStipend ?? ''} onChange={(e) => setFacts(job.id, { paidStipend: e.target.value as Facts['paidStipend'] })}>
+              <option value="">Not stated yet</option>
+              <option value="paid">Paid</option>
+              <option value="stipend">Monthly stipend</option>
+              <option value="unpaid">Unpaid</option>
+            </select>
+          </Field>
+        )}
         <Field label="Direct reports">
           <input style={inputStyle} value={f.directReports} onChange={(e) => setFacts(job.id, { directReports: e.target.value })} placeholder="e.g. 4" />
         </Field>
@@ -379,26 +389,39 @@ export default function FactBar({ job, s, actions = [] }: { job: DemoJob; s: Sta
   const type = typeLabel(f);
   const salary = salaryText(f) || 'Not shown';
   const ro = Boolean(s.reviewerAs);
-  const pills: Array<{ key: PillKey; icon: ReactNode; label: string; value: string; missing?: boolean; extra?: ReactNode }> = [
+  const showGrade = Boolean(f.grade || s.org.scale.length > 0 || s.org.orgType === 'un');
+  const eligLabel = f.eligibility === 'nationals' ? 'Nationals only' : f.eligibility === 'internal' ? 'Internal' : f.eligibility === 'righttowork' ? 'Right to work' : '';
+  const stipendLabel = f.paidStipend === 'paid' ? 'Paid' : f.paidStipend === 'stipend' ? 'Stipend' : f.paidStipend === 'unpaid' ? 'Unpaid' : '';
+  const rawPills: Array<{ key: PillKey; icon: ReactNode; label: string; value: string; missing?: boolean; extra?: ReactNode }> = [
     { key: 'place', icon: <MapPin size={13} strokeWidth={1.8} />, label: 'Place', value: f.location ? `${f.location.split(',')[0]} · ${arrangementLabel(f.arrangement)}` : f.arrangement === 'remote' ? 'Remote' : '', missing: !f.location && f.arrangement !== 'remote' },
-    { key: 'type', icon: <Briefcase size={13} strokeWidth={1.8} />, label: 'Job type', value: type },
-    { key: 'grade', icon: <Layers size={13} strokeWidth={1.8} />, label: 'Grade', value: f.grade },
     { key: 'closes', icon: <CalendarClock size={13} strokeWidth={1.8} />, label: 'Closing date', value: f.rolling ? 'Open until filled' : f.deadline ? `Closes ${shortDate(f.deadline)}` : '', missing: !f.deadline && !f.rolling },
-    {
-      key: 'salary',
-      icon: <Banknote size={13} strokeWidth={1.8} />,
-      label: 'Salary',
-      value: salary,
-      extra: (
-        <Tip label={`${SALARY_FACTS[0].text} (${SALARY_FACTS[0].source})`}>
-          <span className="ml-0.5 inline-flex items-center aj-faint" tabIndex={0} aria-label={SALARY_FACTS[0].text}>
-            <Info size={12} strokeWidth={2} />
-          </span>
-        </Tip>
-      ),
-    },
-    { key: 'more', icon: <MoreHorizontal size={13} strokeWidth={1.8} />, label: 'More details', value: 'More details' },
+    { key: 'type', icon: <Briefcase size={13} strokeWidth={1.8} />, label: 'Job type', value: type, missing: !f.contract && f.engagement === 'job' },
+    ...(showGrade ? [{ key: 'grade' as PillKey, icon: <Layers size={13} strokeWidth={1.8} />, label: 'Grade', value: f.grade }] : []),
+    ...(f.engagement === 'internship'
+      ? [{ key: 'more' as PillKey, icon: <Banknote size={13} strokeWidth={1.8} />, label: 'Pay / stipend', value: stipendLabel, missing: !f.paidStipend }]
+      : [
+          {
+            key: 'salary' as PillKey,
+            icon: <Banknote size={13} strokeWidth={1.8} />,
+            label: f.engagement === 'consultancy' ? 'Rate' : 'Salary',
+            value: salary,
+            extra: (
+              <Tip label={`${SALARY_FACTS[0].text} (${SALARY_FACTS[0].source})`}>
+                <span className="ml-0.5 inline-flex items-center aj-faint" tabIndex={0} aria-label={SALARY_FACTS[0].text}>
+                  <Info size={12} strokeWidth={2} />
+                </span>
+              </Tip>
+            ),
+          },
+        ]),
+    ...(eligLabel ? [{ key: 'more' as PillKey, icon: <Info size={13} strokeWidth={1.8} />, label: 'Eligibility', value: eligLabel }] : []),
+    ...(f.languages.length > 1 || (f.languages[0] && f.languages[0] !== 'English')
+      ? [{ key: 'more' as PillKey, icon: <Info size={13} strokeWidth={1.8} />, label: 'Languages', value: f.languages.join(', ') }]
+      : []),
+    { key: 'more', icon: <MoreHorizontal size={13} strokeWidth={1.8} />, label: 'More details', value: 'More' },
   ];
+  // Always keep missing required facts first so they are never hidden behind "+N".
+  const pills = [...rawPills.filter((p) => p.missing), ...rawPills.filter((p) => !p.missing)];
   const hidden = pills.slice(fit);
   return (
     <>

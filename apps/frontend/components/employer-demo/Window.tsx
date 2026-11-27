@@ -1,10 +1,9 @@
 'use client';
 
-import { ArrowLeft, ChevronDown, Eye, FileText, History, Link2, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ChevronDown, Eye, FileText, History, LayoutList, Link2, Menu, MessageSquare, MoreHorizontal, Plus, X } from 'lucide-react';
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
-import { useIsPhone } from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
-import { applyFormat, applyOrgSdgs, applyOutline, applyTemplate, bringDocument, canDelete, chatNote, closeJob, createFormat, downloadBlock, downloadCopy, formatOf, goOn, greetState, headingOf, hireAgain, isReviewable, LINK_REPLY, carried, carryByRules, markFlyerMade, parkingReply, remindReviewers, removeTranslation, setLinked, sendChat, setChoice, setJobLang, setPart, setSdgs, settleAsk, unparkPart, windowSays, writeNow } from './actions';
+import { addTranslation, applyFormat, applyOrgSdgs, applyOutline, applyTemplate, bringDocument, canDelete, chatNote, closeJob, createFormat, downloadBlock, downloadCopy, formatOf, goOn, greetState, headingOf, hireAgain, isReviewable, LINK_REPLY, carried, carryByRules, markFlyerMade, parkingReply, remindReviewers, removeTranslation, saveJobProfile, setLinked, sendChat, setChoice, setJobLang, setPart, setSdgs, settleAsk, unparkPart, windowSays, writeNow } from './actions';
 import { FlyerPanel } from './Flyer';
 import { isPublished, STATE_LABEL, stateActionsOf, type StateAction } from './lifecycle';
 import { JobDialog, type Kind } from './Jobs';
@@ -27,9 +26,9 @@ import { STATE_DIALOGS, type OpenTarget } from './aiActions';
 import { changesSince, changeSummary } from './changes';
 import { openPoints } from './Checks';
 import Composer, { type ComposerHandle } from './Composer';
-import { ApplyFields, AskAnswer, DocumentView, rich, TitleEditor } from './DocPane';
+import { ApplyDialog, ApplyFields, AskAnswer, DocumentView, rich, TitleEditor } from './DocPane';
 import { arrangementLabel, completeText, headingFor, longDate, PLACES, salaryText } from './engine';
-import { FactDialog, typeLabel, type FactKey } from './FactBar';
+import FactBar, { FactDialog, typeLabel, type FactKey } from './FactBar';
 import { statusLine } from './Home';
 import { DeleteDialog } from './JobActions';
 import { LangDoc } from './LangDoc';
@@ -38,12 +37,13 @@ import { currentPart, hasFields, lineFit, onLine, partsOf, sectionOf, type Part 
 import { GooglePreview, JobPageLangs, ShareCards } from './Publish';
 import { VersionsDialog } from './Review';
 import { inferSdgs, proposedStyle, SDG_NAMES, sdgsOf, toneOf, wordsFor } from './setup';
+import { CheckStagePanel, PublishStagePanel, ReviewStagePanel, stageFromPart, stageSummary, type PublishSubTab, type ShareKind, type WorkspaceStage } from './StagePanels';
 import { getState, go, goBack, notify, READING_KEY, useDemo } from './store';
 import { Commitments } from './Structure';
 import { HeadingsPreview, JobOutline, PhoneTemplate, pickGrouping, previewOrder, startPick, TemplatePanel, type Pick } from './TemplatePanel';
-import { ALL_LANGS, jobLang, langOf, versionsOf } from './translate';
+import { ALL_LANGS, jobLang, langOf, versionChoices, versionsOf } from './translate';
 import type { DemoJob, JobLang, State } from './types';
-import { Dialog, radioKeys, scrollInside } from './ui';
+import { Dialog, radioKeys, scrollInside, useDemoPhone } from './ui';
 
 /** Requests the window answers itself; everything else goes to the writer. */
 const PREVIEW = /^(please\s+)?((show|open|see)( me)?( the)?( job page)? preview|preview( it)?|how (will|does) it look)\b/;
@@ -872,14 +872,20 @@ export default function Window({ id }: { id?: string }) {
 
 function JobWindow({ id }: { id: string }) {
   const s = useDemo();
-  const phone = useIsPhone();
+  const phone = useDemoPhone();
   const job = s.jobs.find((j) => j.id === id) as DemoJob;
   const [reading, setReading] = useState(() => readingNow(id));
-  const [view, setView] = useState<'chat' | 'job'>('chat');
+  const [stage, setStage] = useState<WorkspaceStage>(() => (s.reviewerAs ? 'review' : isPublished(job) ? 'publish' : stageFromPart(job.part ?? '')));
+  const [publishSub, setPublishSub] = useState<PublishSubTab>('publish');
+  const [shareKind, setShareKind] = useState<ShareKind>('flyer');
+  const [phonePane, setPhonePane] = useState<'doc' | 'tools'>('doc');
+  const [chatSheet, setChatSheet] = useState<'closed' | 'half' | 'full'>('closed');
+  const [view, setView] = useState<'chat' | 'job'>('job');
   const [tab, setTab] = useState('doc');
   const [preview, setPreview] = useState(false);
   const [extra, setExtra] = useState<string[]>([]);
   const [skipOpen, setSkipOpen] = useState(false);
+  const [applyOpen, setApplyOpen] = useState(false);
   const [hidden, setHidden] = useState<string | null>(null);
   const [fact, setFact] = useState<RowKey | null>(null);
   const [versionsOpen, setVersionsOpen] = useState(false);
@@ -990,9 +996,7 @@ function JobWindow({ id }: { id: string }) {
     };
     const openApply = () => {
       if (!job || s.reviewerAs) return;
-      setHidden(null);
-      setPart(job.id, 's:apply');
-      scrollToId('ej-part-card');
+      setApplyOpen(true);
     };
     window.addEventListener('ej-open-fact', openFact);
     window.addEventListener('ej-open-apply', openApply);
@@ -1180,24 +1184,35 @@ function JobWindow({ id }: { id: string }) {
     settleAsk(job.id);
     setPartsOpen(false);
     if (!reviewing) unparkPart(job.id, key);
-    // Reviewers see the outline read only, in the same design (section 19, phase 6, B).
     if (key === 'outline' && reviewing) return phone ? setOutlineOpen(true) : openPick('sections');
     if (key === 'outline') {
       if (phone && !job.setup) return setOutlineOpen(true);
       return openPick(job.setup ? 'templates' : 'sections');
     }
+    if (key === 's:apply' && !reviewing) {
+      setApplyOpen(true);
+      return;
+    }
     if (inVersion && sectionOf(key)) {
-      if (phone) setView('job');
+      if (phone) setPhonePane('doc');
       return scrollToId(`ej-ver-${sectionOf(key)}`);
+    }
+    const nextStage = stageFromPart(key);
+    setStage(nextStage);
+    if (key === 'flyer' || key === 'reach') {
+      setPublishSub('share');
+      setShareKind(key);
+      if (key === 'flyer' && reachOpen(job, s)) markFlyerMade(job.id);
+    } else if (nextStage === 'publish') {
+      setPublishSub('publish');
     }
     setPart(job.id, key);
     setPreview(false);
     setTab('doc');
     setHidden(null);
-    if (phone) setView('job');
+    if (phone) setPhonePane(nextStage === 'draft' ? 'doc' : 'tools');
     const sec = sectionOf(key);
-    // About us and Project live in the JD: the progress line scrolls to that section. Apply still opens its fields card.
-    scrollToId(sec && key !== 's:apply' ? `ej-sec-${sec}` : 'ej-part-card');
+    if (sec) scrollToId(`ej-sec-${sec}`);
   };
   const applyPick = () => {
     if (!pick) return;
@@ -1208,7 +1223,6 @@ function JobWindow({ id }: { id: string }) {
       if (wasSetup) applyTemplate(job.id, key, undefined, keys, pickGrouping(pick));
       else applyFormat(job.id, key);
     } else {
-      // The template as adjusted in the panel: its sections, their groups and order, and any heading renamed for this job.
       if (wasSetup) applyTemplate(job.id, pick.key, undefined, keys, pickGrouping(pick));
       else if (pick.key !== job.format) applyFormat(job.id, pick.key);
       applyOutline(job.id, pick.order, pick.groupOrder, pick.customGroups);
@@ -1217,18 +1231,43 @@ function JobWindow({ id }: { id: string }) {
     if (phone) setView(wasSetup ? 'chat' : 'job');
   };
   const openPreview = () => {
-    setPreview(true);
-    setTab('preview');
-    if (phone) setView('job');
+    setPreview((p) => !p);
+    if (phone) setPhonePane('doc');
   };
-  /** A panel tab opened only when needed (section 19): a language version, the flyer, the Reach emails, the review email, payment. */
+  /** Routes legacy tab requests cleanly into the unified 4-stage workspace. */
   const openTab = (k: string) => {
-    if (k === 'flyer' && reachOpen(job, s)) markFlyerMade(job.id);
-    if (!k.startsWith('lang:') && !extra.includes(k)) setExtra((x) => (x.includes(k) ? x : [...x, k]));
+    if (k === 'flyer' || k === 'reach') {
+      if (k === 'flyer' && reachOpen(job, s)) markFlyerMade(job.id);
+      setStage('publish');
+      setPublishSub('share');
+      setShareKind(k);
+      setPreview(false);
+      if (phone) setPhonePane(k === 'flyer' ? 'doc' : 'tools');
+      return;
+    }
+    if (k === 'reviewmail') {
+      setStage('review');
+      setPreview(false);
+      if (phone) setPhonePane('tools');
+      return;
+    }
+    if (k === 'payment') {
+      setStage('publish');
+      setPublishSub('publish');
+      setPreview(false);
+      if (phone) setPhonePane('tools');
+      return;
+    }
+    if (k.startsWith('lang:')) {
+      setPreview(false);
+      setTab(k);
+      if (stage === 'publish') setStage('draft');
+      if (phone) setPhonePane('doc');
+      return;
+    }
+    if (!extra.includes(k)) setExtra((x) => (x.includes(k) ? x : [...x, k]));
     setPreview(false);
     setTab(k);
-    if (phone) setView('job');
-    requestAnimationFrame(() => document.getElementById(`ej-wtab-${k}`)?.focus({ preventScroll: true }));
   };
   const closeTab = (k: string) => {
     setExtra((x) => x.filter((y) => y !== k));
@@ -1414,11 +1453,39 @@ function JobWindow({ id }: { id: string }) {
     );
   })();
 
+  const sum = stageSummary(job, s);
+  const switchStage = (next: WorkspaceStage) => {
+    setStage(next);
+    setPreview(false);
+    if (next === 'publish' && publishSub === 'share' && shareKind === 'flyer' && reachOpen(job, s)) {
+      markFlyerMade(job.id);
+    }
+    if (phone) setPhonePane(next === 'draft' ? 'doc' : 'tools');
+  };
+  const askFromStage = (prompt: string) => {
+    setStage('draft');
+    setPreview(false);
+    if (phone) setChatSheet('half');
+    send(prompt);
+  };
+  const focusTitle = () => {
+    setStage('draft');
+    setPreview(false);
+    setTab('doc');
+    if (phone) setPhonePane('doc');
+    requestAnimationFrame(() => document.getElementById('ej-title-edit')?.focus());
+  };
+  const scrollToSection = (secKey: string) => {
+    setPreview(false);
+    if (stage === 'publish') setStage('draft');
+    if (phone) setPhonePane('doc');
+    requestAnimationFrame(() => scrollToId(inVersion ? `ej-ver-${secKey}` : `ej-sec-${secKey}`));
+  };
+
   const doc = previewing ? (
     headings
   ) : (
     <div className="flex flex-col gap-3">
-      {card && <PartFields part={current} job={job} s={s} onClose={() => setHidden(current)} onFact={(k) => setFact(k)} open={opener} act={act} />}
       {job.status === 'live' && changesSince(job).length > 0 && (
         <div className="aj-card px-3 py-2" role="status" aria-label="Changed since publishing">
           <strong>Changed since publishing:</strong> <span className="aj-muted">{changeSummary(changesSince(job))}</span>
@@ -1431,7 +1498,7 @@ function JobWindow({ id }: { id: string }) {
           current={focus}
           noteEdits
           draft
-          onSeeChat={phone ? () => setView('chat') : undefined}
+          onSeeChat={phone ? () => setChatSheet('half') : undefined}
           open={(t) => goPart(t.startsWith('section:') ? `s:${t.slice(8)}` : t)}
         />
       ) : (
@@ -1445,66 +1512,272 @@ function JobWindow({ id }: { id: string }) {
       )}
     </div>
   );
+
   const lang = active.startsWith('lang:') ? (active.slice(5) as JobLang) : null;
+  const availableLangs = versionChoices(job).filter((l) => !job.translations?.[l.key]);
+
+  // Persistent right-pane hierarchy bar: EN + language tabs + Add language + Link languages + Format & outline + slim TOC.
+  const docToolbar = !preview && stage !== 'publish' && (
+    <>
+      <div className="ej-doc-bar">
+        <div className="aj-no-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto" role="tablist" aria-label="Language versions">
+          <button
+            type="button"
+            role="tab"
+            id="ej-wtab-doc"
+            aria-selected={!lang}
+            className="aj-pill shrink-0"
+            data-active={!lang}
+            style={{ height: 28, fontSize: 12, padding: '0 10px' }}
+            onClick={() => setTab('doc')}
+            lang={ownLang.key}
+          >
+            {ownLang.key.toUpperCase()}
+            {langs.length > 0 ? ` · ${ownLang.label}` : ''}
+          </button>
+          {langs.map((l) => {
+            const k = `lang:${l.key}`;
+            const on = active === k;
+            const tr = job.translations?.[l.key];
+            return (
+              <span key={k} className="inline-flex shrink-0 items-center gap-0.5">
+                <button
+                  type="button"
+                  role="tab"
+                  id={`ej-wtab-${k}`}
+                  aria-selected={on}
+                  className="aj-pill"
+                  data-active={on}
+                  style={{ height: 28, fontSize: 12, padding: '0 10px' }}
+                  onClick={() => setTab(k)}
+                  lang={l.key}
+                >
+                  {l.native}
+                  {tr?.reviewed ? '' : ' · draft'}
+                </button>
+                {!reviewing && (
+                  <Tip label={`Remove ${l.label} version`} side="bottom">
+                    <button
+                      type="button"
+                      className="aj-icon-btn"
+                      style={{ width: 22, height: 22 }}
+                      aria-label={`Remove ${l.label} version`}
+                      onClick={() => removeLangTab({ key: k, label: l.native, lang: l.key, removable: true })}
+                    >
+                      <X size={11} strokeWidth={2} />
+                    </button>
+                  </Tip>
+                )}
+              </span>
+            );
+          })}
+          {!reviewing && availableLangs.length > 0 && (
+            <MenuButton
+              label="Add a language version"
+              trigger={
+                <span className="aj-text-btn inline-flex items-center gap-1" style={{ height: 28, fontSize: 12, padding: '0 8px' }}>
+                  <Plus size={12} strokeWidth={2} /> Add language
+                </span>
+              }
+              actions={availableLangs.map((l) => ({
+                label: `${l.native} (${l.label})`,
+                run: () => {
+                  addTranslation(job.id, l.key);
+                  setTab(`lang:${l.key}`);
+                },
+              }))}
+            />
+          )}
+          {langs.length > 0 && !reviewing && <LinkLangs job={job} disabled={false} />}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1.5">
+          {job.sections.length >= 4 && !previewing && (
+            <select
+              className="ej-select"
+              style={{ height: 28, maxWidth: 148, fontSize: 12, padding: '0 24px 0 8px' }}
+              value=""
+              aria-label="Jump to section"
+              onChange={(e) => {
+                if (e.target.value) scrollToSection(e.target.value);
+              }}
+            >
+              <option value="">Jump to…</option>
+              {(lang && job.translations?.[lang] ? job.translations[lang]!.sections : job.sections).map((sec) => (
+                <option key={sec.key} value={sec.key}>
+                  {sec.title}
+                </option>
+              ))}
+            </select>
+          )}
+          {!reviewing && (
+            <Tip label="Format & outline: switch template or reorder sections (keeps your edited text and locked clauses)" side="bottom">
+              <button
+                type="button"
+                className="aj-pill"
+                style={{ height: 28, fontSize: 12, padding: '0 10px' }}
+                onClick={() => (phone ? setOutlineOpen(true) : openPick('sections'))}
+              >
+                <LayoutList size={12} strokeWidth={1.8} /> Format &amp; outline
+              </button>
+            </Tip>
+          )}
+        </div>
+      </div>
+      {!job.setup && (
+        <div className="ej-fact-strip">
+          <FactBar job={job} s={s} />
+        </div>
+      )}
+    </>
+  );
+
   const panel = (
-    <div id="ej-w-panel" className="aj-scroll min-h-0 flex-1 px-3 py-3 lg:px-5" role={tabs.length > 1 ? 'tabpanel' : 'region'} aria-labelledby={tabs.length > 1 ? `ej-wtab-${active}` : undefined} aria-label={tabs.length > 1 ? undefined : 'Job description'} tabIndex={-1}>
-      {active === 'preview' ? (
-        <PreviewPanel
-          job={job}
-          s={s}
-          onClose={() => {
-            setPreview(false);
-            setTab('doc');
-          }}
-        />
+    <div id="ej-w-panel" className="aj-scroll min-h-0 flex-1 px-3 py-3 lg:px-5" role="region" aria-label={preview ? 'Preview' : stage === 'publish' ? 'Live preview' : 'Job description'} tabIndex={-1}>
+      {preview ? (
+        <PreviewPanel job={job} s={s} onClose={() => setPreview(false)} />
+      ) : stage === 'publish' ? (
+        publishSub === 'share' && shareKind === 'flyer' ? (
+          <FlyerPanel job={job} s={s} url={jobUrl(job)} />
+        ) : (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="ej-panel-label">Live public advert preview</span>
+              <span className="aj-faint" style={{ fontSize: 12 }}>
+                Updates live as you edit details
+              </span>
+            </div>
+            <JobPageLangs job={job} s={s} />
+          </div>
+        )
       ) : lang ? (
         <LangDoc job={job} s={s} lang={lang} readOnly={reviewing} />
-      ) : EXTRA_TABS[active] ? (
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-2">
-            <span className="ej-panel-label min-w-0 flex-1">{EXTRA_TABS[active]}</span>
-            <button type="button" className="aj-text-btn inline-flex items-center gap-1" style={{ height: 28 }} onClick={() => closeTab(active)}>
-              <X size={13} strokeWidth={2} aria-hidden /> Close
-            </button>
-          </div>
-          {active === 'flyer' && <FlyerPanel job={job} s={s} url={jobUrl(job)} />}
-          {active === 'reach' && !reachOpen(job, s) && <p className="aj-muted m-0" role="status">{amplifying(job) ? 'Reach opens once review is done: approved, or no review where your organisation does not ask for one. The invitations you prepared are kept.' : 'Reach comes with Amplify.'}</p>}
-          {active === 'reach' && reachOpen(job, s) && <ReachEditor key={job.id} job={job} s={s} mode={isPublished(job) && job.plan === 'amplify' && job.status === 'live' ? 'send' : 'plan'} sendsOn={job.publishOn ?? null} live={job.status === 'live'} onDone={() => goOn(job.id)} />}
-          {active === 'reviewmail' && (isReviewable(job) ? <ReviewForm job={job} s={s} onSent={() => closeTab('reviewmail')} /> : <p className="aj-muted m-0">Review happens before publishing.</p>)}
-          {active === 'payment' && <PaymentPanel job={job} s={s} open={opener} />}
-        </div>
       ) : (
         doc
       )}
     </div>
   );
-  const tools = !job.setup && (
-    <span className="flex shrink-0 items-center gap-1">
-      {!preview && job.sections.length > 0 && (
-        <Tip label="Preview: the job page, in Google, and when shared" side="bottom">
-          <button type="button" className="aj-icon-btn" onClick={openPreview} aria-label="Preview">
-            <Eye size={14} strokeWidth={1.8} />
-          </button>
-        </Tip>
-      )}
-      {job.versions.length > 0 && (
-        <Tip label="Earlier versions" side="bottom">
-          <button type="button" className="aj-icon-btn" onClick={() => setVersionsOpen(true)} aria-label="Earlier versions">
-            <History size={14} strokeWidth={1.8} />
-          </button>
-        </Tip>
-      )}
-    </span>
+
+  const moreActions = [
+    ...(job.versions.length > 0 ? [{ label: 'Earlier versions', run: () => setVersionsOpen(true) }] : []),
+    {
+      label: 'Download copy',
+      run: () => {
+        const no = downloadBlock(job);
+        if (no) notify(no);
+        else void downloadCopy(job, s.org.name);
+      },
+    },
+    ...(!reviewing && job.facts.title.trim() ? [{ label: 'Save as job profile', run: () => saveJobProfile(job.id) }] : []),
+    ...(!reviewing && isPublished(job)
+      ? stateActionsOf(s, job)
+          .filter((a) => a !== 'download')
+          .map((a, i) => ({ label: STATE_LABEL[a], separator: i === 0, danger: a === 'close' || a === 'withdraw' || a === 'delete', run: () => act(a) }))
+      : []),
+    ...(!reviewing && !isPublished(job) && !canDelete(s, job) ? [{ label: 'Delete draft', separator: true, danger: true, run: () => setDeleteOpen(true) }] : []),
+  ];
+
+  const statusChipLabel =
+    job.status === 'live'
+      ? 'Live'
+      : job.status === 'scheduled'
+        ? 'Scheduled'
+        : job.status === 'closed'
+          ? 'Closed'
+          : sum.reviewApproved
+            ? 'Approved'
+            : job.review.state === 'open'
+              ? 'In review'
+              : 'Draft';
+
+  const statusChipTone =
+    job.status === 'live' || sum.reviewApproved ? 'sage' : job.review.state === 'open' || job.status === 'scheduled' ? 'amber' : undefined;
+
+  const stages: Array<{ key: WorkspaceStage; label: string; count?: string; warn?: boolean }> = [
+    { key: 'draft', label: 'Draft', count: sum.draftMissing ? `${sum.draftMissing} missing` : undefined, warn: sum.draftMissing > 0 },
+    { key: 'check', label: 'Check', count: sum.checkIssues ? String(sum.checkIssues) : undefined, warn: sum.checkIssues > 0 },
+    { key: 'review', label: 'Review', count: sum.openRemarks ? String(sum.openRemarks) : !sum.reviewRequired ? 'optional' : undefined, warn: sum.openRemarks > 0 },
+    { key: 'publish', label: 'Publish' },
+  ];
+
+  const leftPane =
+    stage === 'check' ? (
+      <CheckStagePanel
+        job={job}
+        s={s}
+        onAskAi={askFromStage}
+        onOpenFact={(k) => setFact(k)}
+        onOpenApply={() => setApplyOpen(true)}
+        onScrollSection={scrollToSection}
+        onNext={() => switchStage(sum.reviewRequired ? 'review' : 'publish')}
+      />
+    ) : stage === 'review' ? (
+      <ReviewStagePanel
+        job={job}
+        s={s}
+        on={focus ?? undefined}
+        onSection={scrollToSection}
+        onAskAi={askFromStage}
+        onNext={() => switchStage('publish')}
+      />
+    ) : stage === 'publish' ? (
+      <PublishStagePanel
+        job={job}
+        s={s}
+        open={opener}
+        onOpenFact={(k) => setFact(k)}
+        onOpenApply={() => setApplyOpen(true)}
+        onFocusTitle={focusTitle}
+        sub={publishSub}
+        setSub={setPublishSub}
+        shareKind={shareKind}
+        setShareKind={setShareKind}
+      />
+    ) : (
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="min-h-0 flex-1">
+          {reviewing ? (
+            <ReviewColumn job={job} s={s} on={focus ?? undefined} onSection={scrollToSection} />
+          ) : (
+            <WindowChat job={job} s={s} reading={reading} subject={currentLabel} onSend={send} onSkip={toJob} autoFocus={!phone} open={opener} act={act} />
+          )}
+        </div>
+        {!reviewing && !job.setup && job.sections.length > 0 && (
+          <div className="flex shrink-0 items-center justify-between gap-2 border-t px-3.5 py-2 aj-hair">
+            <span className="aj-faint" style={{ fontSize: 12 }}>
+              {sum.draftMissing ? `${sum.draftMissing} key ${sum.draftMissing === 1 ? 'detail' : 'details'} missing` : 'Draft ready to check'}
+            </span>
+            <button type="button" className="aj-pill" style={{ height: 30, fontSize: 12.5, fontWeight: 600 }} onClick={() => switchStage('check')}>
+              Run Checks <ArrowRight size={13} strokeWidth={2} />
+            </button>
+          </div>
+        )}
+      </div>
+    );
+
+  const previewToggleBtn = !job.setup && job.sections.length > 0 && (
+    <Tip label={preview ? 'Back to editor' : 'Preview: public job page, Google, and share card'} side="bottom">
+      <button type="button" className="ej-preview-toggle" aria-pressed={preview} onClick={() => setPreview((p) => !p)} aria-label="Preview">
+        <Eye size={14} strokeWidth={1.8} />
+        <span className="ej-preview-label">{preview ? 'Editing' : 'Preview'}</span>
+      </button>
+    </Tip>
   );
-  const chat = reviewing ? <ReviewColumn job={job} s={s} on={focus ?? undefined} onSection={(k) => goPart(`s:${k}`)} /> : <WindowChat job={job} s={s} reading={reading} subject={currentLabel} onSend={send} onSkip={toJob} autoFocus={!phone} open={opener} act={act} />;
+
   const titleBox = (
     <span className="ej-w-titlebox">
-      <h1 className="ej-w-title">{job.facts.title || 'Untitled job'}</h1>
-      <Tip label={statusLine(s, job)} side="bottom" className="min-w-0">
-        <span className="ej-w-status" tabIndex={0}>
-          {statusLine(s, job)}
-        </span>
-      </Tip>
+      <button
+        type="button"
+        className="ej-w-title text-left"
+        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'inherit' }}
+        onClick={focusTitle}
+        title="Click to edit title"
+      >
+        {job.facts.title || 'Untitled job'}
+      </button>
+      <span className="aj-chip shrink-0" data-tone={statusChipTone} style={{ height: 22, fontSize: 11 }}>
+        {statusChipLabel}
+      </span>
     </span>
   );
   const back = (
@@ -1519,6 +1792,7 @@ function JobWindow({ id }: { id: string }) {
       <div className="sr-only" aria-live="polite">
         {said}
       </div>
+      {applyOpen && <ApplyDialog job={job} onClose={() => setApplyOpen(false)} />}
       {fact === 'sdgs' && <SdgDialog job={job} onClose={() => setFact(null)} />}
       {fact === 'lang' && <LangDialog job={job} onClose={() => setFact(null)} />}
       {fact && fact !== 'sdgs' && fact !== 'title' && fact !== 'lang' && (
@@ -1549,78 +1823,123 @@ function JobWindow({ id }: { id: string }) {
   );
 
   if (phone) {
-    const question = reading ? 'Reading your role…' : plain([...job.chat].reverse().find((m) => m.from === 'ai')?.text ?? 'Choose a template');
+    const question = reading ? 'Reading your role…' : plain([...job.chat].reverse().find((m) => m.from === 'ai')?.text ?? 'Ask AidJobs to write or edit…');
     const choosing = pick !== null && pick.tab !== 'sections';
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2 aj-hair">
+        {/* Single merged 48px phone header */}
+        <div className="ej-w-head" style={{ gap: 6, padding: '4px 8px' }}>
+          <button
+            type="button"
+            className="aj-icon-btn"
+            aria-label="Open menu"
+            onClick={() => window.dispatchEvent(new CustomEvent('ej-open-drawer'))}
+          >
+            <Menu size={16} strokeWidth={1.8} />
+          </button>
           {back}
-          {titleBox}
-          <div className="ej-switch shrink-0" role="group" aria-label="Show">
-            <button type="button" className="ej-switch-btn" aria-pressed={view === 'chat'} onClick={() => setView('chat')}>
-              {reviewing ? 'Review' : 'Chat'}
-            </button>
-            <button
-              type="button"
-              className="ej-switch-btn"
-              aria-pressed={view === 'job'}
-              onClick={() => {
-                setView('job');
-                setUnseen(false);
-              }}
-            >
-              Job
-              {unseen && view !== 'job' ? (
-                <>
-                  <span className="ej-new-dot" aria-hidden />
-                  <span className="sr-only">, updated</span>
-                </>
-              ) : null}
-            </button>
-          </div>
+          <select
+            className="ej-select min-w-0 flex-1"
+            style={{ height: 34, fontSize: 12.5, fontWeight: 650 }}
+            aria-label="Workspace stage"
+            value={stage}
+            onChange={(e) => switchStage(e.target.value as WorkspaceStage)}
+          >
+            {stages.map((st) => (
+              <option key={st.key} value={st.key}>
+                {st.label}
+                {st.count ? ` · ${st.count}` : ''}
+              </option>
+            ))}
+          </select>
+          {previewToggleBtn}
+          <MenuButton label="More actions" trigger={<MoreHorizontal size={16} strokeWidth={1.8} />} actions={moreActions} />
         </div>
-        {view === 'chat' ? (
-          <div className="min-h-0 flex-1">{chat}</div>
-        ) : choosing && pick ? (
+
+        {choosing && pick ? (
           <PhoneTemplate
             job={job}
             s={s}
             pick={pick}
             setPick={setPick}
             onApply={applyPick}
-            onChat={() => setView('chat')}
-            // R1-20: Cancel on first setup pick too — leave the strip without applying; return to chat while setup is open.
+            onChat={() => setChatSheet('half')}
             onCancel={() => {
               setPick(null);
-              if (job.setup) setView('chat');
             }}
             question={question}
           />
-        ) : (
-          <div className="flex min-h-0 flex-1 flex-col">
-            <div className="flex shrink-0 items-center gap-1.5 border-b px-3 py-1.5 aj-hair">
-              <button type="button" className="ej-parts-btn" aria-haspopup="dialog" aria-label={`${currentLabel}. ${parts.filter((p) => p.done).length} of ${parts.length} done`} onClick={() => setPartsOpen(true)}>
-                <span className="ej-line-label">{currentLabel}</span>
-                <span className="ej-jump-count">
-                  · {parts.filter((p) => p.done).length} of {parts.length} done
-                </span>
-                <ChevronDown size={13} strokeWidth={2} aria-hidden />
-              </button>
-              <span className="ml-auto flex shrink-0 items-center gap-1">{tools}</span>
-            </div>
-            {tabs.length > 1 && (
-              <div className="shrink-0 border-b aj-hair">
-                <PanelTabs tabs={tabs} active={active} onPick={pickPanelTab} onRemove={removeLangTab} end={langs.length && !reviewing ? <LinkLangs job={job} disabled={false} /> : undefined} />
+        ) : stage === 'draft' ? (
+          <>
+            {docToolbar}
+            {panel}
+            {/* Slim bottom bar on Draft -> opens resizable half-sheet Chat */}
+            {!reviewing && (
+              <div className="ej-phone-chat-bar">
+                <button
+                  type="button"
+                  className="aj-pill min-w-0 flex-1 justify-start truncate"
+                  style={{ textAlign: 'left', color: 'var(--text-2)' }}
+                  onClick={() => setChatSheet('half')}
+                >
+                  <MessageSquare size={14} strokeWidth={1.8} className="shrink-0" />
+                  <span className="truncate">{reading ? 'Tailoring draft…' : 'Ask AidJobs to write or edit…'}</span>
+                </button>
+                {job.sections.length > 0 && (
+                  <button type="button" className="aj-ink-btn shrink-0" onClick={() => switchStage('check')}>
+                    Check
+                  </button>
+                )}
               </div>
             )}
-            {panel}
+            {chatSheet !== 'closed' && (
+              <>
+                <div className="fixed inset-0 z-40" style={{ background: 'rgba(0,0,0,0.28)' }} onClick={() => setChatSheet('closed')} aria-hidden />
+                <div
+                  className="ej-phone-sheet"
+                  role="dialog"
+                  aria-label="Chat with AidJobs"
+                  style={{ height: chatSheet === 'full' ? '88dvh' : '54dvh' }}
+                >
+                  <div className="flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2 aj-hair">
+                    <span style={{ fontSize: 13, fontWeight: 700 }}>Chat with AidJobs</span>
+                    <div className="flex items-center gap-1">
+                      <button type="button" className="aj-pill" style={{ height: 28, fontSize: 12 }} onClick={() => setChatSheet(chatSheet === 'full' ? 'half' : 'full')}>
+                        {chatSheet === 'full' ? 'Half' : 'Expand'}
+                      </button>
+                      <button type="button" className="aj-icon-btn" aria-label="Close chat" onClick={() => setChatSheet('closed')}>
+                        <X size={15} strokeWidth={2} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="min-h-0 flex-1">{leftPane}</div>
+                </div>
+              </>
+            )}
+          </>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="flex shrink-0 items-center justify-center border-b px-3 py-1.5 aj-hair">
+              <div className="aj-switch" role="radiogroup" aria-label="Show tools or document" onKeyDown={radioKeys}>
+                <button type="button" role="radio" aria-checked={phonePane === 'tools'} data-active={phonePane === 'tools'} onClick={() => setPhonePane('tools')}>
+                  {stage === 'check' ? 'Checks' : stage === 'review' ? 'Review' : 'Publish'}
+                </button>
+                <button type="button" role="radio" aria-checked={phonePane === 'doc'} data-active={phonePane === 'doc'} onClick={() => setPhonePane('doc')}>
+                  {stage === 'publish' ? 'Preview' : 'Job'}
+                </button>
+              </div>
+            </div>
+            {phonePane === 'tools' ? (
+              <div className="min-h-0 flex-1">{leftPane}</div>
+            ) : (
+              <>
+                {docToolbar}
+                {panel}
+              </>
+            )}
           </div>
         )}
-        {partsOpen && (
-          <Dialog title="Parts of this job" subtitle={`${parts.filter((p) => p.done).length} of ${parts.length} done`} onClose={() => setPartsOpen(false)} half>
-            <PartsList parts={parts} current={current} onGo={goPart} />
-          </Dialog>
-        )}
+
         {outlineOpen && (
           <Dialog title={formatOf(s, job.format).label} subtitle="This job's sections" onClose={() => setOutlineOpen(false)} half>
             <div className="flex flex-col gap-3">
@@ -1645,25 +1964,47 @@ function JobWindow({ id }: { id: string }) {
     );
   }
 
-  const tabRow = tabs.length > 1;
   return (
     <div className="flex h-full min-h-0 flex-col">
+      {/* Unified full-width 48px Header */}
       <div className="ej-w-head">
         {back}
         {titleBox}
-        <span className="min-w-0 flex-1" />
-        {tools}
+        <nav className="ej-stages" aria-label="Job stages">
+          {stages.map((st) => (
+            <button
+              key={st.key}
+              type="button"
+              className="ej-stage-btn"
+              aria-current={stage === st.key ? 'step' : undefined}
+              onClick={() => switchStage(st.key)}
+            >
+              <span>{st.label}</span>
+              {st.count && (
+                <span className="ej-stage-count" data-tone={st.warn ? 'amber' : undefined}>
+                  · {st.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </nav>
+        <span className="flex shrink-0 items-center gap-1.5">
+          {previewToggleBtn}
+          <MenuButton label="More actions" trigger={<MoreHorizontal size={15} strokeWidth={1.8} />} actions={moreActions} />
+        </span>
       </div>
+
+      {/* Consistent Left = tools, Right = live JD / Preview across all 4 stages */}
       <div ref={bodyRef} className="relative flex min-h-0 flex-1" style={{ userSelect: dragging ? 'none' : undefined }}>
-        <section className="ej-w-chat flex min-h-0 flex-col" style={{ width: chatW }} aria-label={reviewing ? 'Review' : 'Chat with AidJobs'}>
-          <div className="aj-card flex min-h-0 flex-1 flex-col overflow-hidden">{chat}</div>
+        <section className="ej-w-chat flex min-h-0 flex-col" style={{ width: chatW }} aria-label={stage === 'draft' ? 'Chat with AidJobs' : stage === 'check' ? 'Checks' : stage === 'review' ? 'Review' : 'Publish'}>
+          <div className="aj-card flex min-h-0 flex-1 flex-col overflow-hidden">{leftPane}</div>
         </section>
         <div
           className="aj-divider"
           data-dragging={dragging}
           role="separator"
           aria-orientation="vertical"
-          aria-label="Resize the chat and the job description"
+          aria-label="Resize the tools and the job description"
           aria-valuenow={Math.round(chatW)}
           aria-valuemin={300}
           aria-valuemax={Math.max(300, body.w - 420)}
@@ -1681,14 +2022,7 @@ function JobWindow({ id }: { id: string }) {
           }}
         />
         <section className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="The job">
-          <div className={tabRow ? 'ej-pline ej-pline--tabs' : 'ej-pline'}>
-            <PanelLine parts={parts} current={current} onGo={goPart} />
-          </div>
-          {tabRow && (
-            <div className="shrink-0 border-b aj-hair">
-              <PanelTabs tabs={tabs} active={active} onPick={pickPanelTab} onRemove={removeLangTab} end={langs.length && !reviewing ? <LinkLangs job={job} disabled={false} /> : undefined} />
-            </div>
-          )}
+          {docToolbar}
           {panel}
         </section>
         {pick && (

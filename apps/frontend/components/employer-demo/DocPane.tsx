@@ -14,14 +14,14 @@ import { jobLang, langOf } from './translate';
 import { placeFor } from './MenuButton';
 import { draftGroupBreaks, groupLabelOf, groupOfKey, groupOrderOf, grouped, KEPT, placeSaid } from './outline';
 import { contractPicks, deadlinePicks, eligibilityPicks, gradePicks, languagePicks, methodPicks, placePatch, placePicks, salaryPicks, safeguardingPicks, type Pick } from './answers';
-import { DOCUMENTS } from './apply';
+import { DOCUMENTS, emailAddress } from './apply';
 import { PROJECT_SECTION, saveAboutForOrg, savePageFieldText } from './context';
 import Composer, { type ComposerHandle } from './Composer';
 import { addDays, commitmentText, COMMITMENTS, completeText, findInclusive, GROUPS, headingFor, inOutlineOrder, longDate, looseLocation, PLACES, quality, recommendSections, SECTIONS, suggestTitle, titleSuggestions, type QualityItem } from './engine';
 import { MAX_TEXT } from './pages';
 import type { ApplySettings, ChatMsg, DemoJob, Facts, GroupKey, JobLang, Section as Sec, State } from './types';
 import { RevealBlock } from './Reveal';
-import { getState } from './store';
+import { getState, update } from './store';
 import { Dialog, Field, inputStyle, scrollInside } from './ui';
 
 /**
@@ -149,9 +149,41 @@ function Lines({ lines, job, section, onFlag }: { lines: string[]; job: DemoJob;
   return <>{blocks}</>;
 }
 
-function ApplyDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
+export function ApplyDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
+  const s = getState();
+  const isOwner = s.me.role === 'owner' && !s.reviewerAs;
+  const [saveDefault, setSaveDefault] = useState(false);
+  const done = () => {
+    if (isOwner && saveDefault) {
+      const latest = getState().jobs.find((x) => x.id === job.id);
+      if (latest) {
+        update((st) => ({ ...st, org: { ...st.org, keptApply: { ...latest.apply } } }));
+      }
+    }
+    onClose();
+  };
   return (
-    <Dialog title="How to apply" subtitle="Writes the section for you" onClose={onClose} wide footer={<div className="flex justify-end"><button type="button" className="aj-ink-btn" onClick={onClose}>Done</button></div>}>
+    <Dialog
+      title="How to apply"
+      subtitle="Writes the section for you"
+      onClose={done}
+      wide
+      footer={
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {isOwner ? (
+            <label className="flex items-center gap-2 aj-muted" style={{ fontSize: 12.5 }}>
+              <input type="checkbox" checked={saveDefault} onChange={(e) => setSaveDefault(e.target.checked)} />
+              <span>Save as default for future jobs</span>
+            </label>
+          ) : (
+            <span />
+          )}
+          <button type="button" className="aj-ink-btn" onClick={done}>
+            Done
+          </button>
+        </div>
+      }
+    >
       <ApplyFields job={job} />
     </Dialog>
   );
@@ -417,13 +449,20 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
             </button>
           </Tip>
         )}
-        {!draft && !reviewing && sec.key === 'apply' && (
-          <Tip label="Set up how to apply">
-            <button type="button" className="aj-icon-btn" onClick={() => setApplyOpen(true)} aria-label="Set up how to apply">
-              <Settings2 size={13} strokeWidth={1.8} />
+        {!reviewing && sec.key === 'apply' && !editing && (() => {
+          const needsContact = job.apply.method === 'email' ? !emailAddress(job.apply, s.org) : !job.apply.address.trim() && !s.org.careersUrl.trim();
+          return needsContact ? (
+            <button type="button" className="aj-pill" style={{ height: 28, background: 'var(--amber-bg)', color: 'var(--amber)', borderColor: 'color-mix(in srgb, var(--amber) 35%, transparent)', fontWeight: 650 }} onClick={() => setApplyOpen(true)}>
+              <Settings2 size={12} strokeWidth={2} /> Add how to apply
             </button>
-          </Tip>
-        )}
+          ) : (
+            <Tip label="Configure how candidates apply">
+              <button type="button" className="aj-pill" style={{ height: 26, fontSize: 11.5 }} onClick={() => setApplyOpen(true)}>
+                <Settings2 size={12} strokeWidth={1.8} /> Configure
+              </button>
+            </Tip>
+          );
+        })()}
         {!reviewing && !editing && (
           <span className={icons ? 'ej-sec-tools' : 'contents'}>
             <Tip label={icons ? editTip : `Edit ${sec.title}`}>
@@ -463,12 +502,6 @@ function SectionView({ job, sec, s, notes, onFlag, onSeeChat, current, noteEdits
       ))}
       {editing ? (
         <div className="flex flex-col gap-2">
-          {draft && sec.key === 'apply' && (
-            <div className="flex flex-col gap-2 rounded-xl border p-3 aj-hair">
-              <span className="ej-panel-label">How people apply</span>
-              <ApplyFields job={job} />
-            </div>
-          )}
           {/* Heading + other-title chips for every section, including Project (R2-P0-4: Save body still never force-renames to About the project). */}
           <label className="flex flex-col gap-1">
             <span className="aj-faint" style={{ fontSize: 11.5 }}>

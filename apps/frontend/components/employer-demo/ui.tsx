@@ -1,10 +1,32 @@
 'use client';
 
 import { Copy, Sparkles, Undo2, X } from 'lucide-react';
-import { createContext, useContext, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useId, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import BottomSheet, { useIsPhone } from '@/components/site/BottomSheet';
+import BottomSheet from '@/components/site/BottomSheet';
 import Tip from '@/components/site/Tip';
+
+function useMediaQuery(query: string): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const mq = window.matchMedia(query);
+      mq.addEventListener('change', onChange);
+      return () => mq.removeEventListener('change', onChange);
+    },
+    () => window.matchMedia(query).matches,
+    () => false,
+  );
+}
+
+/** True on phones (<=767px); tablets 768-1023px keep split/rail layouts without phone 44px touch bloat. */
+export function useDemoPhone(): boolean {
+  return useMediaQuery('(max-width: 767px)');
+}
+
+/** True at 1024-1199px desktop widths where the workspace auto-collapses SideMenu to a 64px icon rail. */
+export function useCompactDesktop(): boolean {
+  return useMediaQuery('(min-width: 1024px) and (max-width: 1199px)');
+}
 import { forgetProfile, restoreDeleted, restoreProfile } from './actions';
 import { jobUrl } from './links';
 import { dismissNotice, notify, undo, useDemo } from './store';
@@ -188,7 +210,7 @@ const openDialogs: object[] = [];
 
 /** A dialog on wide screens and a bottom sheet on phones. */
 export function Dialog({ title, subtitle, onClose, footer, children, wide, half }: { title: string; subtitle?: ReactNode; onClose: () => void; footer?: ReactNode; children: ReactNode; wide?: boolean; half?: boolean }) {
-  const phone = useIsPhone();
+  const phone = useDemoPhone();
   const card = useRef<HTMLDivElement>(null);
   const [self] = useState(() => ({}));
   useEffect(() => {

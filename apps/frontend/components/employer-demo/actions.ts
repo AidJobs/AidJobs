@@ -3760,6 +3760,22 @@ export function publish(id: string, o: PublishOptions): boolean {
   return true;
 }
 
+/** Save the current job as a reusable job profile on demand (e.g. from the ⋯ More menu). */
+export function saveJobProfile(id: string) {
+  if (!ownerOnly()) return;
+  update((s) => {
+    const out = s.jobs.find((x) => x.id === id);
+    if (!out || !out.facts.title.trim()) return s;
+    const replaced = (s.profiles ?? []).find((p) => p.title === out.facts.title && p.location === out.facts.location);
+    const profile = { ...profileOf(out), ...(replaced?.name?.trim() ? { name: replaced.name.trim() } : {}) };
+    return {
+      ...s,
+      profiles: [profile, ...(s.profiles ?? []).filter((p) => !(p.title === profile.title && p.location === profile.location))],
+      notice: { text: `Saved as a job profile: ${profileName(profile)}.`, unprofile: profile.id },
+    };
+  });
+}
+
 /** Undo for a job profile just saved on publish (`unprofile`). */
 export function forgetProfile(profileId: string) {
   if (!ownerOnly()) return;

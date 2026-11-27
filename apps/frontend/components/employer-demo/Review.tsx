@@ -414,3 +414,15 @@ export function ReviewPanel({ job, s, onSend, on, onSection }: { job: DemoJob; s
     </div>
   );
 }
+
+/** Reviewers' left-pane column across all language versions (cannot edit the job, only comment/suggest/decide). */
+export function ReviewColumn({ job, s, on, onSection }: { job: DemoJob; s: State; on?: string; onSection: (key: string) => void }) {
+  return (
+    <div className="aj-scroll flex h-full min-h-0 flex-col" role="region" aria-label="Review">
+      <ReviewPanel job={job} s={s} onSend={() => {}} on={on} onSection={onSection} />
+      <p className="aj-faint m-0 px-3 pb-3" style={{ fontSize: 11.5 }}>
+        Reviewers comment, suggest, and decide across all language versions; only the author changes the job.
+      </p>
+    </div>
+  );
+}
