@@ -29,7 +29,9 @@ from typing import Dict, List, Optional, Tuple
 import feedparser
 
 from contracts.admission import page_verdicts
+from contracts.persist import observation_link
 from contracts.reader import Fetch, ListingResult, Reader, Request, Response
+from crawler_v2 import job_pages
 from crawler_v2.ats_feeds import (
     greenhouse_job_url,
     greenhouse_list_url,
@@ -59,7 +61,6 @@ from crawler_v2.feed_fields import (
     jobs_array,
     json_listing_report,
 )
-from crawler_v2.job_pages import NEW_PAGE_CAP
 from crawler_v2.listing_completeness import (
     closed_catalogue_report,
     general_html_report,
@@ -240,6 +241,19 @@ class SitesReader(_WalkReader):
         )
 
 
+def general_vacancy_count(jobs) -> int:
+    """Distinct vacancy links among the rows admission reads as vacancies (admitted, or thin and
+    so opened on their job page), by the normalised link the observation path uses. Navigation
+    and category links are not vacancies (ICRC, 28 November 2026). A link on the page twice counts
+    once, so it cannot make the count match the stated total while a real vacancy goes unread."""
+    links = set()
+    for index in page_verdicts(list(jobs), "html"):
+        link = observation_link(jobs[index].get("apply_url"))
+        if link:
+            links.add(link)
+    return len(links)
+
+
 class GeneralReader(Reader):
     """The rule-based reader: structured data, then the strategy selector's choice.
 
@@ -267,11 +281,11 @@ class GeneralReader(Reader):
             self._crawler._extract_jobs_sync, first.body, source["careers_url"]
         )
         LISTING_STRATEGY.set(strategy)
-        # Vacancies are the rows admission reads as job links (admitted, or thin and opened on
-        # their job page); navigation and category links are not counted (ICRC, 28 Nov 2026).
-        vacancies = len(page_verdicts(jobs, "html"))
         report = general_html_report(
-            first.body, jobs, vacancies=vacancies, page_cap=NEW_PAGE_CAP
+            first.body,
+            jobs,
+            vacancies=general_vacancy_count(jobs),
+            page_cap=job_pages.NEW_PAGE_CAP,
         )
         return ListingResult.from_report(self.name, jobs, report, strategy=strategy)
 

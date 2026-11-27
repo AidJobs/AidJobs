@@ -20,6 +20,7 @@ from crawler_v2.readers import (
     RssFeedReader,
     WorkableFeedReader,
     api_readers,
+    general_vacancy_count,
     read_listing,
 )
 from crawler_v2.simple_crawler import SimpleCrawler
@@ -115,6 +116,63 @@ def test_vacancies_above_the_page_cap_stay_incomplete():
     assert report["complete"] is False
     assert report["expected"] == 41
     assert "more than the 40 job pages" in report["stop"]
+
+
+def test_a_duplicated_vacancy_link_counts_once_so_a_missed_vacancy_is_not_hidden():
+    # Ten distinct vacancies, one of them linked twice (a second anchor, another title), on a
+    # page that says 11 of 11: the eleventh is unread, so the listing must not complete.
+    html = _label_page(11)
+    jobs = _vacancy_rows(10) + [
+        {"title": "Apply now", "apply_url": _vacancy_rows(10)[0]["apply_url"]}
+    ] + _navigation_rows(12)
+    assert len(page_verdicts(jobs, "html")) == 11
+    assert general_vacancy_count(jobs) == 10
+    report = general_html_report(html, jobs, vacancies=general_vacancy_count(jobs), page_cap=40)
+    assert report["complete"] is False
+    assert report["expected"] == 11
+    assert "read 10 vacancies" in report["stop"]
+
+
+def test_vacancy_count_boundaries_are_pinned():
+    # Exactly the cap is still readable: complete.
+    html = _label_page(40)
+    report = general_html_report(html, _vacancy_rows(40), vacancies=40, page_cap=40)
+    assert report["complete"] is True
+    # More vacancies than the stated total (over-read): not complete.
+    html = _label_page(11)
+    report = general_html_report(html, _vacancy_rows(12), vacancies=12, page_cap=40)
+    assert report["complete"] is False
+    # Tiles on the page disagree with the vacancy count: not complete.
+    short_tiles = _label_page(11).replace(
+        '<li class="job-tile"><a href="/job/Geneva-Role-10/1010">Role 10</a></li>', ""
+    )
+    assert result_row_count(short_tiles) == 10
+    report = general_html_report(short_tiles, _vacancy_rows(11), vacancies=11, page_cap=40)
+    assert report["complete"] is False
+    assert "10 on-page" in report["stop"]
+
+
+def test_general_reader_passes_the_job_page_cap_at_call_time(monkeypatch):
+    # The reader reads the cap from the job-pages module when it runs, so a change there
+    # (here 5) reaches the completeness rule as well (review, 28 November 2026).
+    from crawler_v2 import job_pages
+
+    class _Crawler:
+        def _extract_jobs_sync(self, body, url):
+            return _vacancy_rows(10), "selector-links"
+
+    html = _label_page(10)
+    monkeypatch.setattr(job_pages, "NEW_PAGE_CAP", 5)
+    result = asyncio.run(
+        GeneralReader(_Crawler()).read(Response(200, html), {"careers_url": "https://c.example/"})
+    )
+    assert result.complete is False
+    assert "10 vacancies, more than the 5 job pages" in result.report()["stop"]
+    monkeypatch.setattr(job_pages, "NEW_PAGE_CAP", 40)
+    result = asyncio.run(
+        GeneralReader(_Crawler()).read(Response(200, html), {"careers_url": "https://c.example/"})
+    )
+    assert result.complete is True
 
 
 def test_showing_range_complete_when_vacancies_and_tiles_match():
