@@ -57,9 +57,9 @@ export function profileName(p: JobProfile): string {
   return city ? `${city} ${p.title}` : p.title;
 }
 
-/** Section keys that will actually start from this profile (catalog only). */
+/** Section keys that will actually start from this profile (catalog and custom sections). */
 export function profileTags(p: JobProfile): string[] {
-  return p.tags.filter((k) => SECTION_BY_KEY[k]);
+  return p.tags.filter((k) => SECTION_BY_KEY[k] || k.startsWith('c-'));
 }
 
 /**

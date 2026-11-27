@@ -105,7 +105,7 @@ export function ReachEditor({ job, s, mode, why = 'Invited more', momentKey, sen
           <RecipientInput label="People who could apply" value={plan.candidates} onChange={(v) => setPlan({ ...plan, candidates: v })} max={Math.max(0, room - plan.team.length)} placeholder="name@example.org, another@example.org" />
         ) : (
           <div className="flex flex-col gap-1.5">
-            <RecipientInput label="Colleagues who could pass it on" value={plan.team} onChange={(v) => setPlan({ ...plan, team: v })} max={Math.max(0, room - plan.candidates.length)} domain={s.org.domain} placeholder={`colleague@${s.org.domain}`} />
+            <RecipientInput label="Colleagues, country offices, or partner/cluster coordinators" value={plan.team} onChange={(v) => setPlan({ ...plan, team: v })} max={Math.max(0, room - plan.candidates.length)} placeholder={s.org.domain ? `colleague@${s.org.domain}, coordinator@partner.org` : 'colleague@example.org'} />
             {missing.length > 0 && (
               <button type="button" className="aj-text-btn inline-flex items-center gap-1 self-start" onClick={() => setPlan({ ...plan, team: [...plan.team, ...missing] })}>
                 <Users size={13} strokeWidth={1.8} /> Add your team ({missing.length})
@@ -121,7 +121,7 @@ export function ReachEditor({ job, s, mode, why = 'Invited more', momentKey, sen
         )}
         <EmailEditor kind={tab} msg={tab === 'candidate' ? plan.candidateMsg : plan.teamMsg} onChange={(m) => setPlan(tab === 'candidate' ? { ...plan, candidateMsg: m } : { ...plan, teamMsg: m })} job={job} s={s} to={tab === 'candidate' ? candidates : team} />
         <span className="aj-faint">
-          {mode === 'send' ? 'Sent now; the job is live, so the link works.' : `Sent ${goesLive}, so the link works.`} Recipients are never added to an AidJobs list, never see each other, and can unsubscribe in one click. Team emails go only to @{s.org.domain} addresses. AidJobs wrote the first draft; the words are yours to change.
+          {mode === 'send' ? 'Sent now; the job is live, so the link works.' : `Sent ${goesLive}, so the link works.`} Recipients are never added to an AidJobs list, never see each other, and can unsubscribe in one click. You can include country-office, cluster, and partner contacts. AidJobs wrote the first draft; the words are yours to change.
         </span>
         <div className="flex flex-wrap items-center justify-end gap-2 border-t pt-3 aj-hair">
           <span className="aj-faint mr-auto">

@@ -24,7 +24,7 @@ export const READING_KEY = 'aidjobs.employerDemo.reading';
 export function readPreset(): DemoPreset {
   try {
     const p = localStorage.getItem(PRESET_KEY);
-    if (p === 'tumaini' || p === 'riverstone') return p;
+    if (p === 'tumaini' || p === 'riverstone' || p === 'blank') return p;
   } catch {
     /* storage unavailable */
   }

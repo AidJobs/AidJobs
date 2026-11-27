@@ -483,14 +483,6 @@ function PartFields({ part, job, s, onClose, onFact, open, act }: { part: string
           : `${part === 'reach' ? 'Reach' : 'The flyer'} opens once review is done: approved, or no review where your organisation does not ask for one.`}
       </p>
     );
-  else if ((part === 'flyer' || part === 'reach') && !reachOpen(job, s))
-    body = (
-      <p className="aj-muted m-0">
-        {flyerStale(job, s) && part === 'flyer'
-          ? 'Out of date: the job changed, or changes were asked for, since the flyer was made. It opens again once review is done.'
-          : `${part === 'reach' ? 'Reach' : 'The flyer'} opens once review is done: approved, or no review where your organisation does not ask for one.`}
-      </p>
-    );
   else if (part === 'flyer')
     body = (
       <button type="button" className="aj-pill self-start" onClick={() => open.tab('flyer')}>
@@ -989,15 +981,25 @@ function JobWindow({ id }: { id: string }) {
     };
   }, [dragging]);
 
-  // A placeholder in the text ("[Closing date]") opens that fact's picker.
+  // A placeholder in the text ("[Closing date]", "[Apply email or link]") opens its editor.
   useEffect(() => {
-    const open = (e: Event) => {
+    const openFact = (e: Event) => {
       if (!job || s.reviewerAs) return;
       setFact((e as CustomEvent<FactKey>).detail);
       setPart(job.id, 'details');
     };
-    window.addEventListener('ej-open-fact', open);
-    return () => window.removeEventListener('ej-open-fact', open);
+    const openApply = () => {
+      if (!job || s.reviewerAs) return;
+      setHidden(null);
+      setPart(job.id, 's:apply');
+      scrollToId('ej-part-card');
+    };
+    window.addEventListener('ej-open-fact', openFact);
+    window.addEventListener('ej-open-apply', openApply);
+    return () => {
+      window.removeEventListener('ej-open-fact', openFact);
+      window.removeEventListener('ej-open-apply', openApply);
+    };
   }, [job, s.reviewerAs]);
 
   // The line follows the chat: a section the chat has just changed comes into view, and a fact asked for makes Details current.

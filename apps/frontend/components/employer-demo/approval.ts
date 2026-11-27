@@ -1,9 +1,16 @@
 import type { DemoJob, State } from './types';
 
-/** Whether the organisation asks for approval on this job: on every job, or on senior roles (P4 and above, and D grades). */
+/** Whether the organisation asks for approval on this job: on every job, or on senior roles (configured seniorGrades, or UN P4/P5/D/NO-D). */
 export function approvalRequired(s: State, j: DemoJob): boolean {
   if (s.org.approval === 'all') return true;
-  if (s.org.approval === 'senior') return /^(P[45]|D\d)/.test(j.facts.grade);
+  if (s.org.approval === 'senior') {
+    const grade = j.facts.grade.trim().toUpperCase().replace(/\s+/g, '');
+    if (!grade) return false;
+    if (s.org.seniorGrades?.length) {
+      return s.org.seniorGrades.some((g) => g.trim().toUpperCase().replace(/\s+/g, '') === grade);
+    }
+    return /^(P-?[45]|D-?\d|NO-?D)$/i.test(grade);
+  }
   return false;
 }
 

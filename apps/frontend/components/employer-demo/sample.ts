@@ -5,12 +5,13 @@ import type { DemoJob, Facts, Format, InboxItem, Org, Person, Review, State } fr
 
 const DAY = 86_400_000;
 
-/** Which sample organisation the demo loads (R2-P0-2): Riverstone INGO, or Tumaini local NGO. */
-export type DemoPreset = 'riverstone' | 'tumaini';
+/** Which sample organisation the demo loads (R2-P0-2 + Phase A blank slate): Riverstone INGO, Tumaini local NGO, or blank new org. */
+export type DemoPreset = 'riverstone' | 'tumaini' | 'blank';
 
 export const DEMO_PRESETS: { key: DemoPreset; label: string }[] = [
   { key: 'riverstone', label: 'Riverstone Aid (INGO)' },
   { key: 'tumaini', label: 'Tumaini Community Trust (local NGO)' },
+  { key: 'blank', label: 'New organisation (blank slate)' },
 ];
 
 /** About `days` from today, moved on to the next working day in the country, so the sample draft's checks do not depend on the weekday. */
@@ -53,6 +54,7 @@ export const SAMPLE_ORG: Org = {
   learned: { source: 'history', adverts: 3, confirmed: true },
   approval: 'senior',
   approvalRule: 'any',
+  seniorGrades: ['D1', 'D2'],
   noSkip: false,
   verified: true,
   setupDone: true,
@@ -343,8 +345,62 @@ function tumainiState(today: number): State {
   };
 }
 
+/** True blank-slate new organisation (Phase A): empty About us, voice, domain, careers URL, commitments, scale, and no past jobs. */
+export const SAMPLE_ORG_BLANK: Org = {
+  name: 'Your Organisation',
+  short: 'Your Organisation',
+  type: 'National NGO',
+  orgType: 'ngo',
+  hq: '',
+  website: '',
+  careersUrl: '',
+  domain: '',
+  about: '',
+  sectors: [],
+  sdgs: [],
+  countries: [],
+  voice: [],
+  standard: [],
+  mdsMember: false,
+  scale: [],
+  learned: null,
+  approval: 'off',
+  approvalRule: 'any',
+  noSkip: false,
+  verified: false,
+  setupDone: false,
+  freeTermsAccepted: false,
+};
+
+export const SAMPLE_ME_BLANK: Person = { id: 'me', name: 'New User', email: 'hr@example.org', role: 'owner' };
+
+export const SAMPLE_TEAM_BLANK: Person[] = [SAMPLE_ME_BLANK];
+
+function blankState(today: number): State {
+  return {
+    v: 4,
+    today,
+    signedIn: false,
+    me: SAMPLE_ME_BLANK,
+    org: SAMPLE_ORG_BLANK,
+    team: SAMPLE_TEAM_BLANK,
+    jobs: [],
+    formats: allFormats('blank'),
+    inbox: [],
+    free: {},
+    packs: [],
+    subscription: null,
+    receipts: [],
+    reviewerAs: null,
+    notice: null,
+    seq: 1,
+  };
+}
+
 export function initialState(today: number, preset: DemoPreset = 'riverstone'): State {
-  return preset === 'tumaini' ? tumainiState(today) : riverstoneState(today);
+  if (preset === 'tumaini') return tumainiState(today);
+  if (preset === 'blank') return blankState(today);
+  return riverstoneState(today);
 }
 
 /** Sample jobs from other fictional organisations, for the public view only. */

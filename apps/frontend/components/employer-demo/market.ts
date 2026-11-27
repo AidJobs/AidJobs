@@ -38,7 +38,25 @@ const REGIONS: Array<{ name: string; isos: string[] }> = [
 ];
 
 /** The language similar jobs in a country most often ask for besides English. */
-export const LOCAL_LANG: Record<string, string> = { CD: 'French', SN: 'French', HT: 'French', JO: 'Arabic', SS: 'Arabic', SO: 'Arabic', MZ: 'Portuguese', CO: 'Spanish', KE: 'Swahili', UG: 'Swahili' };
+export const LOCAL_LANG: Record<string, string> = {
+  CD: 'French',
+  SN: 'French',
+  HT: 'French',
+  JO: 'Arabic',
+  SS: 'Arabic',
+  SO: 'Arabic',
+  MZ: 'Portuguese',
+  CO: 'Spanish',
+  KE: 'Swahili',
+  UG: 'Swahili',
+  ET: 'Amharic',
+  NG: 'Hausa',
+  BD: 'Bangla',
+  AF: 'Dari',
+  NP: 'Nepali',
+  IN: 'Hindi',
+  PH: 'Filipino',
+};
 
 function seeded(text: string): () => number {
   let h = 2166136261;
@@ -184,12 +202,14 @@ export function fullAdvertCheck(job: DemoJob, s: State): { thin: boolean; points
   const req = job.sections.find((x) => x.key === 'requirements');
   const typicalYears = median(similar.map((x) => x.years));
   if (req) {
+    // UN formats use fixed ICSC grade-to-years rules — never flag mandatory UN years as "too high" (R2-UN #10).
+    const unFormat = job.format === 'un-secretariat' || job.format === 'un-agency';
     const at = req.lines.findIndex((l) => /\b\d+\+?\s+years\b/i.test(l));
     const years = at >= 0 ? Number(req.lines[at].match(/\b(\d+)\+?\s+years\b/i)?.[1]) : null;
-    if (years !== null && years >= typicalYears + 3) {
+    if (!unFormat && years !== null && years >= typicalYears + 3) {
       const lines = req.lines.map((l, i) => (i === at ? l.replace(/\b\d+(\+?\s+years)\b/i, `${typicalYears}$1`) : l));
       points.push({ key: 'years', ok: false, section: 'requirements', title: `Asks for ${years} years of experience; similar jobs ask a median ${typicalYears}`, detail: 'A high bar puts off capable people, and women more than men.', fix: { label: `Ask for ${typicalYears} years`, fix: { kind: 'text', section: 'requirements', lines } } });
-    } else if (years !== null) points.push({ key: 'years', ok: true, title: `Experience asked is in line with similar jobs (median ${typicalYears} years)` });
+    } else if (!unFormat && years !== null) points.push({ key: 'years', ok: true, title: `Experience asked is in line with similar jobs (median ${typicalYears} years)` });
     const range = essentialRange(req.lines);
     const essentials = range ? req.lines.slice(range.from, range.to).filter((l) => l.startsWith('- ')) : [];
     const typicalEssentials = median(similar.map((x) => x.essentials));

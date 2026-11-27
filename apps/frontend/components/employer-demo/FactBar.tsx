@@ -181,21 +181,46 @@ function GradeDialog({ job, s, onClose }: { job: DemoJob; s: State; onClose: () 
   );
 }
 
+const TIMEZONES = ['UTC', 'EAT', 'CAT', 'WAT', 'CET', 'GMT', 'EST', 'America/New_York', 'Europe/Geneva', 'Africa/Nairobi', 'Asia/Bangkok', 'Asia/Amman'];
+
 function ClosesDialog({ job, onClose }: { job: DemoJob; onClose: () => void }) {
   const f = job.facts;
+  const tzOptions = f.timezone && !TIMEZONES.includes(f.timezone) ? [f.timezone, ...TIMEZONES] : TIMEZONES;
   return (
     <Dialog title="Closing date" onClose={onClose} footer={<div className="flex justify-end"><button type="button" className="aj-ink-btn" onClick={onClose}>Done</button></div>}>
       <div className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-2">
-          <Field label="Date">
-            <input type="date" style={inputStyle} value={f.deadline} onChange={(e) => setFacts(job.id, { deadline: e.target.value })} />
-          </Field>
-          <Field label={`Time${f.timezone ? ` (${f.timezone})` : ''}`}>
-            <input type="time" style={inputStyle} value={f.closingTime} onChange={(e) => setFacts(job.id, { closingTime: e.target.value })} />
-          </Field>
-        </div>
-        {f.deadline && weekend(f.deadline) && <span className="aj-muted">{longDate(f.deadline)} is a weekend; candidates may expect it to close the working day before.</span>}
-        {f.deadline && holiday(f.deadline, f.iso) && <span className="aj-muted">{longDate(f.deadline)} is a public holiday{f.country ? ` in ${f.country}` : ''}.</span>}
+        <label className="flex items-center gap-2" style={{ fontSize: 13 }}>
+          <input
+            type="checkbox"
+            checked={Boolean(f.rolling)}
+            onChange={(e) => setFacts(job.id, { rolling: e.target.checked, ...(e.target.checked ? { deadline: '' } : {}) })}
+          />
+          <span>Open until filled (rolling / roster — no fixed closing date)</span>
+        </label>
+        {!f.rolling && (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Date">
+                <input type="date" style={inputStyle} value={f.deadline} onChange={(e) => setFacts(job.id, { deadline: e.target.value })} />
+              </Field>
+              <Field label="Time">
+                <input type="time" style={inputStyle} value={f.closingTime} onChange={(e) => setFacts(job.id, { closingTime: e.target.value })} />
+              </Field>
+            </div>
+            <Field label="Timezone">
+              <select style={inputStyle} value={f.timezone} onChange={(e) => setFacts(job.id, { timezone: e.target.value })}>
+                <option value="">Local duty station time</option>
+                {tzOptions.map((tz) => (
+                  <option key={tz} value={tz}>
+                    {tz}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {f.deadline && weekend(f.deadline, f.iso) && <span className="aj-muted">{longDate(f.deadline)} is a weekend{f.country ? ` in ${f.country}` : ''}; candidates may expect it to close the working day before.</span>}
+            {f.deadline && holiday(f.deadline, f.iso) && <span className="aj-muted">{longDate(f.deadline)} is a public holiday{f.country ? ` in ${f.country}` : ''}.</span>}
+          </>
+        )}
         <Field label="Start date (optional)">
           <input type="date" style={inputStyle} value={f.startDate} onChange={(e) => setFacts(job.id, { startDate: e.target.value })} />
         </Field>
@@ -358,7 +383,7 @@ export default function FactBar({ job, s, actions = [] }: { job: DemoJob; s: Sta
     { key: 'place', icon: <MapPin size={13} strokeWidth={1.8} />, label: 'Place', value: f.location ? `${f.location.split(',')[0]} · ${arrangementLabel(f.arrangement)}` : f.arrangement === 'remote' ? 'Remote' : '', missing: !f.location && f.arrangement !== 'remote' },
     { key: 'type', icon: <Briefcase size={13} strokeWidth={1.8} />, label: 'Job type', value: type },
     { key: 'grade', icon: <Layers size={13} strokeWidth={1.8} />, label: 'Grade', value: f.grade },
-    { key: 'closes', icon: <CalendarClock size={13} strokeWidth={1.8} />, label: 'Closing date', value: f.deadline ? `Closes ${shortDate(f.deadline)}` : '', missing: !f.deadline },
+    { key: 'closes', icon: <CalendarClock size={13} strokeWidth={1.8} />, label: 'Closing date', value: f.rolling ? 'Open until filled' : f.deadline ? `Closes ${shortDate(f.deadline)}` : '', missing: !f.deadline && !f.rolling },
     {
       key: 'salary',
       icon: <Banknote size={13} strokeWidth={1.8} />,

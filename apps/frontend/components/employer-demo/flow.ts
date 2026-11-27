@@ -222,7 +222,7 @@ export function essentials(job: DemoJob, org?: Pick<Org, 'domain'>): AskKind[] {
   const out: AskKind[] = [];
   if (!f.title) out.push('title');
   if (!f.location && f.arrangement !== 'remote') out.push('place');
-  if (!f.deadline) out.push('deadline');
+  if (!f.deadline && !f.rolling) out.push('deadline');
   if (!f.contract && f.engagement === 'job') out.push('contract');
   if (job.apply.method === 'email' && !(org ? emailAddress(job.apply, org) : job.apply.address.trim())) out.push('method');
   return out;

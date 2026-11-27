@@ -329,19 +329,6 @@ function ApprovalSettingView({ org }: { org: Org }) {
           </span>
         </label>
       )}
-      {org.approval !== 'off' && org.approvalRule === 'any' && (
-        <label className="flex items-start gap-2" style={{ cursor: 'pointer' }}>
-          <input type="checkbox" className="mt-0.5" checked={Boolean(org.changesPause)} onChange={(e) => setOrg({ changesPause: e.target.checked })} />
-          <span className="flex flex-col">
-            <span style={{ fontWeight: 650 }}>Any request for changes pauses publishing</span>
-            <span className="aj-faint">
-              {org.changesPause
-                ? 'A request for changes withdraws the approval until it is dealt with, even if another reviewer approved.'
-                : 'Without it, one approval is enough: a later request for changes is shown to whoever publishes, who decides; publishing anyway is recorded and the reviewer told.'}
-            </span>
-          </span>
-        </label>
-      )}
       {org.approval !== 'off' && (
         <label className="flex items-start gap-2" style={{ cursor: 'pointer' }}>
           <input type="checkbox" className="mt-0.5" checked={org.noSkip} onChange={(e) => setOrg({ noSkip: e.target.checked })} />
@@ -610,6 +597,13 @@ function FormatEditor({ format, onClose }: { format: Format; onClose: () => void
   const editable = format.family === 'Your organisation';
   const save = (patch: Partial<Format>) => update((s) => ({ ...s, formats: s.formats.map((x) => (x.key === format.key ? { ...x, ...patch } : x)) }));
   const has = (k: string) => format.order.some((o) => o.key === k);
+  const move = (from: number, to: number) => {
+    if (to < 0 || to >= format.order.length) return;
+    const next = [...format.order];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
+    save({ order: next });
+  };
   return (
     <div className="aj-card flex flex-col gap-3 p-4">
       <div className="flex items-center gap-2">
@@ -619,12 +613,28 @@ function FormatEditor({ format, onClose }: { format: Format; onClose: () => void
         </button>
       </div>
       {!editable && <span className="aj-faint">Real formats are kept as their users write them. Duplicate one to make your own.</span>}
+      {format.customGroups && format.customGroups.length > 0 && (
+        <span className="aj-faint" style={{ fontSize: 12 }}>
+          Keeps {format.customGroups.length} custom {format.customGroups.length === 1 ? 'group' : 'groups'} ({format.customGroups.map((g) => g.label).join(', ')}).
+        </span>
+      )}
       <Field label="Headings, in order">
-        <ol className="flex flex-col gap-1" style={{ margin: 0, paddingLeft: 20 }}>
+        <ol className="flex flex-col gap-1.5" style={{ margin: 0, paddingLeft: 20 }}>
           {format.order.map((o, i) => (
             <li key={o.key}>
               {editable ? (
-                <input style={{ ...inputStyle, minHeight: 32 }} value={o.heading} onChange={(e) => save({ order: format.order.map((x, k) => (k === i ? { ...x, heading: e.target.value } : x)) })} aria-label={`Heading ${i + 1}`} />
+                <div className="flex items-center gap-1.5">
+                  <input style={{ ...inputStyle, minHeight: 32, flex: 1 }} value={o.heading} onChange={(e) => save({ order: format.order.map((x, k) => (k === i ? { ...x, heading: e.target.value } : x)) })} aria-label={`Heading ${i + 1}`} />
+                  <button type="button" className="aj-pill" style={{ height: 30, padding: '0 8px' }} disabled={i === 0} onClick={() => move(i, i - 1)} aria-label={`Move ${o.heading} up`}>
+                    ↑
+                  </button>
+                  <button type="button" className="aj-pill" style={{ height: 30, padding: '0 8px' }} disabled={i === format.order.length - 1} onClick={() => move(i, i + 1)} aria-label={`Move ${o.heading} down`}>
+                    ↓
+                  </button>
+                  <button type="button" className="aj-text-btn" style={{ height: 30 }} onClick={() => save({ order: format.order.filter((x) => x.key !== o.key) })} aria-label={`Remove ${o.heading}`}>
+                    Remove
+                  </button>
+                </div>
               ) : (
                 o.heading
               )}

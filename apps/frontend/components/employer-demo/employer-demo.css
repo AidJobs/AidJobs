@@ -1290,6 +1290,12 @@ button.ej-step:hover {
 .ej-ring svg {
   position: absolute;
   inset: 0;
+  pointer-events: none;
+}
+
+.ej-ring .ej-send {
+  position: relative;
+  z-index: 1;
 }
 
 .ej-ring-track {
@@ -1366,8 +1372,7 @@ button.ej-step:hover {
 
 .ej-fact-mark {
   border-bottom: 2px dotted var(--sage-5);
-  cursor: pointer;
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 .ej-composer[data-drop='true'] {
@@ -1537,7 +1542,7 @@ button.ej-step:hover {
   display: block;
   padding: 4px 6px;
   margin: 0 -6px 10px;
-  border: 1px dashed #c6d3c1;
+  border: 1px dashed var(--hair-strong, var(--hair));
   border-radius: 8px;
   background: transparent;
   color: inherit;
@@ -1554,7 +1559,7 @@ button.ej-step:hover {
 
 .ej-email-edit:focus {
   border-style: solid;
-  border-color: #6f9a62;
+  border-color: var(--sage-6, #6f9a62);
   outline: none;
 }
 
@@ -1705,20 +1710,22 @@ button.ej-step:hover {
   }
 
   .ej-flyer {
-    position: fixed;
-    inset: 0;
-    width: 210mm;
-    max-width: none;
-    height: 297mm;
+    position: static;
+    width: 100%;
+    max-width: 210mm;
+    min-height: 270mm;
+    height: auto;
+    overflow: visible;
     aspect-ratio: auto;
-    padding: 18mm;
+    padding: 14mm 16mm;
     border-radius: 0;
     box-shadow: none;
-    font-size: 13pt;
+    font-size: 12pt;
+    break-inside: avoid;
   }
 
   .ej-flyer-title {
-    font-size: 30pt;
+    font-size: 26pt;
   }
 }
 
@@ -2767,7 +2774,7 @@ button.ej-step:hover {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  opacity: 0.45;
+  opacity: 0.7;
   transition: opacity 120ms ease;
 }
 

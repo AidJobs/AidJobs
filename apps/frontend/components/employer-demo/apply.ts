@@ -23,9 +23,12 @@ export function defaultApply(orgType: OrgType, careersUrl: string, domain = ''):
     replyWeeks: '',
     anonymised: false,
   };
-  // FW-1: NGO email apply starts with jobs@domain when the org has a domain, so the fact matches applyLines.
+  // FW-1 + Phase A: NGO email apply starts with jobs@domain only when domain exists; charity without careersUrl falls back to email.
   if (orgType === 'ngo') return { ...base, method: 'email', address: domain ? `jobs@${domain}` : '', documents: ['CV', 'Cover letter', 'Academic certificates'], subjectLine: true, onePdf: true, maxMb: '5' };
-  if (orgType === 'charity') return { ...base, method: 'formOnly', documents: ['Supporting statement'], statementWords: '1500', shortlistedOnly: false, replyWeeks: '2' };
+  if (orgType === 'charity') {
+    if (!careersUrl.trim()) return { ...base, method: 'email', address: domain ? `jobs@${domain}` : '', documents: ['CV', 'Supporting statement'], shortlistedOnly: false, replyWeeks: '2' };
+    return { ...base, method: 'formOnly', documents: ['Supporting statement'], statementWords: '1500', shortlistedOnly: false, replyWeeks: '2' };
+  }
   if (orgType === 'contractor') return { ...base, documents: ['CV', 'Cover letter'], cvPages: '5', references: '3' };
   if (orgType === 'un') return { ...base, documents: ['CV'] };
   return { ...base, rolling: true };
@@ -47,19 +50,27 @@ export function withEmailAddress(a: ApplySettings, org: Pick<Org, 'domain'>): Ap
 }
 
 export function applyLines(a: ApplySettings, f: Facts, org: Org): string[] {
-  const by = f.deadline ? ` by ${longDate(f.deadline)}${f.closingTime ? `, ${f.closingTime}${f.timezone ? ` ${f.timezone}` : ''}` : ''}` : ' by [Closing date]';
+  const by = f.rolling
+    ? ' (open until filled)'
+    : f.deadline
+      ? ` by ${longDate(f.deadline)}${f.closingTime ? `, ${f.closingTime}${f.timezone ? ` ${f.timezone}` : ''}` : ''}`
+      : ' by [Closing date]';
   const docs = a.documents.length ? a.documents.join(', ').replace(/, ([^,]*)$/, ' and $1') : 'your application';
   const lines: string[] = [];
   if (a.method === 'email') {
-    lines.push(`Send ${docs.toLowerCase().replace(/^cv/, 'your CV')} to ${emailAddress(a, org) || `jobs@${org.domain}`}${by}.`);
+    const addr = emailAddress(a, org);
+    lines.push(`Send ${docs.toLowerCase().replace(/^cv/, 'your CV')} to ${addr || '[Apply email or link]'}${by}.`);
     const rules = [a.subjectLine && `use the job title, "${f.title || 'job title'}", as the subject`, a.onePdf && 'combine everything into one PDF', a.maxMb && `keep attachments under ${a.maxMb} MB`].filter(Boolean);
     if (rules.length) lines.push(`Please ${rules.join(', ')}.`);
   } else if (a.method === 'formOnly') {
-    lines.push(`Apply through the application form on our careers site${by}. We do not accept CVs.`);
+    const target = a.address.trim() || org.careersUrl.trim();
+    lines.push(target ? `Apply through the application form on our careers site${by}. We do not accept CVs.` : `Apply through our online application form ([Apply email or link])${by}. We do not accept CVs.`);
   } else if (a.method === 'form') {
-    lines.push(`Apply through the online form${by}, attaching ${docs.toLowerCase().replace(/^cv/, 'your CV')}.`);
+    const target = a.address.trim() || org.careersUrl.trim();
+    lines.push(target ? `Apply through the online form${by}, attaching ${docs.toLowerCase().replace(/^cv/, 'your CV')}.` : `Apply through our online form ([Apply email or link])${by}, attaching ${docs.toLowerCase().replace(/^cv/, 'your CV')}.`);
   } else {
-    lines.push(`Apply on ${org.short}'s careers site${by}, with ${docs.toLowerCase().replace(/^cv/, 'your CV')}.`);
+    const target = a.address.trim() || org.careersUrl.trim();
+    lines.push(target ? `Apply on ${org.short}'s careers site${by}, with ${docs.toLowerCase().replace(/^cv/, 'your CV')}.` : `Apply online ([Apply email or link])${by}, with ${docs.toLowerCase().replace(/^cv/, 'your CV')}.`);
   }
   const limits = [a.cvPages && `CV of no more than ${a.cvPages} pages`, a.statementWords && `statement of no more than ${a.statementWords} words`, a.references && `${a.references} professional references`].filter(Boolean);
   if (limits.length) lines.push(`Please include a ${limits.join(', ')}.`);

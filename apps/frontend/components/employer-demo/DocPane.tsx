@@ -79,9 +79,9 @@ function MarkedText({ text, job, section, onFlag }: { text: string; job: DemoJob
 
 const SLOTS: Record<string, 'place' | 'closes'> = { 'Duty station': 'place', 'Closing date': 'closes' };
 
-/** Text with clickable placeholders for missing facts ("[Closing date]"); each opens the fact's editor. */
+/** Text with clickable placeholders for missing facts ("[Closing date]", "[Apply email or link]"); each opens its editor. */
 function SlotText({ text, job, section, onFlag }: { text: string; job: DemoJob; section: string; onFlag: (f: Flag) => void }) {
-  const parts = text.split(/\[(Duty station|Closing date)\]/);
+  const parts = text.split(/\[(Duty station|Closing date|Apply email or link)\]/);
   if (parts.length === 1) return <MarkedText text={text} job={job} section={section} onFlag={onFlag} />;
   const reviewing = Boolean(getState().reviewerAs);
   return (
@@ -91,7 +91,15 @@ function SlotText({ text, job, section, onFlag }: { text: string; job: DemoJob; 
           <span key={i} className="ej-slot">{part}</span>
         ) : i % 2 ? (
           <Tip key={i} label={`Missing: ${part.toLowerCase()}. Click to add it.`}>
-            <button type="button" className="ej-slot" onClick={() => window.dispatchEvent(new CustomEvent('ej-open-fact', { detail: SLOTS[part] }))}>
+            <button
+              type="button"
+              className="ej-slot"
+              onClick={() =>
+                part === 'Apply email or link'
+                  ? window.dispatchEvent(new CustomEvent('ej-open-apply'))
+                  : window.dispatchEvent(new CustomEvent('ej-open-fact', { detail: SLOTS[part] }))
+              }
+            >
               {part}
             </button>
           </Tip>

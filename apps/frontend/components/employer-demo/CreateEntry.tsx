@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { LINK_REPLY, startFromDocument, startJob } from './actions';
 import Composer, { type ComposerHandle } from './Composer';
 import { FactSlot, PlusMenu } from './ComposerTools';
-import { article, completeText, detectRole, extractFacts, PLACES, recognise, ROLE_FAMILIES } from './engine';
+import { article, completeText, detectRole, extractFacts, PLACES, readPasted, recognise, ROLE_FAMILIES } from './engine';
 import { go, READING_KEY, useDemo } from './store';
 import { readJobFile } from './readFile';
 import type { State } from './types';
@@ -45,7 +45,7 @@ export default function CreateEntry() {
     const t = setInterval(() => setExample((n) => n + 1), 4000);
     return () => clearInterval(t);
   }, [text]);
-  const { facts } = extractFacts(text, s.today);
+  const { facts } = extractFacts(text, s.today, undefined, s.org.scale.map((g) => g.grade));
   const { role } = detectRole(text);
   const own = [...s.jobs.map((j) => j.facts.title).filter(Boolean), ...s.org.countries.flatMap((c) => PLACES.filter((p) => p.country === c).map((p) => `${p.city}, ${p.country}`))];
   const have = [
@@ -109,7 +109,9 @@ export default function CreateEntry() {
             readiness={text.trim() ? readiness : undefined}
             placeholder={examples[example % examples.length]}
             marks={text ? recognise(text, s.today, s.org.scale.map((g) => g.grade)) : undefined}
-            onPasteLong={setOffer}
+            onPasteLong={(t) => {
+              if (readPasted(t).length >= 2) setOffer(t);
+            }}
             onFile={(f) => void dropped(f)}
             label="Describe the role"
             large
