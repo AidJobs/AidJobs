@@ -20,7 +20,7 @@
 
 5. ~~Approve vs unsaved buffers; Add-panel blur/Escape~~ — **Fixed 20 Nov 2026** (Step A R1-06; Step B R1-11; user confirmed on preview)
 
-**Next (23 Nov 2026):** Phase 7 complete for now (`PROFILE_ASKED` minor at `6cda4c9`). Post-Phase-7 work next (FW-3 note; LANG-ONLY / flyer / UN; role-library leap). R1-07 deferred. Next.js security upgrade runs on `chore/next-security-upgrade` from `main` (separate worktree).
+**Next (27 Nov 2026):** Holistic JD generator UX, chat & data redesign plan recorded (awaiting approval before code changes): see `docs/architecture/employer-demo-ux-redesign-plan-2026-11-27.md` (synthesises live walkthrough, 6 independent reviews, and open Round 1/2 items into Phases A–D). Phase 7 complete (`6cda4c9`). Next.js security upgrade merged on `main` (`37f0f7b`, PR #198).
 
 ---
 
