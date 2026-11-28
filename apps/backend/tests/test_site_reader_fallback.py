@@ -861,7 +861,7 @@ def test_crawl_source_reports_the_listing_outcome():
     import inspect
 
     source = inspect.getsource(SimpleCrawler.crawl_source)
-    assert "_listing_outcome(len(jobs), listing_report)" in source
+    assert "_listing_outcome(found_count, listing_report)" in source
     assert "self._listing_report" not in inspect.getsource(SimpleCrawler)
     assert "extracted_fields['listing_complete']" in source
 
