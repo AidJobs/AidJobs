@@ -13,6 +13,7 @@ import {
   type ImpactCount,
 } from '@/lib/admin/danger';
 import { adminDateTime } from '@/lib/dates';
+import { resolveEffectiveSchedule } from '@/lib/admin/schedule';
 
 const CRAWL_RUN_LIMIT = 100;
 
@@ -171,7 +172,7 @@ export default function SourceDetailPage() {
     ['Type', source.source_type],
     ['Organisation type', source.org_type || '—'],
     ['Status', source.status],
-    ['Schedule', source.crawl_frequency_days ? `Every ${source.crawl_frequency_days} days` : '—'],
+    ['Base schedule', `${resolveEffectiveSchedule(source.crawl_frequency_days, source.org_type).summaryLabel} (adaptive rules & ±15% jitter apply)`],
     ['Last crawl', adminDateTime(source.last_crawled_at)],
     ['Next crawl', adminDateTime(source.next_run_at)],
     ['Failures', String(source.consecutive_failures ?? 0)],

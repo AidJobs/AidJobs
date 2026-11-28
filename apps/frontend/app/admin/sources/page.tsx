@@ -5,6 +5,14 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { adminDateTime } from '@/lib/dates';
 import { sourceRowActions } from '@/lib/admin/danger';
+import {
+  ADAPTIVE_SCHEDULE_NOTE,
+  MAX_CUSTOM_FREQ_DAYS,
+  crawlFrequencyPayload,
+  resolveEffectiveSchedule,
+  scheduleModeFromStored,
+  type ScheduleMode,
+} from '@/lib/admin/schedule';
 import { Plus, Upload, Play, Pause, Edit, TestTube, FileCode, Download, X, ChevronDown, ChevronUp, Check, XCircle, Info, History, AlertCircle, CheckCircle, Search } from 'lucide-react';
 
 type Source = {
@@ -32,7 +40,8 @@ type SourceFormData = {
   careers_url: string;
   source_type: string;
   org_type: string;
-  crawl_frequency_days: number;
+  schedule_mode: ScheduleMode;
+  custom_frequency_days: string;
   parser_hint: string;
   time_window: string;
 };
@@ -79,7 +88,8 @@ export default function AdminSourcesPage() {
     careers_url: '',
     source_type: 'html',
     org_type: '',
-    crawl_frequency_days: 3,
+    schedule_mode: 'auto',
+    custom_frequency_days: '',
     parser_hint: '',
     time_window: '',
   });
@@ -439,15 +449,25 @@ export default function AdminSourcesPage() {
       }
 
       // Pre-fill form with imported data
+      const importedSchedule = scheduleModeFromStored(sourceData.crawl_frequency_days);
       setFormData({
         org_name: sourceData.org_name || '',
         careers_url: sourceData.careers_url,
         source_type: sourceData.source_type || 'html',
         org_type: sourceData.org_type || '',
-        crawl_frequency_days: sourceData.crawl_frequency_days || 3,
+        schedule_mode: importedSchedule.mode,
+        custom_frequency_days: importedSchedule.customDays,
         parser_hint: sourceData.parser_hint || '',
         time_window: sourceData.time_window || '',
       });
+      setShowAdvanced(
+        !!(
+          sourceData.org_type ||
+          sourceData.time_window ||
+          sourceData.parser_hint ||
+          importedSchedule.mode === 'custom'
+        )
+      );
 
       // Open add modal
       setShowAddModal(true);
@@ -471,6 +491,15 @@ export default function AdminSourcesPage() {
         return;
       }
 
+      const schedulePayload = crawlFrequencyPayload(
+        formData.schedule_mode,
+        formData.custom_frequency_days
+      );
+      if (!schedulePayload.ok) {
+        toast.error(schedulePayload.error);
+        return;
+      }
+
       const res = await fetch('/api/admin/sources', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -480,7 +509,7 @@ export default function AdminSourcesPage() {
           careers_url: formData.careers_url,
           source_type: formData.source_type,
           org_type: formData.org_type || null,
-          crawl_frequency_days: formData.crawl_frequency_days,
+          crawl_frequency_days: schedulePayload.value,
           parser_hint: formData.parser_hint || null,
           time_window: formData.time_window || null,
         }),
@@ -582,6 +611,15 @@ export default function AdminSourcesPage() {
         return;
       }
 
+      const schedulePayload = crawlFrequencyPayload(
+        formData.schedule_mode,
+        formData.custom_frequency_days
+      );
+      if (!schedulePayload.ok) {
+        toast.error(schedulePayload.error);
+        return;
+      }
+
       const updates: any = {};
       
       // Always include fields that might have changed
@@ -589,7 +627,7 @@ export default function AdminSourcesPage() {
       updates.careers_url = formData.careers_url;
       updates.source_type = formData.source_type;
       updates.org_type = formData.org_type || null;
-      updates.crawl_frequency_days = formData.crawl_frequency_days;
+      updates.crawl_frequency_days = schedulePayload.value;
       updates.parser_hint = formData.parser_hint || null;
       updates.time_window = formData.time_window || null;
 
@@ -851,18 +889,27 @@ export default function AdminSourcesPage() {
 
 
   const openEditModal = (source: Source) => {
+    const storedSchedule = scheduleModeFromStored(source.crawl_frequency_days);
     setEditingSource(source);
     setFormData({
       org_name: source.org_name || '',
       careers_url: source.careers_url,
       source_type: source.source_type,
       org_type: source.org_type || '',
-      crawl_frequency_days: source.crawl_frequency_days || 3,
+      schedule_mode: storedSchedule.mode,
+      custom_frequency_days: storedSchedule.customDays,
       parser_hint: source.parser_hint || '',
       time_window: source.time_window || '',
     });
-    // Show advanced options if source has advanced fields
-    setShowAdvanced(!!(source.org_type || source.time_window || source.parser_hint));
+    // Show advanced options if source has advanced fields or a custom schedule override
+    setShowAdvanced(
+      !!(
+        source.org_type ||
+        source.time_window ||
+        source.parser_hint ||
+        storedSchedule.mode === 'custom'
+      )
+    );
     setShowEditModal(true);
     setAddEditModalPosition({ x: 0, y: 0 }); // Reset position when opening
   };
@@ -880,7 +927,8 @@ export default function AdminSourcesPage() {
       careers_url: '',
       source_type: 'html',
       org_type: '',
-      crawl_frequency_days: 3,
+      schedule_mode: 'auto',
+      custom_frequency_days: '',
       parser_hint: '',
       time_window: '',
     });
@@ -1417,18 +1465,82 @@ export default function AdminSourcesPage() {
 
                       <div>
                         <label className="block text-caption-sm font-medium text-[#86868B] mb-1">
-                          Crawl Frequency
+                          Base Crawl Schedule
                         </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="number"
-                            value={formData.crawl_frequency_days}
-                            onChange={(e) => setFormData({ ...formData, crawl_frequency_days: parseInt(e.target.value) || 3 })}
-                            className="w-20 border border-[#D2D2D7] rounded-lg px-2.5 py-1.5 bg-white text-[#1D1D1F] text-caption focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
-                            min="1"
-                          />
-                          <span className="text-caption-sm text-[#86868B]">days</span>
+                        <div className="flex items-center gap-2 mb-2">
+                          <button
+                            type="button"
+                            aria-pressed={formData.schedule_mode === 'auto'}
+                            onClick={() => setFormData({ ...formData, schedule_mode: 'auto' })}
+                            className={`px-2.5 py-1 rounded-lg text-caption-sm border transition-colors ${
+                              formData.schedule_mode === 'auto'
+                                ? 'bg-[#0071E3] text-white border-[#0071E3]'
+                                : 'bg-white text-[#1D1D1F] border-[#D2D2D7] hover:bg-[#F5F5F7]'
+                            }`}
+                          >
+                            Auto (by org type)
+                          </button>
+                          <button
+                            type="button"
+                            aria-pressed={formData.schedule_mode === 'custom'}
+                            onClick={() => setFormData({ ...formData, schedule_mode: 'custom' })}
+                            className={`px-2.5 py-1 rounded-lg text-caption-sm border transition-colors ${
+                              formData.schedule_mode === 'custom'
+                                ? 'bg-[#0071E3] text-white border-[#0071E3]'
+                                : 'bg-white text-[#1D1D1F] border-[#D2D2D7] hover:bg-[#F5F5F7]'
+                            }`}
+                          >
+                            Custom override
+                          </button>
                         </div>
+                        {formData.schedule_mode === 'custom' && (
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <input
+                              type="number"
+                              aria-label="Custom crawl frequency in days"
+                              value={formData.custom_frequency_days}
+                              onChange={(e) => setFormData({ ...formData, custom_frequency_days: e.target.value })}
+                              className="w-24 border border-[#D2D2D7] rounded-lg px-2.5 py-1.5 bg-white text-[#1D1D1F] text-caption focus:outline-none focus:ring-2 focus:ring-[#0071E3] focus:ring-opacity-20"
+                              min="1"
+                              max={MAX_CUSTOM_FREQ_DAYS}
+                              step="1"
+                              placeholder="e.g., 2"
+                            />
+                            <span className="text-caption-sm text-[#86868B]">days</span>
+                          </div>
+                        )}
+                        {(() => {
+                          const payload = crawlFrequencyPayload(
+                            formData.schedule_mode,
+                            formData.custom_frequency_days
+                          );
+                          if (formData.schedule_mode === 'custom' && !payload.ok) {
+                            if (formData.custom_frequency_days.trim() === '') {
+                              return (
+                                <p className="text-caption-sm text-[#86868B] mt-1">
+                                  Enter a whole number of days (1–{MAX_CUSTOM_FREQ_DAYS}; 3 is reserved for Auto).
+                                </p>
+                              );
+                            }
+                            return (
+                              <p role="alert" className="text-caption-sm text-[#FF3B30] mt-1">
+                                {payload.error}
+                              </p>
+                            );
+                          }
+                          const effective = resolveEffectiveSchedule(
+                            payload.ok ? payload.value : null,
+                            formData.org_type
+                          );
+                          return (
+                            <p className="text-caption-sm text-[#1D1D1F] mt-1">
+                              Effective base: <span className="font-medium">{effective.summaryLabel}</span>
+                            </p>
+                          );
+                        })()}
+                        <p className="text-caption-sm text-[#86868B] mt-0.5">
+                          {ADAPTIVE_SCHEDULE_NOTE}
+                        </p>
                       </div>
 
                       <div>
@@ -2126,12 +2238,18 @@ export default function AdminSourcesPage() {
                   <div>
                     <h3 className="text-body-sm font-semibold text-[#1D1D1F] mb-2">Statistics</h3>
                     <div className="bg-[#F5F5F7] rounded-lg p-3 space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-caption-sm text-[#86868B]">Frequency:</span>
-                        <span className="text-body-sm text-[#1D1D1F]">
-                          {selectedSourceForDetails.crawl_frequency_days || '-'} days
+                      <div className="flex justify-between gap-3">
+                        <span className="text-caption-sm text-[#86868B]">Base Schedule:</span>
+                        <span className="text-body-sm text-[#1D1D1F] text-right">
+                          {resolveEffectiveSchedule(
+                            selectedSourceForDetails.crawl_frequency_days,
+                            selectedSourceForDetails.org_type
+                          ).summaryLabel}
                         </span>
                       </div>
+                      <p className="text-caption-sm text-[#86868B]">
+                        {ADAPTIVE_SCHEDULE_NOTE}
+                      </p>
                       <div className="flex justify-between">
                         <span className="text-caption-sm text-[#86868B]">Next Run:</span>
                         <span className="text-body-sm text-[#1D1D1F]">
