@@ -798,8 +798,9 @@ class PolicyNet:
         self.routes, self.sent = routes, []
 
     async def hop(self, url, method, headers, timeout, max_bytes, resolver, backend_factory, pool_factory,
-                  dns_timeout):
+                  dns_timeout, body=b""):
         from urllib.parse import urlsplit as split
+        assert body == b""                              # the survey sends no body (only Workday's POST does)
         addresses = await resolver(split(url).hostname, 443)
         assert addresses == ["93.184.216.34"]          # the lookup's own answer reaches the policy
         self.sent.append(url)

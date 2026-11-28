@@ -112,7 +112,7 @@ def _requests(events):
     """'METHOD host/path' for each request sent, and its headers."""
     sent = []
     for kind, buffer in events:
-        if kind != "write" or buffer[:4] not in (b"GET ", b"HEAD"):
+        if kind != "write" or not buffer.startswith((b"GET ", b"HEAD ", b"POST ")):
             continue
         lines = buffer.decode("latin-1").split("\r\n")
         method, target = lines[0].split()[:2]
@@ -1125,3 +1125,323 @@ def test_only_known_third_parties_are_called_outside_the_fetch_policy():
     assert not (BACKEND / "core" / "net.py").exists()
     assert not (BACKEND / "core" / "robots.py").exists()
     assert not (BACKEND / "core" / "geocoder.py").exists()
+
+
+# Workday's job search: the one POST (contract §9, amendment of 6 November 2026) ---------------
+
+WORKDAY = "https://theirc.wd1.myworkdayjobs.com/wday/cxs/theirc/External_Careers/jobs"
+WORKDAY_PATH = "theirc.wd1.myworkdayjobs.com/wday/cxs/theirc/External_Careers/jobs"
+CANONICAL = b'{"limit":20,"offset":0,"searchText":"","appliedFacets":{}}'
+_REQUEST_STARTS = (b"GET ", b"HEAD ", b"POST ")
+
+
+def _search_body(**changes):
+    body = {"limit": 20, "offset": 0, "searchText": "", "appliedFacets": {}}
+    body.update(changes)
+    return body
+
+
+class _Dict(dict):
+    """A dict subclass with the right four keys: still not a body the policy sends."""
+
+
+def _parse_headers(head: bytes) -> dict[str, str]:
+    headers = {}
+    for line in head.decode("latin-1").split("\r\n")[1:]:
+        if ":" in line:
+            name, value = line.split(":", 1)
+            headers[name.strip().lower()] = value.strip()
+    return headers
+
+
+def _posts(events):
+    """(header block, body bytes) for each POST sent, in order."""
+    writes = [buffer for kind, buffer in events if kind == "write"]
+    posts = []
+    for index, buffer in enumerate(writes):
+        if not buffer.startswith(b"POST "):
+            continue
+        head, _, rest = buffer.partition(b"\r\n\r\n")
+        parts = [rest] if rest else []
+        for later in writes[index + 1:]:
+            if later.startswith(_REQUEST_STARTS):
+                break
+            parts.append(later)
+        posts.append((head, b"".join(parts)))
+    return posts
+
+
+def test_the_workday_search_is_one_canonical_post_after_robots_txt(slept):
+    events, world = _world([_robots(), _response(200, b'{"jobs":[]}')])
+    result = _fetch(WORKDAY, world, method="POST", json_body=_search_body(),
+                    headers={"Accept": "application/json", "Accept-Language": "en"})
+    assert result.body == b'{"jobs":[]}'
+    assert _sent(events) == ["GET theirc.wd1.myworkdayjobs.com/robots.txt",
+                             f"POST {WORKDAY_PATH}"]
+    [(head, body)] = _posts(events)
+    assert body == CANONICAL
+    headers = _parse_headers(head)
+    assert headers["content-type"] == "application/json"
+    assert headers["content-length"] == str(len(CANONICAL))
+    assert headers["user-agent"] == IDENTITY
+    assert headers["from"] == "aidjobz@gmail.com"
+    assert headers["accept"] == "application/json"
+    assert headers["accept-language"] == "en"
+    assert "cookie" not in headers and "authorization" not in headers
+
+
+def test_the_search_body_is_canonical_whatever_the_callers_key_order(slept):
+    reordered = {"appliedFacets": {}, "searchText": "", "offset": 0, "limit": 20}
+    events, world = _world([_robots(), _response(200, b"{}")])
+    _fetch(WORKDAY, world, method="POST", json_body=reordered)
+    [(head, body)] = _posts(events)
+    assert body == CANONICAL
+    assert _parse_headers(head)["content-length"] == str(len(CANONICAL))
+
+
+def test_a_lowercase_post_is_the_same_search(slept):
+    events, world = _world([_robots(), _response(200, b"{}")])
+    _fetch(WORKDAY, world, method="post", json_body=_search_body())
+    assert _sent(events)[-1] == f"POST {WORKDAY_PATH}"
+
+
+def test_an_explicit_default_port_is_the_same_search(slept):
+    events, world = _world([_robots(), _response(200, b"{}")])
+    _fetch(WORKDAY.replace(".com/", ".com:443/"), world, method="POST", json_body=_search_body())
+    assert _sent(events)[-1] == f"POST {WORKDAY_PATH}"
+
+
+BAD_DESTINATIONS = [
+    "https://jobs.example/wday/cxs/theirc/External_Careers/jobs",
+    "https://theirc.wd1.myworkdayjobs.com/en-US/External_Careers/jobs",
+    "https://theirc.wd1.myworkdayjobs.com/wday/cxs/theirc/External_Careers/jobs/",
+    "https://theirc.wd1.myworkdayjobs.com/wday/cxs/theirc/External_Careers/jobs/extra",
+    "https://theirc.wd1.myworkdayjobs.com/wday/cxs/theirc/External_Careers/refreshFacet/",
+    "https://theirc.wd1.myworkdayjobs.com/wday/cxs/theirc/External_Careers/job/x-R1/apply",
+    "https://theirc.wd1.myworkdayjobs.com/wday/cxs/other/External_Careers/jobs",
+    "https://theirc.wd1.myworkdayjobs.com/wday/cxs/theirc/%2e%2e/jobs",
+    "https://theirc.wd1.myworkdayjobs.com/wday/cxs/theirc/External Careers/jobs",
+    "https://theirc.wd1.myworkdayjobs.com/wday/cxs/theirc/External_Careers/jobs?limit=1",
+    "https://theirc.wd1.myworkdayjobs.com/wday/cxs/theirc/External_Careers/jobs#x",
+    "https://user:secret@theirc.wd1.myworkdayjobs.com/wday/cxs/theirc/External_Careers/jobs",
+    "https://theirc.wd1.myworkdayjobs.com:8443/wday/cxs/theirc/External_Careers/jobs",
+    "http://theirc.wd1.myworkdayjobs.com/wday/cxs/theirc/External_Careers/jobs",
+    "https://theirc.wd1.myworkdayjobs.com./wday/cxs/theirc/External_Careers/jobs",
+    "https://theirc.wd1.myworkdayjobs.com.evil.example/wday/cxs/theirc/External_Careers/jobs",
+    "https://theirc.impl-wd1.myworkdayjobs.com/wday/cxs/theirc/External_Careers/jobs",
+    "https://theirc.wd1.myworkdayjobs.com/wday/cxs/theirc/External_Careers/jobs\r\nHost: x",
+    "https://wd1.myworkdayjobs.com/wday/cxs/wd1/External/jobs",
+    "https://myworkdayjobs.com/wday/cxs/theirc/External_Careers/jobs",
+    "https://wd3.myworkdaysite.com/recruiting/theirc/External/jobs",
+    "https://theirc.wd1.myworkdaysite.com/wday/cxs/theirc/External_Careers/jobs",
+    "https://theirc.wd1.myworkdayjobs.com/robots.txt",
+]
+
+
+@pytest.mark.parametrize("url", BAD_DESTINATIONS)
+def test_a_post_to_any_other_destination_is_refused_before_any_request(url, slept):
+    events, world = _world([])
+    with pytest.raises(FetchError, match="^method is not permitted$"):
+        _fetch(url, world, method="POST", json_body=_search_body())
+    assert events == []
+
+
+@pytest.mark.parametrize("method", ["GET", "HEAD"])
+def test_a_body_on_get_or_head_is_refused_before_any_request(method, slept):
+    events, world = _world([])
+    with pytest.raises(FetchError, match="^request body is not permitted$"):
+        _fetch(WORKDAY, world, method=method, json_body=_search_body())
+    assert events == []
+
+
+def test_a_survey_identity_cannot_post_the_search(slept):
+    events, world = _world([])
+    with pytest.raises(FetchError, match="^identity is not permitted$"):
+        _fetch(WORKDAY, world, method="POST", json_body=_search_body(), identity="survey")
+    assert events == []
+
+
+BAD_BODIES = [
+    None,
+    [],
+    "{}",
+    b'{"limit":20,"offset":0,"searchText":"","appliedFacets":{}}',
+    _Dict(_search_body()),
+    {"limit": 20, "offset": 0, "searchText": ""},
+    _search_body(sort="latest"),
+    _search_body(limit=0),
+    _search_body(limit=21),
+    _search_body(limit=-1),
+    _search_body(limit=True),
+    _search_body(limit=20.0),
+    _search_body(limit="20"),
+    _search_body(offset=-1),
+    _search_body(offset=10_001),
+    _search_body(offset=False),
+    _search_body(offset="0"),
+    _search_body(searchText="engineer"),
+    _search_body(searchText=None),
+    _search_body(appliedFacets={"locations": ["x"]}),
+    _search_body(appliedFacets=[]),
+]
+
+
+@pytest.mark.parametrize("json_body", BAD_BODIES)
+def test_a_search_body_with_anything_but_the_four_permitted_keys_is_refused(json_body, slept):
+    events, world = _world([])
+    with pytest.raises(FetchError, match="^request body is not permitted$"):
+        _fetch(WORKDAY, world, method="POST", json_body=json_body)
+    assert events == []
+
+
+BAD_HEADERS = [
+    {"Cookie": "session=abc"},
+    {"Authorization": "Bearer abc"},
+    {"Proxy-Authorization": "abc"},
+    {"X-CSRF-Token": "abc"},
+    {"X-XSRF-Token": "abc"},
+    {"X-Api-Key": "abc"},
+    {"Content-Length": "99"},
+    {"Transfer-Encoding": "chunked"},
+    {"Content-Type": "text/plain"},
+    {"Origin": "https://theirc.wd1.myworkdayjobs.com"},
+    {"Referer": "https://theirc.wd1.myworkdayjobs.com/"},
+    {"Accept": "a", "accept": "b"},
+    {"Accept": "a\r\nX-Injected: 1"},
+    {"Content-Type": "application/json", "content-type": "application/json"},
+    {"Accept": "en\u0100"},
+    {"Accept": "a\x0bb"},
+    {"Accept": "a\x7fb"},
+]
+
+
+@pytest.mark.parametrize("headers", BAD_HEADERS)
+def test_a_search_header_outside_the_allowlist_is_refused(headers, slept):
+    events, world = _world([])
+    with pytest.raises(FetchError, match="^request header is not permitted$"):
+        _fetch(WORKDAY, world, method="POST", json_body=_search_body(), headers=headers)
+    assert events == []
+
+
+@pytest.mark.parametrize("headers", [{"User-Agent": "Mozilla/5.0"}, {"from": "a@b.example"}])
+def test_a_search_cannot_set_the_identity(headers, slept):
+    events, world = _world([])
+    with pytest.raises(FetchError, match="^user agent is set by the policy$"):
+        _fetch(WORKDAY, world, method="POST", json_body=_search_body(), headers=headers)
+    assert events == []
+
+
+def test_a_search_content_type_is_sent_once_as_application_json(slept):
+    events, world = _world([_robots(), _response(200, b"{}")])
+    _fetch(WORKDAY, world, method="POST", json_body=_search_body(),
+           headers={"Content-Type": " APPLICATION/JSON "})
+    [(head, _body)] = _posts(events)
+    lines = head.decode("latin-1").split("\r\n")[1:]
+    content_types = [line for line in lines if line.lower().startswith("content-type:")]
+    assert len(content_types) == 1
+    assert content_types[0].split(":", 1)[1].strip() == "application/json"
+
+
+def test_a_refused_search_spends_no_host_group_slot_or_crawl_request(slept):
+    group = next(iter(outbound.HOST_GROUP_LIMITS))
+    before = list(outbound._group_hits.get(group, []))
+    events, world = _world([])
+    with outbound.host_group(group), crawl_budget(requests=1) as budget:
+        with pytest.raises(FetchError, match="^request header is not permitted$"):
+            _fetch(WORKDAY, world, method="POST", json_body=_search_body(),
+                   headers={"Cookie": "session=abc"})
+        assert budget.used == 0
+        assert budget.requests_left == 1
+    assert outbound._group_hits.get(group, []) == before
+    assert events == []
+
+
+def test_a_search_name_that_turns_private_at_post_time_never_posts(slept):
+    events, world = _world([_robots(), _response(200, b"{}")])
+    answers = iter([["8.8.8.8"], ["169.254.169.254"]])
+
+    async def resolver(host, port):
+        return next(answers)
+
+    world["resolver"] = resolver
+    with pytest.raises(FetchError, match="^destination address is not permitted$"):
+        _fetch(WORKDAY, world, method="POST", json_body=_search_body())
+    assert _sent(events) == ["GET theirc.wd1.myworkdayjobs.com/robots.txt"]
+
+
+@pytest.mark.parametrize("status", [300, 301, 302, 303, 304, 307, 308])
+@pytest.mark.parametrize("location", ["https://elsewhere.example/x", None])
+def test_a_search_answered_with_a_redirect_is_never_followed(status, location, slept):
+    headers = {"Location": location} if location else {}
+    events, world = _world([_robots(), _response(status, b"", headers, reason="Redirect")])
+    with pytest.raises(FetchError, match="^redirect is not permitted$"):
+        _fetch(WORKDAY, world, method="POST", json_body=_search_body(), max_redirects=20)
+    assert _sent(events) == ["GET theirc.wd1.myworkdayjobs.com/robots.txt", f"POST {WORKDAY_PATH}"]
+
+
+def test_robots_txt_that_disallows_the_search_stops_the_post(slept):
+    events, world = _world([_robots("User-agent: *\nDisallow: /wday/cxs/\n")])
+    with pytest.raises(FetchError, match="^robots.txt forbids this address$"):
+        _fetch(WORKDAY, world, method="POST", json_body=_search_body())
+    assert _sent(events) == ["GET theirc.wd1.myworkdayjobs.com/robots.txt"]
+
+
+@pytest.mark.parametrize("answer", [
+    _response(503), _response(202, b"wait"), httpcore.ConnectError("refused"),
+])
+def test_an_unreadable_robots_txt_forbids_the_search(answer, slept):
+    events, world = _world([answer])
+    with pytest.raises(FetchError, match="^robots.txt unreachable$"):
+        _fetch(WORKDAY, world, method="POST", json_body=_search_body())
+    assert not any(line.startswith("POST ") for line in _sent(events))
+
+
+def test_a_search_name_resolving_into_a_closed_range_never_posts(slept):
+    events, world = _world([_robots(), _response(200, b"{}")])
+
+    async def resolver(host, port):
+        return ["169.254.169.254"]
+
+    world["resolver"] = resolver
+    with pytest.raises(FetchError):
+        _fetch(WORKDAY, world, method="POST", json_body=_search_body())
+    assert not any(line.startswith("POST ") for line in _sent(events))
+
+
+@pytest.mark.parametrize("answer, reason", [
+    (_response(403), "HTTP 403"),
+    (_response(429), "HTTP 429"),
+    (_response(202, b"<html></html>"), "HTTP 202"),
+    (_response(200, b"<html></html>", {"cf-mitigated": "challenge"}),
+     "HTTP 200 (Cloudflare challenge)"),
+])
+def test_a_refused_search_stops_the_rest_of_the_crawl(answer, reason, slept):
+    events, world = _world([_robots(), answer])
+
+    async def crawl():
+        with crawl_budget() as budget:
+            await fetch_url(WORKDAY, method="POST", json_body=_search_body(), **world)
+            with pytest.raises(FetchError, match="^stopped after a refusal$"):
+                await fetch_url("https://theirc.wd1.myworkdayjobs.com/wday/cxs/theirc/"
+                                "External_Careers/job/x-R1", **world)
+            return budget.refused
+
+    assert asyncio.run(crawl()) == reason
+    assert _sent(events) == ["GET theirc.wd1.myworkdayjobs.com/robots.txt", f"POST {WORKDAY_PATH}"]
+
+
+def test_a_cookie_set_by_one_search_is_not_sent_with_the_next(slept):
+    events, world = _world([_robots(), _response(200, b"{}", {"Set-Cookie": "session=abc"}),
+                            _response(200, b"{}")])
+    _fetch(WORKDAY, world, method="POST", json_body=_search_body())
+    _fetch(WORKDAY, world, method="POST", json_body=_search_body())
+    posts = _posts(events)
+    assert len(posts) == 2
+    assert "cookie" not in _parse_headers(posts[1][0])
+    assert b"session=abc" not in b"".join(head + body for head, body in posts)
+
+
+def test_an_oversized_search_answer_fails_closed(slept):
+    events, world = _world([_robots(), _response(200, b"x" * 64)])
+    with pytest.raises(FetchError, match="^response exceeds size limit$"):
+        _fetch(WORKDAY, world, method="POST", json_body=_search_body(), max_bytes=16)
