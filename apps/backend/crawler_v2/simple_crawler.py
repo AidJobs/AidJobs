@@ -64,7 +64,13 @@ from crawler_v2.listing_fingerprint import (
     previous_complete_listing_hash,
 )
 from crawler_v2.parse_lock import DATEPARSER_LOCK
-from crawler_v2.readers import LISTING_READER, LISTING_STRATEGY, html_readers, read_listing
+from crawler_v2.readers import (
+    LISTING_READER,
+    LISTING_STRATEGY,
+    general_vacancy_count,
+    html_readers,
+    read_listing,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -2597,6 +2603,14 @@ class SimpleCrawler:
 
                 # Listing size before job-page caps hold rows back (canary rows_read, W-35).
                 listing_row_count = len(jobs)
+                # General HTML extracts navigation links alongside vacancies; count distinct
+                # vacancies before choose_pages holds unconfirmed rows back so found and the
+                # crawl message agree with listing_expected (W-39).
+                general_vacancies = (
+                    general_vacancy_count(jobs)
+                    if LISTING_READER.get() == "general"
+                    else None
+                )
                 listing_hash, listing_id_count = listing_ids_fingerprint(jobs)
                 listing_complete = bool(
                     listing_report and listing_report.get("complete") is True
@@ -2832,7 +2846,10 @@ class SimpleCrawler:
                         job_count=len(jobs)
                     )
                 
-                crawl_status, crawl_message = _listing_outcome(len(jobs), listing_report)
+                found_count = (
+                    general_vacancies if general_vacancies is not None else len(jobs)
+                )
+                crawl_status, crawl_message = _listing_outcome(found_count, listing_report)
                 if detail_stop:
                     # Rows whose job page was not opened may have been rejected as too thin.
                     crawl_status = 'warn'
@@ -2859,7 +2876,7 @@ class SimpleCrawler:
                         'updated': counts.get('updated', 0)
                     } if jobs else None,
                     'counts': {
-                        'found': len(jobs),
+                        'found': found_count,
                         'inserted': counts['inserted'],
                         'updated': counts['updated'],
                         'skipped': counts['skipped'],

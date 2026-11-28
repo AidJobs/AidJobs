@@ -437,6 +437,7 @@ def test_a_new_employer_on_a_known_system_is_read_with_no_code(monkeypatch):
     html = _sites_page("https://careers.example.org", [1, 2, 3], 3)
     result, run, fields = _crawl(monkeypatch, html, url)
     assert result["status"] == "ok"
+    assert result["counts"]["found"] == 3
     assert result["message"] == "Found 3 jobs; listing complete: 1 page, expected 3"
     assert result["listing"] == {"pages": 1, "expected": 3, "complete": True,
                                  "stop": "no next-page link"}
@@ -451,13 +452,15 @@ def test_the_general_readers_crawl_records_its_strategy(monkeypatch):
     html, record = _fixture("general_reader", "icrc-listing")
     result, _run, fields = _crawl(monkeypatch, html, record["url"])
     # The page's stated total (12) matches its 12 vacancy links, so the listing reads complete
-    # (ICRC, 28 November 2026). The 32 is the candidate count the crawl has always reported as
-    # found; navigation links are in it. Thin listing rows are not admitted without job pages,
-    # so the canary notes that (W-35); the found count and the other fields are unchanged.
+    # and reports 12 vacancies as found (navigation links excluded, matching listing_expected).
+    # Thin listing rows are not admitted without job pages, so the canary notes that (W-35)
+    # using the full extracted row count (32); extraction_logs still records job_count=32.
     assert result["status"] == "ok"
-    assert result["message"].startswith("Found 32 jobs; listing complete:")
+    assert result["counts"]["found"] == 12
+    assert result["message"].startswith("Found 12 jobs; listing complete: 1 page, expected 12")
     assert "canary: rows read but none admitted or observed" in result["message"]
     assert (fields["reader"], fields["strategy"]) == ("general", "selector-links")
+    assert fields["job_count"] == 32
     assert fields.get("canary") == ["rows read but none admitted or observed"]
     assert fields["listing_complete"] is True
     assert fields["listing_expected"] == 12
@@ -516,3 +519,89 @@ def test_each_crawl_starts_with_no_reader_named(monkeypatch):
     first, second = asyncio.run(two_crawls())
     assert (first["reader"], first["strategy"]) == ("general", "selector-links")
     assert second["reader"] == "unknown" and "strategy" not in second
+
+
+def test_general_html_with_only_navigation_rows_reports_zero_found(monkeypatch):
+    nav_rows = [
+        {"title": f"Category {n}", "apply_url": f"https://careers.example.org/go/Cat-{n}/{n}"}
+        for n in range(4)
+    ]
+    crawler = _crawler()
+    crawler.html_storage = None
+    crawler.quality_scorer = None
+    crawler.extraction_logger = _Logger()
+    crawler._saved_jobs_for_pages = lambda source_id, run_token: ({}, 0, None)
+    crawler._extract_jobs_sync = lambda body, url: (list(nav_rows), "selector-links")
+
+    async def fake_fetch_url(_url, **_kwargs):
+        return FetchResult(200, {}, b"<html><body><p>nav only</p></body></html>", _url)
+
+    monkeypatch.setattr(simple_crawler, "fetch_url", fake_fetch_url)
+    source = {
+        "id": "src-nav",
+        "org_name": "Example",
+        "careers_url": "https://careers.example.org/go/Global/1/",
+        "source_type": "html",
+    }
+    result = asyncio.run(crawler.crawl_source(source, _Run()))
+    fields = crawler.extraction_logger.extractions[-1]["extracted_fields"]
+    assert result["counts"]["found"] == 0
+    assert result["status"] == "warn"
+    assert result["message"].startswith("No jobs found")
+    assert "canary: rows read but none admitted or observed" in result["message"]
+    assert fields["reader"] == "general"
+    assert fields["job_count"] == 4
+
+
+def test_general_html_found_counts_all_vacancies_before_page_cap_holdback(monkeypatch):
+    from crawler_v2 import job_pages
+
+    monkeypatch.setattr(job_pages, "NEW_PAGE_CAP", 3)
+    base = "https://careers.icrc.org/job/Geneva-Role-"
+    vacancies = [
+        {"title": f"Role {n}", "apply_url": f"{base}{n}/{1000 + n}"}
+        for n in range(5)
+    ]
+    nav_rows = [
+        {"title": f"Category {n}", "apply_url": f"https://careers.icrc.org/go/Category-{n}/{n}"}
+        for n in range(4)
+    ]
+    tiles = "".join(
+        f'<li class="job-tile"><a href="/job/Geneva-Role-{n}/{1000 + n}">Role {n}</a></li>'
+        for n in range(5)
+    )
+    html = (
+        '<p id="tile-search-results-label">Showing 1 to 5 of 5 Jobs</p>'
+        f'<ul id="job-tile-list">{tiles}</ul>'
+    )
+
+    crawler = _crawler()
+    crawler.html_storage = None
+    crawler.quality_scorer = None
+    crawler.extraction_logger = _Logger()
+    crawler._saved_jobs_for_pages = lambda source_id, run_token: ({}, 0, None)
+    crawler._extract_jobs_sync = lambda body, url: (list(vacancies + nav_rows), "selector-links")
+
+    async def same(job, _base_url):
+        return job
+
+    async def fake_fetch_url(_url, **_kwargs):
+        return FetchResult(200, {}, html.encode("utf-8"), _url)
+
+    crawler.enrich_job_from_detail_page = same
+    monkeypatch.setattr(simple_crawler, "fetch_url", fake_fetch_url)
+    source = {
+        "id": "src-cap",
+        "org_name": "ICRC",
+        "careers_url": "https://careers.icrc.org/go/Global/1/",
+        "source_type": "html",
+    }
+    result = asyncio.run(crawler.crawl_source(source, _Run()))
+    assert result["counts"]["found"] == 5
+    assert result["status"] == "warn"
+    assert result["listing"]["complete"] is False
+    assert result["listing"]["expected"] == 5
+    assert result["message"].startswith(
+        "Found 5 jobs; listing partial: 1 page, expected 5, "
+        "stopped: 5 vacancies, more than the 3 job pages read in a crawl"
+    )
