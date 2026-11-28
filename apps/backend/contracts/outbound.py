@@ -4,7 +4,8 @@ Each hop resolves DNS, rejects any prohibited answer, and opens a new
 connection pool whose TCP connect uses only the pinned address. TLS SNI and
 certificate verification keep the URL hostname.
 
-Every request carries one honest identity, set here; is a GET or HEAD; is allowed by the
+Every request carries one honest identity, set here; is a GET or HEAD, or the one Workday job-search
+POST (contract §9, amendment of 6 November 2026), which follows no redirect; is allowed by the
 destination's robots.txt (RFC 9309), checked before each hop; and waits its turn for its host:
 one request at a time, a few seconds apart. Inside a crawl (`crawl_budget`), the crawl's
 request and time budget is spent here, and after a refusal or a challenge the crawl's later
@@ -18,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import contextvars
 import ipaddress
+import json
 import logging
 import math
 import os
@@ -50,8 +52,22 @@ DEFAULT_CONTACT = "aidjobz@gmail.com"
 SURVEY_USER_AGENT = "AidJobsSurvey/0.1 (+mailto:aidjobz@gmail.com)"
 _TOKENS = {"crawler": "aidjobsbot", "survey": "aidjobssurvey"}
 _EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
-_METHODS = frozenset({"GET", "HEAD"})
+_METHODS = frozenset({"GET", "HEAD", "POST"})
 _SET_BY_POLICY = frozenset({"user-agent", "from"})
+
+# Workday's public job search (contract §9, amendment of 6 November 2026): the one POST the policy
+# sends. Destination, body and headers are fixed here; anything else is refused before robots.txt,
+# DNS, or any connection. Only the tenant's own host, one path, and the four keys are accepted.
+WORKDAY_POST_MAX_LIMIT = 20
+WORKDAY_POST_MAX_OFFSET = 10_000
+_TENANT = r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
+_WORKDAY_SEARCH = re.compile(
+    rf"https://(?P<host_tenant>{_TENANT})\.wd[0-9]+\.myworkdayjobs\.com(?::443)?"
+    rf"/wday/cxs/(?P<path_tenant>{_TENANT})/(?P<site>[A-Za-z0-9][A-Za-z0-9_-]{{0,127}})/jobs"
+)
+_WORKDAY_BODY_KEYS = frozenset({"limit", "offset", "searchText", "appliedFacets"})
+# Caller headers the search may carry. The policy sets Content-Type and Content-Length itself.
+_POST_HEADERS = frozenset({"accept", "accept-language", "accept-encoding", "content-type"})
 
 HOST_SPACING_SECONDS = 5.0
 MAX_CRAWL_DELAY_SECONDS = 60.0
@@ -144,6 +160,9 @@ FETCH_MESSAGES = frozenset({
     "stopped after a refusal",
     "request budget used up",
     "time budget used up",
+    "request body is not permitted",
+    "request header is not permitted",
+    "redirect is not permitted",
 })
 # The stops of the politeness rules, as opposed to network failures.
 POLITENESS_STOPS = frozenset({
@@ -771,6 +790,59 @@ async def _resolve(resolver: Resolver, host: str, port: int, dns_timeout: float)
         raise FetchError("DNS resolution failed") from exc
 
 
+def _workday_search(url: str) -> bool:
+    """True only for Workday's job search on the tenant's own host (contract §9): the host's tenant
+    and the path's tenant are the same, the path is `/wday/cxs/{tenant}/{site}/jobs`, and nothing
+    else (no userinfo, query, fragment, locale, trailing slash, or other host) is in the URL."""
+    match = _WORKDAY_SEARCH.fullmatch(url)
+    return match is not None and match.group("host_tenant") == match.group("path_tenant")
+
+
+def _workday_body(json_body: object) -> bytes:
+    """The four keys, exactly, with the limits in this module. Serialised freshly, so the bytes
+    sent are canonical whatever the caller's dict looked like."""
+    if type(json_body) is not dict or set(json_body) != _WORKDAY_BODY_KEYS:
+        raise FetchError("request body is not permitted")
+    limit = json_body["limit"]
+    offset = json_body["offset"]
+    search = json_body["searchText"]
+    facets = json_body["appliedFacets"]
+    if (
+        type(limit) is not int or not 1 <= limit <= WORKDAY_POST_MAX_LIMIT
+        or type(offset) is not int or not 0 <= offset <= WORKDAY_POST_MAX_OFFSET
+        or type(search) is not str or search != ""
+        or type(facets) is not dict or facets
+    ):
+        raise FetchError("request body is not permitted")
+    canonical = {"limit": limit, "offset": offset, "searchText": "", "appliedFacets": {}}
+    return json.dumps(canonical, separators=(",", ":"), ensure_ascii=True).encode("ascii")
+
+
+def _workday_headers(headers: dict[str, str]) -> dict[str, str]:
+    """The caller's headers for the search: an allowlist, one of each name, no line breaks. A
+    Content-Type is accepted only as application/json and is then dropped, because the policy
+    sets its own."""
+    kept: dict[str, str] = {}
+    seen: set[str] = set()
+    for key, value in headers.items():
+        if type(key) is not str or type(value) is not str:
+            raise FetchError("request header is not permitted")
+        name = key.lower()
+        if (
+            name not in _POST_HEADERS
+            or name in seen
+            or any(not 0x20 <= ord(char) < 0x7F for char in value)
+        ):
+            raise FetchError("request header is not permitted")
+        seen.add(name)
+        if name == "content-type":
+            if value.strip().lower() != "application/json":
+                raise FetchError("request header is not permitted")
+            continue
+        kept[name] = value
+    return kept
+
+
 async def _hop(
     url: str,
     method: str,
@@ -781,6 +853,7 @@ async def _hop(
     backend_factory: BackendFactory,
     pool_factory: PoolFactory,
     dns_timeout: float,
+    body: bytes = b"",
 ) -> tuple[int, dict[str, str], bytes | None, str | None]:
     scheme, host, port, target = _split(url)
     addresses = await _resolve(resolver, host, port, dns_timeout)
@@ -799,7 +872,7 @@ async def _hop(
                 target=target,
             ),
             headers=_raw_headers(host, headers),
-            content=b"",
+            content=body,
             extensions={
                 "timeout": {
                     "connect": timeout,
@@ -814,6 +887,9 @@ async def _hop(
         except _TIMEOUTS as exc:
             raise FetchError("timeout") from exc
         mapped = _header_map(response.headers)
+        if method == "POST" and 300 <= response.status < 400:
+            # The search never follows a redirect, and its answer is not read (contract §9).
+            raise FetchError("redirect is not permitted")
         if response.status in _REDIRECTS:
             return response.status, mapped, None, mapped.get("location", "")
         try:
@@ -841,21 +917,38 @@ async def fetch_url(
     backend_factory: BackendFactory | None = None,
     pool_factory: PoolFactory | None = None,
     identity: str = "crawler",
+    json_body: object = None,
 ) -> FetchResult:
     """Fetch one URL. The initial request is not counted as a redirect.
 
     Running out of `total_timeout` raises FetchError("time limit"). A caller's own deadline
     expiring first is not converted: its cancellation reaches the caller unchanged.
     The policy sets User-Agent and From for `identity`; a caller may not set either.
+
+    A POST is refused unless it is Workday's job search with a permitted body, headers and
+    identity (contract §9). Every check runs before robots.txt, DNS, or the crawl's budget.
     """
-    method = method.upper()
-    if method not in _METHODS:
+    if not isinstance(method, str) or method.upper() not in _METHODS:
         raise FetchError("method is not permitted")
+    method = method.upper()
     if identity not in _TOKENS:
         raise FetchError("identity is not permitted")
     request_headers = dict(headers or {})
     if any(str(key).lower() in _SET_BY_POLICY for key in request_headers):
         raise FetchError("user agent is set by the policy")
+    body = b""
+    if method == "POST":
+        if not _workday_search(url):
+            raise FetchError("method is not permitted")
+        if identity != "crawler":
+            raise FetchError("identity is not permitted")
+        body = _workday_body(json_body)
+        request_headers = _workday_headers(request_headers)
+        request_headers["Content-Type"] = "application/json"
+        request_headers["Content-Length"] = str(len(body))
+        max_redirects = 0
+    elif json_body is not None:
+        raise FetchError("request body is not permitted")
     net = _Net(
         resolver or _default_resolver,
         backend_factory or _default_backend_factory,
@@ -866,7 +959,7 @@ async def fetch_url(
     await _take_group_slot(_HOST_GROUP.get(), budget)
     result = await _follow(
         url, method, request_headers, identity, timeout, total_timeout, max_bytes,
-        max_redirects, net, budget, check_robots=True,
+        max_redirects, net, budget, check_robots=True, body=body,
     )
     # A caller's own robots.txt answer serves the policy too (the survey's), so the host is not
     # asked twice; only a real answer within the policy's size limit, never a failure.
@@ -895,6 +988,7 @@ async def _follow(
     budget: CrawlBudget | None,
     *,
     check_robots: bool,
+    body: bytes = b"",
 ) -> FetchResult:
     current = url
     followed = 0
@@ -912,7 +1006,7 @@ async def _follow(
             started = time.monotonic()
             try:
                 async with asyncio.timeout(remaining) as limit:
-                    status, mapped, body, location = await _hop(
+                    status, mapped, response_body, location = await _hop(
                         current,
                         method,
                         {**request_headers, **_identity_headers(identity)},
@@ -922,6 +1016,7 @@ async def _follow(
                         net.backends,
                         net.pools,
                         net.dns_timeout,
+                        body,
                     )
             except TimeoutError as exc:
                 if limit.expired():
@@ -929,7 +1024,7 @@ async def _follow(
                 raise
             remaining -= time.monotonic() - started
         if location is None:
-            decoded = _decode_content(body or b"", mapped, max_bytes)
+            decoded = _decode_content(response_body or b"", mapped, max_bytes)
             return FetchResult(status, mapped, decoded, current, followed)
         followed += 1
         if followed > max_redirects:
