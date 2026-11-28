@@ -105,7 +105,7 @@ class TilePage:
     total_conflict: bool = False
     # The site's tile endpoint (relative), from the page's own script; None when not stated.
     endpoint: Optional[str] = None
-    # The site's own next-page link, when it is on the site and the listing; else None.
+    # The site's own next-page link, when it is on the same site; else None.
     next_url: Optional[str] = None
     # A next-page link that leaves the site: found, but not to be followed.
     next_refused: bool = False
@@ -273,9 +273,9 @@ def tile_endpoint_url(endpoint: Optional[str], listing_url: str, start_row: int)
         return None
     target = urlparse(urljoin(listing_url, endpoint))
     base = urlparse(listing_url)
-    if target.scheme not in ("http", "https") or (target.hostname or "").lower() != (
-        base.hostname or ""
-    ).lower():
+    if not base.hostname or target.scheme not in ("http", "https"):
+        return None
+    if (target.hostname or "").lower() != base.hostname.lower():
         return None
     kept = [
         (name, value)
@@ -359,7 +359,8 @@ class SuccessFactorsListingReader:
         if link is None:
             return None, False
         href = (link.get("href") or "").strip()
-        if not href or href.startswith("#"):
+        # A script or empty control is not a link to follow: the tile endpoint is the way on.
+        if not href or href.startswith("#") or href.lower().startswith(("javascript:", "mailto:")):
             return None, False
         target = urljoin(page_url, href)
         if not _same_site(target, page_url):

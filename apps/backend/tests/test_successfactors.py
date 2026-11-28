@@ -427,6 +427,53 @@ def test_an_off_site_next_link_does_not_matter_once_every_tile_is_read():
     assert report == {"pages": 1, "expected": 2, "complete": True, "stop": "all tiles read"}
 
 
+def test_a_script_pager_link_falls_back_to_the_tile_endpoint():
+    # A pager button that only runs script is not a link: the walk asks the tile endpoint.
+    first = _listing(
+        [_job_tile(1), _job_tile(2)],
+        label="Showing 1 to 2 of 4 Jobs",
+        script=_script(_ENDPOINT, 4),
+        next_link="javascript:void(0)",
+    )
+    answers = {f"{_ENDPOINT_URL}?startrow=2": (200, _fragment([_job_tile(3), _job_tile(4)]), "")}
+    jobs, report, asked = _walk(first, answers)
+    assert asked == [f"{_ENDPOINT_URL}?startrow=2"]
+    assert len(jobs) == 4
+    assert report == {"pages": 2, "expected": 4, "complete": True, "stop": "all tiles read"}
+
+
+def test_more_tiles_than_stated_is_partial_and_names_both_counts():
+    first = _listing([_job_tile(1), _job_tile(2), _job_tile(3)], label="Showing 1 to 3 of 2 Jobs")
+    jobs, report, asked = _walk(first, {})
+    assert asked == [] and len(jobs) == 3
+    assert report == {
+        "pages": 1,
+        "expected": 2,
+        "complete": False,
+        "stop": "read 3 jobs, more than the stated 2",
+    }
+
+
+def test_the_second_page_is_also_parsed_in_a_worker_thread(monkeypatch):
+    seen = []
+    real = simple_crawler._successfactors_page_sync
+
+    def recording(html, page_url):
+        seen.append(threading.current_thread() is threading.main_thread())
+        return real(html, page_url)
+
+    monkeypatch.setattr(simple_crawler, "_successfactors_page_sync", recording)
+    first = _listing([_job_tile(1)], label="Showing 1 to 1 of 2 Jobs", script=_script(_ENDPOINT, 2))
+    answers = {f"{_ENDPOINT_URL}?startrow=1": (200, _fragment([_job_tile(2)]), "")}
+    jobs, report, _asked = _walk(first, answers)
+    assert seen == [False, False]
+    assert report["complete"] is True
+
+
+def test_a_listing_address_without_a_host_gives_no_tile_request():
+    assert tile_endpoint_url(_ENDPOINT, "https:///go/Global/1/", 0) is None
+
+
 @pytest.mark.parametrize("answer, stop", [
     ((0, "", "HTTP 202 (AWS WAF challenge)"),
      f"refused: HTTP 202 (AWS WAF challenge) on {_ENDPOINT_URL}?startrow=2"),
