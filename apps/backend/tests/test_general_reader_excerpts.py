@@ -15,7 +15,9 @@ from pathlib import Path
 import pytest
 
 from contracts.admission import admit_batch
+from contracts.reader import Response
 from core.strategy_selector import StrategySelector
+from crawler_v2.readers import GeneralReader
 from crawler_v2.simple_crawler import SimpleCrawler
 
 _FIXTURES = Path(__file__).resolve().parent / "fixtures" / "general_reader"
@@ -28,14 +30,20 @@ def _load(name):
     return html, record
 
 
-def _listing(html, url):
-    return asyncio.run(SimpleCrawler("postgresql://example")._listing_jobs(html, url))
+def _listing(name, html, url):
+    crawler = SimpleCrawler("postgresql://example")
+    if name == "icrc-listing":
+        # ICRC's tile page is read by the SuccessFactors reader since growth plan step 6 (pull
+        # request 1). This file keeps pinning the rows the general reader reads from that page.
+        result = asyncio.run(GeneralReader(crawler).read(Response(200, html), {"careers_url": url}))
+        return result.jobs, result.report()
+    return asyncio.run(crawler._listing_jobs(html, url))
 
 
 @pytest.mark.parametrize("name", _PAGES)
 def test_the_listing_step_reads_exactly_the_recorded_rows(name):
     html, record = _load(name)
-    jobs, report = _listing(html, record["url"])
+    jobs, report = _listing(name, html, record["url"])
     assert jobs == record["jobs"]
     assert report == record["report"]
 
@@ -43,7 +51,7 @@ def test_the_listing_step_reads_exactly_the_recorded_rows(name):
 @pytest.mark.parametrize("name", _PAGES)
 def test_admission_gives_the_recorded_verdicts(name):
     html, record = _load(name)
-    jobs, _report = _listing(html, record["url"])
+    jobs, _report = _listing(name, html, record["url"])
     admitted, rejected = admit_batch([dict(job) for job in jobs], "html")
     assert admitted == []
     assert dict(Counter(reason for _job, reason in rejected)) == record["rejections"]

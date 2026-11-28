@@ -380,30 +380,28 @@ def test_saved_unicef_titles_match_the_stored_identities(monkeypatch):
     assert mismatched == []
 
 
-def test_saved_icrc_listing_goes_straight_to_the_general_reader(monkeypatch):
+def test_saved_icrc_listing_goes_to_the_successfactors_reader(monkeypatch):
     if not _SAVED_ICRC.is_file():
         pytest.skip("saved ICRC listing is gitignored")
     html = _SAVED_ICRC.read_bytes().decode("utf-8", errors="replace")
     assert PageUpListingReader().read_job_cards(html, _ICRC_LISTING) == []
     crawler = SimpleCrawler("postgresql://example")
     _no_network(crawler, monkeypatch)
-    before = crawler.extract_jobs_from_html(html, _ICRC_LISTING)
+    general = crawler.extract_jobs_from_html(html, _ICRC_LISTING)
     after, report = asyncio.run(crawler._listing_jobs(html, _ICRC_LISTING))
-    # The page's stated total and its vacancy links agree, so the listing reads complete
-    # (ICRC, 28 November 2026; before, every extracted row was compared and it never could).
+    # The page states 12 and shows 12 tiles: the SuccessFactors reader reads every one, and
+    # each tile's own apply link is one the general reader also found, so the saved rows keep
+    # their keys (growth plan step 6, pull request 1).
     assert report == {
         "pages": 1,
         "expected": 12,
         "complete": True,
-        "stop": "showing range complete",
+        "stop": "all tiles read",
     }
-    assert after == before
-    first = admit_batch([dict(job) for job in before], "html")
-    second = admit_batch([dict(job) for job in after], "html")
-    assert [job["apply_url"] for job in first[0]] == [job["apply_url"] for job in second[0]]
-    assert [(job["apply_url"], reason) for job, reason in first[1]] == [
-        (job["apply_url"], reason) for job, reason in second[1]
-    ]
+    assert len(after) == 12
+    assert {job["apply_url"] for job in after} <= {job["apply_url"] for job in general}
+    admitted, rejected = admit_batch([dict(job) for job in after], "html")
+    assert len(admitted) == 12 and rejected == []
 
 
 _PAGE = "https://jobs.unicef.org/en-us/listing/?page={}&page-items=20"

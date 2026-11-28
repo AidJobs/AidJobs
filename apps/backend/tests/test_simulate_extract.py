@@ -8,8 +8,6 @@ import asyncio
 import json
 from pathlib import Path
 
-import pytest
-
 from crawler_v2.simple_crawler import SimpleCrawler
 from crawler_v2.simulate import FIRST_PAGE_ONLY, simulate_html, summarise_jobs
 
@@ -73,11 +71,23 @@ def test_simulate_html_does_not_fetch_later_pages(monkeypatch):
     assert FIRST_PAGE_ONLY in (result["stop"] or "")
 
 
-@pytest.mark.parametrize("name, reader, strategy", [
-    ("icrc-listing", "general", "selector-links"),
-    ("oxfam-listing", "general", "selector-divs"),
-])
-def test_simulate_html_on_general_fixtures_matches_admission(name, reader, strategy):
+def test_simulate_html_on_the_icrc_tile_page_admits_every_tile():
+    # ICRC's tiles are read by the SuccessFactors reader (growth plan step 6); each tile carries
+    # a location, a contract type and a deadline, so admission takes the cards from the listing.
+    html, record = _load_general("icrc-listing")
+    result = asyncio.run(simulate_html(_crawler(), html, record["url"]))
+    assert result["reader"] == "successfactors"
+    assert result["strategy"] is None
+    assert result["pages"] == 1
+    assert result["count"] == 12
+    assert result["admitted"] == 12
+    assert result["rejected"] == 0
+    assert result["rejected_by_reason"] == {}
+    assert all(row["verdict"] == "admitted" for row in result["rows"])
+
+
+def test_simulate_html_on_the_general_fixture_matches_admission():
+    name, reader, strategy = "oxfam-listing", "general", "selector-divs"
     html, record = _load_general(name)
     result = asyncio.run(simulate_html(_crawler(), html, record["url"]))
     assert result["reader"] == reader
