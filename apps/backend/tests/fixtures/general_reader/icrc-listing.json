@@ -3,8 +3,8 @@
  "report": {
   "pages": 1,
   "expected": 12,
-  "complete": false,
-  "stop": "showing 1 to 12 of 12, read 32 rows, 12 on-page"
+  "complete": true,
+  "stop": "showing range complete"
  },
  "jobs": [
   {

@@ -109,8 +109,21 @@ def has_unfollowed_pager(html: str) -> bool:
     return False
 
 
-def general_html_report(html: str, jobs: Sequence[Dict]) -> Dict[str, Any]:
-    """Completeness for the general HTML reader (always a bool report on a finished extract)."""
+def general_html_report(
+    html: str,
+    jobs: Sequence[Dict],
+    *,
+    vacancies: int,
+    page_cap: int,
+) -> Dict[str, Any]:
+    """Completeness for the general HTML reader (always a bool report on a finished extract).
+
+    vacancies: the rows admission reads as job links (admitted, or too thin and so opened on
+    their job page). Navigation and category links are not vacancies and are not counted, which
+    is why `jobs` (every extracted candidate) no longer decides the stated-total comparison
+    (ICRC, 28 November 2026). page_cap: the job pages a crawl reads for new rows; a listing with
+    more vacancies than that cannot be read in full, so it stays incomplete.
+    """
     found = len(jobs)
     stated = showing_range(html)
     rows = result_row_count(html)
@@ -119,13 +132,18 @@ def general_html_report(html: str, jobs: Sequence[Dict]) -> Dict[str, Any]:
     if stated is not None:
         start, end, total = stated
         # Full range on this page: a matching stated total wins over a decorative load-more.
-        # Candidates and on-page rows (when present) must each equal the stated total — a tile
+        # Vacancies and on-page rows (when present) must each equal the stated total: a tile
         # count alone must not complete while the reader under- or over-reads (W-39 review).
         if start == 1 and end == total:
-            if found == total and (rows is None or rows == total):
+            if vacancies > page_cap:
+                return incomplete(
+                    f"{vacancies} vacancies, more than the {page_cap} job pages read in a crawl",
+                    expected=total,
+                )
+            if vacancies == total and (rows is None or rows == total):
                 return complete_catalogue(total, stop="showing range complete")
             return incomplete(
-                f"showing {start} to {end} of {total}, read {found} rows"
+                f"showing {start} to {end} of {total}, read {vacancies} vacancies"
                 + (f", {rows} on-page" if rows is not None else ""),
                 expected=total,
             )
