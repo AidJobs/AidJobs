@@ -273,6 +273,9 @@ def _resized_listing_page(html: str, careers_url: str) -> Optional[str]:
 
 _LISTING_COMPLETE_STOP = 'no More Jobs link'
 _SITES_COMPLETE_STOP = 'no next-page link'
+_SUCCESSFACTORS_COMPLETE_STOP = 'all tiles read'
+# A SuccessFactors tile page shows 25 jobs (ICRC, 28 November 2026): 30 pages reach 750 jobs.
+_SUCCESSFACTORS_PAGE_CAP = 30
 
 
 # Stops that mean "cannot claim complete", not "we under-read the catalogue". Status stays ok so
@@ -346,6 +349,12 @@ def _sites_page_sync(html: str, page_url: str):
     from crawler.plugins.sites_engine import SitesListingReader
 
     return SitesListingReader().read_page(html, page_url)
+
+
+def _successfactors_page_sync(html: str, page_url: str):
+    from crawler.plugins.successfactors import SuccessFactorsListingReader
+
+    return SuccessFactorsListingReader().read_page(html, page_url)
 
 
 class SimpleCrawler:
@@ -2469,6 +2478,99 @@ class SimpleCrawler:
             'pages': pages,
             'expected': expected,
             'complete': stop == _LISTING_COMPLETE_STOP,
+            'stop': stop,
+        }
+        return jobs, report
+
+    async def _successfactors_listing_jobs(
+        self, first_html: str, careers_url: str, fetch=None
+    ) -> Tuple[List[Dict], Optional[Dict]]:
+        """A SuccessFactors career site's job tiles (growth plan, step 6): page one's tiles, then
+        the site's own next-page link, or else its tile endpoint at the next start row, one GET at
+        a time. ([], None) when the page shows no job tiles; no request is made then.
+
+        A failed or refused page keeps the jobs already read and ends the walk as partial. A later
+        page must state the same total (or none), and must add new jobs. Only a walk that reads
+        exactly the stated total is complete; no stated total is partial. Later pages come from
+        `fetch` (url -> (status, html, stop)), or this crawler's `_fetch_listing_page` when None.
+        """
+        from crawler.plugins.successfactors import tile_endpoint_url
+
+        fetch_page = fetch or self._fetch_listing_page
+        first = await asyncio.to_thread(_successfactors_page_sync, first_html, careers_url)
+        if not first.is_tiles or not first.jobs:
+            return [], None
+        jobs = _first_row_per_link(first.jobs)
+        seen = {job.get('apply_url') for job in jobs}
+        expected = first.total
+        page, endpoint = first, first.endpoint
+        rows_read = first.tiles
+        pages = 1
+        stop = _SUCCESSFACTORS_COMPLETE_STOP
+        if first.total_conflict:
+            stop = f'stated totals disagree on {careers_url}'
+        elif first.next_refused and expected is not None and len(jobs) < expected:
+            # A link off the site matters only when more tiles are needed to reach the total.
+            stop = f'next-page link not followed on {careers_url}'
+        while (
+            stop == _SUCCESSFACTORS_COMPLETE_STOP
+            and expected is not None
+            and len(jobs) < expected
+        ):
+            if page.next_url is not None:
+                target = page.next_url
+            else:
+                target = tile_endpoint_url(endpoint, careers_url, rows_read)
+                if target is None:
+                    stop = f'no next-page address on {careers_url}'
+                    break
+            if pages >= _SUCCESSFACTORS_PAGE_CAP:
+                stop = f'page cap {_SUCCESSFACTORS_PAGE_CAP}'
+                break
+            status, page_html, page_stop = await fetch_page(target)
+            if page_stop:
+                stop = f'{_stop_text(page_stop)} on {target}'
+                break
+            if status != 200 or not page_html:
+                stop = f'HTTP {status} on {target}'
+                break
+            pages += 1
+            page = await asyncio.to_thread(_successfactors_page_sync, page_html, target)
+            if not page.is_tiles:
+                stop = f'{target} shows no job tiles'
+                break
+            if page.total_conflict:
+                stop = f'stated totals disagree on {target}'
+                break
+            if page.total is not None and page.total != expected:
+                stop = f'total changed from {expected} to {page.total} on {target}'
+                break
+            new_jobs = [job for job in _first_row_per_link(page.jobs)
+                        if job.get('apply_url') not in seen]
+            if not new_jobs:
+                stop = f'{target} added no new jobs'
+                break
+            seen.update(job.get('apply_url') for job in new_jobs)
+            jobs.extend(new_jobs)
+            rows_read += page.tiles
+            endpoint = page.endpoint or endpoint
+            if page.next_refused and len(jobs) < expected:
+                stop = f'next-page link not followed on {target}'
+        if stop == _SUCCESSFACTORS_COMPLETE_STOP:
+            if expected is None:
+                stop = 'expected total unknown'
+            elif len(jobs) < expected:
+                stop = f'read {len(jobs)} of {expected} jobs'
+            elif len(jobs) > expected:
+                stop = f'read {len(jobs)} jobs, more than the stated {expected}'
+        logger.info(
+            "SuccessFactors listing: %s pages, %s jobs, expected %s, stopped: %s",
+            pages, len(jobs), expected if expected is not None else 'unknown', stop,
+        )
+        report = {
+            'pages': pages,
+            'expected': expected,
+            'complete': stop == _SUCCESSFACTORS_COMPLETE_STOP,
             'stop': stop,
         }
         return jobs, report

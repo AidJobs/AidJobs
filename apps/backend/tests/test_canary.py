@@ -9,7 +9,7 @@ from contracts.canary import (
     previous_kept_from_logs,
     previous_reader_from_logs,
 )
-from crawler_v2.readers import GeneralReader, PageUpReader, SitesReader
+from crawler_v2.readers import GeneralReader, PageUpReader, SitesReader, SuccessFactorsReader
 
 
 class _FakeCrawler:
@@ -19,7 +19,7 @@ class _FakeCrawler:
 @pytest.fixture
 def readers():
     c = _FakeCrawler()
-    return [PageUpReader(c), SitesReader(c), GeneralReader(c)]
+    return [PageUpReader(c), SitesReader(c), SuccessFactorsReader(c), GeneralReader(c)]
 
 
 def test_pageup_marks_weaker_than_cards():
@@ -43,8 +43,36 @@ def test_sites_marks_pager_alone():
     )
 
 
+def test_successfactors_marks_its_tile_markers_alone():
+    tiles = '<ul class="container job-list" id="job-tile-list"><li class="job-tile">'
+    assert SuccessFactorsReader(_FakeCrawler()).marks(tiles)
+    assert SuccessFactorsReader(_FakeCrawler()).marks(
+        '<link href="https://rmkcdn.successfactors.com/x.css">'
+    )
+    assert SuccessFactorsReader(_FakeCrawler()).marks('<body class="coreCSB">')
+    assert not SuccessFactorsReader(_FakeCrawler()).marks(
+        '<article class="job-search-results-card-col"></article>'
+    )
+    assert not SuccessFactorsReader(_FakeCrawler()).marks("<html>no marks</html>")
+
+
 def test_general_marks_never():
     assert not GeneralReader(_FakeCrawler()).marks("<html>anything</html>")
+
+
+def test_marks_present_but_general_read_the_successfactors_page(readers):
+    page = '<body class="coreCSB"><ul id="job-tile-list"></ul></body>'
+    warnings = evaluate(
+        page=page,
+        readers=readers,
+        reader_name="general",
+        rows_read=12,
+        admitted=12,
+        observed=0,
+        previous_kept=None,
+        previous_reader=None,
+    )
+    assert any("successfactors marks present but general read the listing" in w for w in warnings)
 
 
 def test_quiet_when_healthy(readers):

@@ -22,6 +22,7 @@ from crawler_v2.readers import (
     GeneralReader,
     PageUpReader,
     SitesReader,
+    SuccessFactorsReader,
     html_readers,
     read_listing,
 )
@@ -121,10 +122,10 @@ def test_a_reader_by_default_is_chosen_by_the_page_and_opens_no_job_page():
 
 def test_the_html_readers_in_todays_order():
     assert [reader.name for reader in html_readers(_crawler())] == [
-        "pageup", "sites-engine", "general"
+        "pageup", "sites-engine", "successfactors", "general"
     ]
     assert [type(reader) for reader in html_readers(_crawler())] == [
-        PageUpReader, SitesReader, GeneralReader
+        PageUpReader, SitesReader, SuccessFactorsReader, GeneralReader
     ]
 
 
@@ -309,7 +310,7 @@ def test_a_fetch_handed_in_answers_the_walks_later_pages():
 # The reader recorded for each crawl ---------------------------------------------------------
 
 @pytest.mark.parametrize("folder, name, reader, strategy", [
-    ("general_reader", "icrc-listing", "general", "selector-links"),
+    ("general_reader", "icrc-listing", "successfactors", None),
     ("general_reader", "oxfam-listing", "general", "selector-divs"),
     ("unicef_listing", "page1-items50", "pageup", None),
 ])
@@ -346,22 +347,23 @@ def test_structured_data_found_first_is_named():
 
 
 def test_a_second_listing_in_one_crawl_starts_with_no_strategy():
-    icrc_html, icrc_record = _fixture("general_reader", "icrc-listing")
+    # A general-reader page (Oxfam GB's; ICRC's tiles are read by the SuccessFactors reader).
+    oxfam_html, oxfam_record = _fixture("general_reader", "oxfam-listing")
     crawler = _crawler()
 
     async def two_listings():
-        await crawler._listing_jobs(icrc_html, icrc_record["url"])
+        await crawler._listing_jobs(oxfam_html, oxfam_record["url"])
         first = LISTING_STRATEGY.get()
         crawler.extract_jobs_from_html = lambda html, url: []
-        await crawler._listing_jobs("<html></html>", icrc_record["url"])
+        await crawler._listing_jobs("<html></html>", oxfam_record["url"])
         return first, LISTING_STRATEGY.get()
 
-    assert asyncio.run(two_listings()) == ("selector-links", None)
+    assert asyncio.run(two_listings()) == ("selector-divs", None)
 
 
 def test_concurrent_crawls_keep_their_own_reader():
     pageup_html, pageup_record = _fixture("unicef_listing", "page1-items50")
-    icrc_html, icrc_record = _fixture("general_reader", "icrc-listing")
+    oxfam_html, oxfam_record = _fixture("general_reader", "oxfam-listing")
     crawler = _crawler()
 
     async def no_page(_url):
@@ -378,7 +380,7 @@ def test_concurrent_crawls_keep_their_own_reader():
     async def both():
         return await asyncio.gather(
             asyncio.create_task(one(pageup_html, pageup_record["url"])),
-            asyncio.create_task(one(icrc_html, icrc_record["url"])),
+            asyncio.create_task(one(oxfam_html, oxfam_record["url"])),
         )
 
     assert asyncio.run(both()) == ["pageup", "general"]
@@ -449,21 +451,18 @@ def test_a_new_employer_on_a_known_system_is_read_with_no_code(monkeypatch):
 
 
 def test_the_general_readers_crawl_records_its_strategy(monkeypatch):
-    html, record = _fixture("general_reader", "icrc-listing")
+    # Oxfam GB's teaser page states no total, so its listing is not counted as complete (W-39).
+    html, record = _fixture("general_reader", "oxfam-listing")
     result, _run, fields = _crawl(monkeypatch, html, record["url"])
-    # The page's stated total (12) matches its 12 vacancy links, so the listing reads complete
-    # and reports 12 vacancies as found (navigation links excluded, matching listing_expected).
-    # Thin listing rows are not admitted without job pages, so the canary notes that (W-35)
-    # using the full extracted row count (32); extraction_logs still records job_count=32.
     assert result["status"] == "ok"
-    assert result["counts"]["found"] == 12
-    assert result["message"].startswith("Found 12 jobs; listing complete: 1 page, expected 12")
+    assert result["counts"]["found"] == 6
+    assert result["message"].startswith("Found 6 jobs; listing not counted: no stated total")
     assert "canary: rows read but none admitted or observed" in result["message"]
-    assert (fields["reader"], fields["strategy"]) == ("general", "selector-links")
-    assert fields["job_count"] == 32
+    assert (fields["reader"], fields["strategy"]) == ("general", "selector-divs")
+    assert fields["job_count"] == 6
     assert fields.get("canary") == ["rows read but none admitted or observed"]
-    assert fields["listing_complete"] is True
-    assert fields["listing_expected"] == 12
+    assert fields["listing_complete"] is False
+    assert fields["listing_stop"] == "no stated total"
 
 
 def test_canary_warnings_do_not_change_status_or_valid(monkeypatch):
@@ -490,7 +489,7 @@ def test_a_replaced_listing_step_is_recorded_as_unknown(monkeypatch):
 
 
 def test_each_crawl_starts_with_no_reader_named(monkeypatch):
-    html, record = _fixture("general_reader", "icrc-listing")
+    html, record = _fixture("general_reader", "oxfam-listing")
 
     async def listing(html, url):
         return [{"title": "Officer", "apply_url": "https://jobs.example/job/1/x"}], None
@@ -517,7 +516,7 @@ def test_each_crawl_starts_with_no_reader_named(monkeypatch):
 
     monkeypatch.setattr(simple_crawler, "fetch_url", fake_fetch_url)
     first, second = asyncio.run(two_crawls())
-    assert (first["reader"], first["strategy"]) == ("general", "selector-links")
+    assert (first["reader"], first["strategy"]) == ("general", "selector-divs")
     assert second["reader"] == "unknown" and "strategy" not in second
 
 

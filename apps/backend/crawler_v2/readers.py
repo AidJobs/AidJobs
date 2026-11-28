@@ -1,7 +1,8 @@
 """The readers of a listing, in the order they are tried (ledger W-35, W-38).
 
 HTML: chosen by what the fetched page shows, never by its address: the PageUp career-site
-reader, then the "Sites" engine reader, then the general rule-based reader. A reader that fails
+reader, then the "Sites" engine reader, then the SuccessFactors tile reader, then the general
+rule-based reader. A reader that fails
 or reads no rows passes the page to the next; the general reader's own failure fails the crawl.
 
 RSS and API (pull request 3b): one feed reader and one generic JSON reader. Each turns the first
@@ -255,6 +256,33 @@ def general_vacancy_count(jobs) -> int:
     return len(links)
 
 
+class SuccessFactorsReader(_WalkReader):
+    """SuccessFactors Career Site Builder tile listings (growth plan, step 6). Chosen by the job
+    tiles the page shows (`li.job-tile` with a title link), never by its address."""
+
+    name = "successfactors"
+    walk = "_successfactors_listing_jobs"
+    label = "SuccessFactors career-site reader"
+
+    def marks(self, page: str) -> bool:
+        # Weaker than acceptance (tiles with title links): the system's own asset or tile markers.
+        if not page:
+            return False
+        lower = page.lower()
+        return any(
+            marker in lower
+            for marker in (
+                "rmkcdn.successfactors.com",
+                "corecsb",
+                "j2w.searchresults",
+                "job-tile-result-container",
+                'id="job-tile-list"',
+                "id='job-tile-list'",
+                "tile-search-results",
+            )
+        )
+
+
 class GeneralReader(Reader):
     """The rule-based reader: structured data, then the strategy selector's choice.
 
@@ -292,7 +320,12 @@ class GeneralReader(Reader):
 
 
 def html_readers(crawler) -> List[Reader]:
-    return [PageUpReader(crawler), SitesReader(crawler), GeneralReader(crawler)]
+    return [
+        PageUpReader(crawler),
+        SitesReader(crawler),
+        SuccessFactorsReader(crawler),
+        GeneralReader(crawler),
+    ]
 
 
 class RssFeedReader(Reader):
